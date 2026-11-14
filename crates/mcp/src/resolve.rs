@@ -1,7 +1,7 @@
 //! Argument resolution and parsing: names to slugs, English/Polish words to enums.
 
-use morwisko_core::chrono::NaiveDate;
-use morwisko_core::{
+use montybrain_core::chrono::NaiveDate;
+use montybrain_core::{
     Due, Priority, Project, Snapshot, TaskStatus, Topic, TopicStatus, fold, slugify,
 };
 
@@ -175,7 +175,7 @@ pub fn parse_date(s: &str) -> Result<NaiveDate, String> {
 mod tests {
     use std::path::PathBuf;
 
-    use morwisko_core::{ProjectState, Topic, TopicStatus};
+    use montybrain_core::{ProjectState, Topic, TopicStatus};
 
     use super::*;
 

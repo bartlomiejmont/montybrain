@@ -1,4 +1,4 @@
-//! Morwisko MCP server: exposes the Morwisko vault to coding agents over stdio.
+//! MontyBrain MCP server: exposes the MontyBrain vault to coding agents over stdio.
 //!
 //! stdout is the protocol channel; all logging goes to stderr.
 
@@ -6,7 +6,7 @@ mod render;
 mod resolve;
 mod server;
 
-use morwisko_core::Vault;
+use montybrain_core::Vault;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::EnvFilter;
 
@@ -21,19 +21,22 @@ async fn main() {
     // Read-only mode is decided first: a read-only server opens an existing
     // vault and never creates anything (no skeleton, no lock dir). With no
     // vault it still starts, and every tool answers with the reason.
-    let read_only = server::read_only_from_env(std::env::var(server::ENV_READONLY).ok().as_deref());
-    let morwisko = if read_only {
+    let read_only = server::read_only_from_vars(
+        std::env::var(server::ENV_READONLY).ok().as_deref(),
+        std::env::var(server::LEGACY_ENV_READONLY).ok().as_deref(),
+    );
+    let montybrain = if read_only {
         match server::open_read_only(Vault::default_root()) {
             Ok(vault) => {
                 tracing::info!(
-                    "morwisko-mcp serving vault {} (read-only)",
+                    "montybrain-mcp serving vault {} (read-only)",
                     vault.root().display()
                 );
-                server::Morwisko::new(vault)
+                server::MontyBrain::new(vault)
             }
             Err(problem) => {
                 tracing::error!("{problem}");
-                server::Morwisko::unavailable(problem)
+                server::MontyBrain::unavailable(problem)
             }
         }
         .with_read_only(true)
@@ -41,15 +44,15 @@ async fn main() {
         let vault = match Vault::init_default() {
             Ok(v) => v,
             Err(e) => {
-                tracing::error!("cannot open the Morwisko vault: {e}");
+                tracing::error!("cannot open the MontyBrain vault: {e}");
                 std::process::exit(1);
             }
         };
-        tracing::info!("morwisko-mcp serving vault {}", vault.root().display());
-        server::Morwisko::new(vault)
+        tracing::info!("montybrain-mcp serving vault {}", vault.root().display());
+        server::MontyBrain::new(vault)
     };
 
-    let service = match morwisko.serve(stdio()).await {
+    let service = match montybrain.serve(stdio()).await {
         Ok(s) => s,
         Err(e) => {
             tracing::error!("MCP handshake failed: {e}");

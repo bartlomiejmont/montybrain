@@ -21,7 +21,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 const PF: &str = "p/projekt.md";
 /// Seeds `0..CASES`; `REPOS_PROPERTY_CASES=<n>` runs more.
@@ -438,6 +438,6 @@ fn random_list_edits_keep_the_invariants() {
             Err(msg) => panic!("seed {seed}: {msg}"),
         }
     }
-    // Every generated list is one Morwisko supports, so no save may be refused.
+    // Every generated list is one MontyBrain supports, so no save may be refused.
     assert!(refused.is_empty(), "refused seeds: {refused:?}");
 }

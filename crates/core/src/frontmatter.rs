@@ -308,7 +308,7 @@ fn replace_value(line: &str, at: usize, enc: Option<&str>) -> String {
 /// Only the key's own line is ever changed: an existing key keeps its position, the
 /// text before the colon, the spacing after it and any trailing comment. Lines that
 /// follow the key (indented continuation lines, comments) are never touched; such
-/// continuation content under one of Morwisko's scalar keys is unsupported and
+/// continuation content under one of MontyBrain's scalar keys is unsupported and
 /// reported as a load warning. Removing a key deletes its line, unless the line has
 /// a trailing comment or continuation lines: then its value is emptied (`key:`, comment
 /// kept), so neither is lost. It is emptied too when the key occurs again further
@@ -786,7 +786,7 @@ fn edit_item(doc: &Doc, it: &RepoItem, r: &Repo) -> Vec<Src> {
 /// stays, as `[]`, so the duplicate cannot take over).
 ///
 /// Returns `Err(message)` when the existing value is not a block list (for example a
-/// flow list `[{…}]`), which Morwisko cannot edit without losing it.
+/// flow list `[{…}]`), which MontyBrain cannot edit without losing it.
 pub(crate) fn set_repos(doc: &mut Doc, repos: &[Repo], after: &[&str]) -> Result<(), String> {
     let outline = Outline::of(doc);
     let fm = Frontmatter::of(doc, &outline);
@@ -825,7 +825,7 @@ pub(crate) fn set_repos(doc: &mut Doc, repos: &[Repo], after: &[&str]) -> Result
     let colon = key_colon(&header).expect("entry line has a colon");
     let (empty_flow, comment) = repos_header(&header[colon + 1..]).map_err(|v| {
         format!(
-            "`{REPOS_KEY}` is not a block list (`{v}`); Morwisko cannot change it without losing it, edit it by hand"
+            "`{REPOS_KEY}` is not a block list (`{v}`); MontyBrain cannot change it without losing it, edit it by hand"
         )
     })?;
 

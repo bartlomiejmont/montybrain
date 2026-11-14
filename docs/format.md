@@ -1,8 +1,8 @@
-# Morwisko on-disk format
+# MontyBrain on-disk format
 
-Morwisko keeps everything in plain Markdown files inside one directory, the **vault**.
+MontyBrain keeps everything in plain Markdown files inside one directory, the **vault**.
 People and coding agents may edit these files by hand at any time. The
-`morwisko-core` crate reads them tolerantly and writes them back **losslessly**:
+`montybrain-core` crate reads them tolerantly and writes them back **losslessly**:
 parsing and re-serialising an untouched file gives back the same bytes, and a change
 only rewrites the lines it is about (plus `zaktualizowano`, see below).
 
@@ -13,7 +13,9 @@ The words in the files are Polish. Identifiers in code and JSON are English (see
 
 ## 1. Vault layout
 
-The vault root is `$MORWISKO_DIR` if that is set and not empty, otherwise `~/Morwisko`.
+The vault root is `$MONTYBRAIN_DIR` if that is set and not empty, else `$MORWISKO_DIR`
+(the name before the rename), else `~/MontyBrain` if it exists, else `~/Morwisko` if it
+exists, else `~/MontyBrain` (created). Nothing is ever moved or copied.
 
 ```
 <vault>/
@@ -22,9 +24,14 @@ The vault root is `$MORWISKO_DIR` if that is set and not empty, otherwise `~/Mor
     projekt.md                project metadata + project-level tasks
     tematy/
       <topic-slug>.md         one file per topic
-  .morwisko/
+  .montybrain/
     lock                      advisory lock file (see §9)
 ```
+
+A vault created before the rename has `.morwisko/` instead of `.montybrain/` and keeps
+using it: MontyBrain uses `.montybrain/` when it exists, else an existing `.morwisko/`,
+and creates `.montybrain/` only in a vault that has neither. Both are skipped by the
+loader and the watcher.
 
 How the loader finds things:
 
@@ -37,7 +44,7 @@ How the loader finds things:
   stem is the topic's **slug**, its stable id inside the project. Subdirectories of
   `tematy/` are ignored.
 * `skrzynka.md` may be missing; it is created when the first inbox task is added.
-* Hidden entries (`.git`, `.obsidian`, `.morwisko`, …) are never read.
+* Hidden entries (`.git`, `.obsidian`, `.montybrain`, …) are never read.
 * Only an unreadable vault root makes loading fail. Every other discovery problem is a
   **warning** and the rest of the vault still loads: a project directory that cannot
   be read, a `tematy` that is a file instead of a directory or cannot be read, a broken
@@ -52,20 +59,20 @@ by hand.
 * Encoding: UTF-8. A UTF-8 BOM is kept if there is one. A file that is not valid
   UTF-8 is skipped with a warning, and mutations on it fail with
   `Error::Unparseable`.
-* Line endings: LF and CRLF are both kept exactly. Lines that Morwisko adds use the
-  file's **first** line ending (LF if the file has none yet). Morwisko never creates
+* Line endings: LF and CRLF are both kept exactly. Lines that MontyBrain adds use the
+  file's **first** line ending (LF if the file has none yet). MontyBrain never creates
   mixed line endings in a file that did not have them: lines moved in from another
   file (§7.3) take the destination's line ending, and only a destination without any
   line ending yet (empty, or one unterminated line) takes the moved block's.
 * Whether the file ends with a newline is kept, even when lines are added at the
   end.
-* Lines Morwisko does not understand are never removed or reordered. When a file
+* Lines MontyBrain does not understand are never removed or reordered. When a file
   has a problem, the loader reports a **warning** (file, 1-based line, message) and
   keeps going. One bad line never stops the rest of the vault from loading.
 
 ### 2.1 What a written value may contain
 
-Every value Morwisko writes stays inside its own field: it can never create or change
+Every value MontyBrain writes stays inside its own field: it can never create or change
 structure elsewhere (a task, a heading or section, a journal entry, a frontmatter key
 or delimiter, or a code fence that hides what follows). Input that would do so is
 **rejected** with `InvalidInput` naming the field (`title`, `links[0]`, `summary`, …)
@@ -80,11 +87,11 @@ and the reason; it is not silently rewritten.
 | task notes, journal text | indented lines below the item | Multi-line. `\r\n` counts as a line break; a lone `\r`, other control characters (tab is fine) and U+2028/U+2029 are rejected. Every line is written indented, so it can contain anything else (`## …`, `- [ ] …`, fences): an indented line is never structure, and a fence inside an item stays inside it (§6). |
 | topic summary, project description | column-0 lines between the title and the first `##` | Same character rules as notes. Trimmed, and trailing whitespace is removed from each line. In addition, a line outside a code fence must not be a level-1 or level-2 heading (`#`, `# …`, `##`, `## …`; use `###` or deeper), the first line must not be `---`, and every code fence opened in the text must be closed in it. Checklists, `###` headings and balanced fences are fine. |
 
-Morwisko also checks every write before it happens: it parses the would-be file again
+MontyBrain also checks every write before it happens: it parses the would-be file again
 and compares its structure with the file on disk. Only the intended change may differ
 (for example, creating a task: exactly one more task with the new id, the same other
-tasks, sections, journal entries and non-Morwisko frontmatter keys; a missing
-`## Zadania`/`## Dziennik` may be added; Morwisko's own keys may change). Otherwise the
+tasks, sections, journal entries and non-MontyBrain frontmatter keys; a missing
+`## Zadania`/`## Dziennik` may be added; MontyBrain's own keys may change). Otherwise the
 mutation fails with `InvalidInput` ("refusing to write …; nothing was changed") and
 nothing is written.
 
@@ -94,7 +101,7 @@ An optional YAML block at the very top of the file, between a line `---` and the
 line `---` (or `...`). If the opening `---` is never closed, the block is ignored as
 frontmatter (the text stays as it is) and a warning is reported.
 
-Morwisko supports this YAML subset:
+MontyBrain supports this YAML subset:
 
 * `key: value` lines starting in column 0. Values can be:
   * plain: `stan: aktywny`. A `#` after a space or a tab starts a comment
@@ -105,8 +112,8 @@ Morwisko supports this YAML subset:
   * empty, `~` or `null`: no value.
 * The `repozytoria` block list (see §4).
 * Comments (`# …`), blank lines, unknown keys and nested structures under unknown
-  keys are kept byte for byte. Morwisko does not interpret them.
-* **A repeated key.** If one of Morwisko's keys occurs more than once (for example
+  keys are kept byte for byte. MontyBrain does not interpret them.
+* **A repeated key.** If one of MontyBrain's keys occurs more than once (for example
   two `stan:` lines, or two `repozytoria:` blocks), the **first** occurrence is the
   one that is read and written. Every later occurrence gives a warning ("duplicate
   frontmatter key") on its line and is kept byte for byte, but never read or changed.
@@ -114,13 +121,13 @@ Morwisko supports this YAML subset:
   first line (`kolor:`) instead of deleting it, and clearing a duplicated
   `repozytoria` leaves `repozytoria: []` (§4).
 
-When Morwisko writes a key:
+When MontyBrain writes a key:
 
 * An existing key keeps its position, the text before its colon, the spacing after
   the colon and any trailing `# comment`. Only the value changes, and only the key's
   own line is rewritten: `stan: aktywny   # x` becomes `stan: archiwum   # x`, and
   `stan:   # x` becomes `stan: archiwum   # x`.
-* Lines below one of Morwisko's scalar keys (indented continuation lines, or
+* Lines below one of MontyBrain's scalar keys (indented continuation lines, or
   comments followed by them) are not supported. They are kept byte for byte, never
   removed by an update, and reported as a warning on the key's line.
 * A new key goes after the keys that come before it in the canonical order
@@ -139,7 +146,7 @@ When Morwisko writes a key:
   (such as `#`, `-`, `[`, `"`), contains `: ` or ` #`, has leading or trailing
   spaces, or looks like a number, boolean or null.
 
-Block scalars (`|`, `>`) are not supported for Morwisko's own keys. If one is used,
+Block scalars (`|`, `>`) are not supported for MontyBrain's own keys. If one is used,
 the value is reported as a warning and ignored.
 
 ## 4. `projekt.md`
@@ -204,7 +211,7 @@ Free-text description (optional).
 
   Passes 2–4 read a changed repository as a **rename** or edit of an existing item.
   A whole-list update cannot tell "rename `a` to `b`" from "remove `a`, add `b`", so
-  Morwisko always picks the reading that keeps the item's other lines. The result:
+  MontyBrain always picks the reading that keeps the item's other lines. The result:
   **an item is removed only when the new list is shorter than the list of named
   items**, and then exactly as many items as it is shorter (those that no
   repository matched). A repository is **new** only when every named item is
@@ -327,7 +334,7 @@ Free text between the H1 and the first `##` = the topic's "current state" summar
     heading), a marker indented by 1–3 spaces opens a real fence, as in CommonMark.
   * A line indented by 4 or more spaces (or a tab) is never a fence marker.
 * Structural lines (headings, task lines, journal entries) always start in column 0.
-* Section names are compared after trimming, ignoring ASCII case. Morwisko knows
+* Section names are compared after trimming, ignoring ASCII case. MontyBrain knows
   `Zadania` (tasks) and `Dziennik` (journal). All other sections are kept and
   ignored. Checkbox lines in other sections are **not** tasks.
 * If there are several `## Zadania` sections, they are all read. New tasks go after
@@ -377,14 +384,14 @@ So `Fix @mention parsing` stays a title, and only trailing tokens count.
 | `✓YYYY-MM-DD`        | completion date (U+2713). Added automatically when a task becomes done and removed when it is reopened. Loading never adds or removes it. |
 | `^xxxxxx`            | stable task id: exactly 6 characters from `[0-9a-z]` |
 
-* When tokens are read, their order does not matter. When Morwisko **writes** a line,
+* When tokens are read, their order does not matter. When MontyBrain **writes** a line,
   the canonical order is `title !prio @due ✓done ^id`, with single spaces.
 * Words that look like tokens but are invalid, such as `@2026-02-30`, `^ABC123`,
   `^abc12` or `✓wczoraj`, stop the token run and stay in the title. A warning is
   reported. Only words that really look like a token are reported (`@` followed by
   `DDDD-`, `^` followed by 4–8 alphanumerics, any `✓…`), so `@2x` or `^ab` in a title
   are not reported.
-* **Ambiguous titles**: Morwisko refuses (`InvalidInput`) to write a title that would
+* **Ambiguous titles**: MontyBrain refuses (`InvalidInput`) to write a title that would
   read back as something else. For example, the title `Meet @2026-11-20` on a task
   without a due date would be read back as title `Meet` with a due date. The same
   title is fine on a task that already has a due date, because the second `@…` stops
@@ -472,10 +479,10 @@ no task yet:
   may contain `·`. With a single `·`, the author is empty and everything after it
   is the text.
 * Author: free text, for example `ja`, `agent` or an agent or thread name. When
-  Morwisko writes an author, it removes `·` and newlines, collapses whitespace, and
+  MontyBrain writes an author, it removes `·` and newlines, collapses whitespace, and
   uses `ja` if the result is empty.
 * Indented lines after an entry continue its text (joined with `\n`, each line
-  trimmed). When Morwisko writes a multi-line text, every line after the first is
+  trimmed). When MontyBrain writes a multi-line text, every line after the first is
   written indented by two spaces, so the text can never start a new entry, section or
   task (§2.1).
 * Entries are newest first. A new entry goes before the first existing entry. If
@@ -502,16 +509,18 @@ Example: `Płatności: Stripe → Przelewy24` → `platnosci-stripe-przelewy24`.
 ## 11. Concurrency protocol (for every writer)
 
 The desktop app and the MCP server are separate processes that write the same
-files. Every Morwisko mutation:
+files. Every MontyBrain mutation:
 
-1. takes an **exclusive advisory lock** on `<vault>/.morwisko/lock`
-   (`flock`-style, through Rust's `File::lock`), waiting if another writer holds it;
+1. takes an **exclusive advisory lock** on `<vault>/.montybrain/lock` (or
+   `<vault>/.morwisko/lock` in a vault from before the rename, §1; when a vault has both
+   directories, both locks, the legacy one first) (`flock`-style, through Rust's
+   `File::lock`), waiting if another writer holds it;
 2. **re-reads** the affected files from disk;
 3. applies the change in memory and **verifies** it: every affected file is parsed
    again and its structure must have changed exactly as intended (§2.1). All files
    of the mutation are verified before the first one is written;
 4. writes each file **atomically**: it writes a temp file
-   `.<name>.<pid>.<n>.morwisko-tmp` in the same directory, fsyncs it, copies the old
+   `.<name>.<pid>.<n>.montybrain-tmp` in the same directory, fsyncs it, copies the old
    file's permissions to it, and renames it over the original;
 5. releases the lock.
 
@@ -523,10 +532,10 @@ Readers do not take the lock. The atomic rename means a reader always sees eithe
 the old or the new file, never a half-written one.
 
 People editing by hand do not take the lock. Editors usually save in a fraction of
-a second, so the remaining risk is small: Morwisko re-reads inside the lock, and a
-hand save that lands between Morwisko's read and its rename can be overwritten. A
+a second, so the remaining risk is small: MontyBrain re-reads inside the lock, and a
+hand save that lands between MontyBrain's read and its rename can be overwritten. A
 script or agent that edits files directly should take the same lock (for example
-`flock <vault>/.morwisko/lock <command>`) or go through the MCP server.
+`flock <vault>/.montybrain/lock <command>`) or go through the MCP server.
 
 ## 11a. References between topics and tasks (a convention on free text)
 

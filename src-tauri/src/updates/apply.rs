@@ -15,8 +15,8 @@
 //! puts the old value back ([`Vault::restoring`]) and the file reads as
 //! untouched; writes are taken back in reverse order.
 
-use morwisko_core::chrono::NaiveDateTime;
-use morwisko_core::{
+use montybrain_core::chrono::NaiveDateTime;
+use montybrain_core::{
     JournalEntry, JournalRevert, NewJournalEntry, NewTask, NewTopic, Priority, Stamp, Task,
     TaskLocation, TaskPatch, TaskStatus, TopicStatus, Vault,
 };
@@ -88,7 +88,7 @@ pub enum UndoItem {
         summary: Option<(String, String)>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         stamp: Option<Stamp>,
-        /// Branch links stored with it (`.morwisko/links.json`).
+        /// Branch links stored with it (`.montybrain/links.json`).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         links: Vec<proposal::BranchRef>,
     },
@@ -146,7 +146,7 @@ impl UndoItem {
 pub struct UndoRecord {
     pub token: String,
     pub run_id: String,
-    #[serde(with = "morwisko_core::minute")]
+    #[serde(with = "montybrain_core::minute")]
     pub at: NaiveDateTime,
     pub items: Vec<UndoItem>,
 }
@@ -380,7 +380,7 @@ pub fn apply(
         let (status, message) = match vault.load() {
             Err(e) => (
                 ChangeStatus::Failed,
-                format!("Nie udało się wczytać Morwiska: {e}"),
+                format!("Nie udało się wczytać MontyBrain: {e}"),
             ),
             Ok(snap) => match proposal::check_current(&stored.change, &snap, project) {
                 Err(stale) => (ChangeStatus::Stale, stale),
@@ -457,7 +457,7 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
             format!("{what} zmieniło się w międzyczasie; zostawione bez zmian."),
         )
     };
-    let failed = |e: morwisko_core::Error| (UndoStatus::Failed, e.to_string());
+    let failed = |e: montybrain_core::Error| (UndoStatus::Failed, e.to_string());
     match item {
         UndoItem::TaskStatus { task, from, to, .. } => {
             let patch = TaskPatch {
@@ -467,7 +467,7 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
             match vault.update_task_if(task, |t| t.status == *to, patch) {
                 Ok(Some(_)) => (UndoStatus::Undone, "Przywrócono poprzedni status.".into()),
                 Ok(None) => changed("Zadanie"),
-                Err(morwisko_core::Error::TaskNotFound(_)) => changed("Zadanie"),
+                Err(montybrain_core::Error::TaskNotFound(_)) => changed("Zadanie"),
                 Err(e) => failed(e),
             }
         }
@@ -476,7 +476,7 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
                 .delete_topic_if(project, topic, |text| proposal::content_hash(text) == *hash)
             {
                 Ok(Some(_)) => (UndoStatus::Undone, "Usunięto dodany temat.".into()),
-                Ok(None) | Err(morwisko_core::Error::TopicNotFound { .. }) => changed("Temat"),
+                Ok(None) | Err(montybrain_core::Error::TopicNotFound { .. }) => changed("Temat"),
                 Err(e) => failed(e),
             }
         }
@@ -487,7 +487,7 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
             ..
         } => match vault.delete_task_if(task, |t| untouched(t, title, location)) {
             Ok(Some(_)) => (UndoStatus::Undone, "Usunięto dodane zadanie.".into()),
-            Ok(None) | Err(morwisko_core::Error::TaskNotFound(_)) => changed("Zadanie"),
+            Ok(None) | Err(montybrain_core::Error::TaskNotFound(_)) => changed("Zadanie"),
             Err(e) => failed(e),
         },
         UndoItem::Rejected { .. } => (UndoStatus::Changed, String::new()),
@@ -533,7 +533,7 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
                         )
                     }
                 }
-                Err(morwisko_core::Error::TopicNotFound { .. }) => changed("Temat"),
+                Err(montybrain_core::Error::TopicNotFound { .. }) => changed("Temat"),
                 Err(e) => failed(e),
             }
         }
@@ -641,7 +641,7 @@ pub fn undo(
 mod tests {
     use super::*;
     use crate::updates::store::TriggerKind;
-    use morwisko_core::{NewProject, NewTopic, TaskLocation, TaskStatus, TopicStatus};
+    use montybrain_core::{NewProject, NewTopic, TaskLocation, TaskStatus, TopicStatus};
 
     struct Fixture {
         _dir: tempfile::TempDir,
@@ -714,7 +714,7 @@ mod tests {
     }
 
     fn at(s: &str) -> NaiveDateTime {
-        morwisko_core::minute::parse(s).unwrap()
+        montybrain_core::minute::parse(s).unwrap()
     }
 
     fn proposal_for(f: &Fixture, provider: ProviderId) -> StoredProposal {
@@ -812,7 +812,7 @@ mod tests {
             .update_topic(
                 "beeking",
                 "platnosci",
-                morwisko_core::TopicPatch {
+                montybrain_core::TopicPatch {
                     summary: Some("Nowy stan.".into()),
                     ..Default::default()
                 },
@@ -955,7 +955,7 @@ mod tests {
             .update_topic(
                 "beeking",
                 "platnosci",
-                morwisko_core::TopicPatch {
+                montybrain_core::TopicPatch {
                     status: Some(TopicStatus::Blocked),
                     ..Default::default()
                 },
@@ -1389,7 +1389,7 @@ mod tests {
             .update_topic(
                 "beeking",
                 "platnosci",
-                morwisko_core::TopicPatch {
+                montybrain_core::TopicPatch {
                     title: Some("Płatności i zwroty".into()),
                     ..Default::default()
                 },
@@ -1416,8 +1416,8 @@ mod tests {
         f.vault
             .update_project(
                 "beeking",
-                morwisko_core::ProjectPatch {
-                    repos: Some(vec![morwisko_core::Repo {
+                montybrain_core::ProjectPatch {
+                    repos: Some(vec![montybrain_core::Repo {
                         name: "app".into(),
                         path: "/r/app".into(),
                     }]),

@@ -1,6 +1,6 @@
-//! Morwisko desktop app: a Tauri shell around `morwisko-core`.
+//! MontyBrain desktop app: a Tauri shell around `montybrain-core`.
 //!
-//! * On startup: `Vault::init_default()` (honours `$MORWISKO_DIR`), `normalize()`,
+//! * On startup: `Vault::init_default()` (honours `$MONTYBRAIN_DIR`), `normalize()`,
 //!   `load()`; the snapshot lives in managed [`state::VaultState`].
 //! * The core watcher reloads the snapshot on every external change and emits
 //!   [`VAULT_CHANGED`] so the window refreshes without user action.
@@ -8,7 +8,7 @@
 //! * Native layer ([`native`]): menu-bar item with the "today" count ([`tray`]),
 //!   global quick-capture shortcut + window, due reminders ([`reminders`]),
 //!   autostart and app settings ([`settings`], stored outside the vault).
-//! * Actions ([`runs`]): agent runs of the Morwisko skills via Claude Code or
+//! * Actions ([`runs`]): agent runs of the MontyBrain skills via Claude Code or
 //!   Codex CLI, in the background or in Terminal.
 //! * Project updates ([`updates`]): proposals of the `aktualizacja` and `zlecenie` recipes,
 //!   applied by the app after review, and the opt-in automatic schedule.
@@ -16,12 +16,13 @@
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
-use morwisko_core::{DEFAULT_DEBOUNCE, Vault, VaultWatcher};
+use montybrain_core::{DEFAULT_DEBOUNCE, Vault, VaultWatcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime};
 
 pub mod commands;
 pub mod drift;
+pub mod legacy_autostart;
 pub mod native;
 pub mod notifier;
 pub mod paths;
@@ -62,7 +63,7 @@ struct WatcherHandle(#[allow(dead_code)] Mutex<VaultWatcher>);
 
 /// Diagnostics go to stderr (visible when run from a terminal).
 pub(crate) fn log(msg: &str) {
-    eprintln!("[morwisko] {msg}");
+    eprintln!("[montybrain] {msg}");
 }
 
 /// Locks a mutex, recovering from poisoning (the data is still usable).
@@ -196,7 +197,7 @@ pub fn run() {
             commands::set_update_sources,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Morwisko");
+        .expect("error while building MontyBrain");
 
     app.run(|app, event| {
         // Dock icon clicked (or app re-opened) while the window is hidden.

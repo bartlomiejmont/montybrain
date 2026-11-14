@@ -62,10 +62,10 @@ export function buildRequestProposal(snap: Snapshot, project: string, runId: str
   const topics = snap.topics.filter((t) => t.project === project && t.status !== "done");
   const topic = topics.find((t) => words.some((w) => fold(t.title).includes(w.slice(0, 5)))) ?? topics[0];
   const noAccess = /slack|mail|poczt/i.test(request) ? "Nie mam w tym trybie dostępu do poczty ani Slacka. " : "";
-  const base = history ? "Opieram się na Morwisku, repozytoriach i historii rozmów (sesje z 10.11 i 12.11)." : "Opieram się na Morwisku i repozytoriach; historia rozmów jest wyłączona.";
+  const base = history ? "Opieram się na MontyBrain, repozytoriach i historii rozmów (sesje z 10.11 i 12.11)." : "Opieram się na MontyBrain i repozytoriach; historia rozmów jest wyłączona.";
   const proposal = (report: string, changes: StoredChange[]): StoredProposal => ({ run_id: runId, provider, trigger: "manual", created_at: at, report, changes, dropped: [], dropped_more: 0, problem: null, request, history_note: history ? MOCK_REQUEST_HISTORY_NOTE : HISTORY_OFF_NOTE });
   if (/\?\s*$/.test(request)) {
-    return proposal(`${noAccess}${base}\n\nOstatnie commity w tym obszarze są z 12 lis (\`feature/blik-e2e\`), bez merge. Nic nie trzeba zmieniać w Morwisku.`, []);
+    return proposal(`${noAccess}${base}\n\nOstatnie commity w tym obszarze są z 12 lis (\`feature/blik-e2e\`), bez merge. Nic nie trzeba zmieniać w MontyBrain.`, []);
   }
   const report = `${noAccess}${base}\n\n- W historii rozmów: ustalono testy end-to-end na sandboksie i obsługę odrzuconych płatności (sesja Claude Code z 10.11).\n- W repozytorium: gałąź \`feature/blik-e2e\` z commitami z 12 i 13 lis, bez merge.\n\nRozpisuję temat na trzy kroki; maili i wątków ze Slacka nie sprawdziłem.`;
   if (!topic) {
@@ -201,13 +201,13 @@ Proponuję zamknąć webhook, dopisać stan płatności do dziennika i dodać za
 const NO_CHANGES_REPORT = `Tematy i zadania projektu „WhenUBuy” zgadzają się ze stanem repozytoriów; nic nie trzeba zmieniać.
 
 - **Płatności: Stripe → Przelewy24** — status „zablokowany” nadal pasuje: od ostatniego wpisu brak nowych commitów na \`feature/p24\`.
-- **A/B testy cen** — gałąź \`feature/ab-ceny\` ma commity z wczoraj; temat jest „w toku”, tak jak w Morwisku.
+- **A/B testy cen** — gałąź \`feature/ab-ceny\` ma commity z wczoraj; temat jest „w toku”, tak jak w MontyBrain.
 
 Nie znalazłem nowych strumieni pracy ani zadań do zamknięcia.`;
 
 const author = (p: ProviderId) => (p === "claude" ? "claude-code" : "codex");
 
-const TOPICS_REPORT = `W repozytoriach widać trzy strumienie pracy z ostatnich dwóch tygodni; w Morwisku nie ma jeszcze żadnego tematu.
+const TOPICS_REPORT = `W repozytoriach widać trzy strumienie pracy z ostatnich dwóch tygodni; w MontyBrain nie ma jeszcze żadnego tematu.
 
 - **Aplikacja kasowa (POS)** — gałąź \`feature/pos-offline\` w drzewie roboczym, 14 commitów od 3 lis, bez merge.
 - **Integracja z hurtownią** — commity w \`api\` i \`app\` od 6 do 12 lis; wygląda na zakończoną (wniosek).
@@ -339,7 +339,7 @@ export function buildProposal(snap: Snapshot, project: string, runId: string, pr
           { title: "Naliczanie punktów po zakupie", status: "doing" },
           { title: "Ekran nagród", status: "todo" },
         ],
-        reason: "Strumień pracy bez tematu w Morwisku: aktywna gałąź i świeże commity.",
+        reason: "Strumień pracy bez tematu w MontyBrain: aktywna gałąź i świeże commity.",
       },
       outcome: null,
     });
@@ -361,7 +361,7 @@ export function buildProposal(snap: Snapshot, project: string, runId: string, pr
           { title: "Kanały powiadomień na Androidzie", status: "doing" },
           { title: "Odpowiedzieć na uwagi z App Store Review", status: "todo" },
         ],
-        reason: "Aktywna gałąź bez tematu w Morwisku.",
+        reason: "Aktywna gałąź bez tematu w MontyBrain.",
         branches: [{ repo: snap.projects.find((p) => p.slug === project)?.repos[1]?.name ?? repo ?? "whenubuy-mobile", branch: "push-notifications-android" }],
       },
       outcome: null,
@@ -551,7 +551,7 @@ export function createMockUpdates(
       runs.seedRunning?.({ recipe: "aktualizacja", provider: "codex", mode: "background", params: { project: P } }, 42, [
         { kind: "note", text: "Zbieram stan repozytoriów (2; tylko odczyt)…" },
         { kind: "note", text: "Zebrano stan 2 z 2 repozytoriów (5 KB)." },
-        { kind: "note", text: "Uruchamiam Codex CLI w tle (Morwisko tylko do odczytu)" },
+        { kind: "note", text: "Uruchamiam Codex CLI w tle (MontyBrain tylko do odczytu)" },
         { kind: "tool", text: 'list_tasks {"project":"whenubuy"}' },
         { kind: "text", text: "Porównuję otwarte zadania z commitami z ostatnich 14 dni." },
       ]);

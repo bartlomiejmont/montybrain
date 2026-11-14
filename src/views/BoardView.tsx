@@ -47,8 +47,8 @@ interface Drag {
   over: string | null;
 }
 
-const MODE_PREF = "morwisko.board.mode";
-const SCOPE_PREF = "morwisko.board.scope";
+const MODE_PREF = "montybrain.board.mode";
+const SCOPE_PREF = "montybrain.board.scope";
 
 export function BoardView() {
   const view = useView();
@@ -58,8 +58,8 @@ export function BoardView() {
   const [mode, setModeState] = useState<BoardMode>(() => (readPref(MODE_PREF) === "topics" ? "topics" : "tasks"));
   const [scopePref, setScopePref] = useState<string>(() => readPref(SCOPE_PREF) ?? ALL_PROJECTS);
   const scope = effectiveScope(snap, scopePref);
-  const [taskDoneOpen, setTaskDoneOpen] = useStoredFlag("morwisko.board.done.tasks", false);
-  const [topicDoneOpen, setTopicDoneOpen] = useStoredFlag("morwisko.board.done.topics", false);
+  const [taskDoneOpen, setTaskDoneOpen] = useStoredFlag("montybrain.board.done.tasks", false);
+  const [topicDoneOpen, setTopicDoneOpen] = useStoredFlag("montybrain.board.done.topics", false);
   const doneOpen = mode === "tasks" ? taskDoneOpen : topicDoneOpen;
   const setDoneOpen = mode === "tasks" ? setTaskDoneOpen : setTopicDoneOpen;
 

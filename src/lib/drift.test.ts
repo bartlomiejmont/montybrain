@@ -132,7 +132,7 @@ Czekamy na KRS.
 - backend: feature/p24 (ostatni commit 2026-11-13, drzewo robocze /r/backend-p24, widziana 2026-11-14 11:00)
 
 ---
-Zapisuj postęp w Morwisku dla tego tematu (projekt \`whenubuy\`, temat \`platnosci\`): wpisy przez \`log_update\`, statusy zadań przez \`update_task\`, nowe zadania przez \`create_task\` (serwer MCP \`morwisko\`).
+Zapisuj postęp w MontyBrain dla tego tematu (projekt \`whenubuy\`, temat \`platnosci\`): wpisy przez \`log_update\`, statusy zadań przez \`update_task\`, nowe zadania przez \`create_task\` (serwer MCP \`montybrain\`).
 `);
   });
 });

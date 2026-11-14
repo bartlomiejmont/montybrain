@@ -5,12 +5,12 @@
 //!
 //! Isolation of a background run:
 //! * Claude Code gets no built-in tools at all (no Bash, no file tools): only
-//!   the Morwisko MCP tools are allowed, and `--strict-mcp-config` with an
-//!   app-written config attaches `morwisko-mcp` as the only MCP server.
+//!   the MontyBrain MCP tools are allowed, and `--strict-mcp-config` with an
+//!   app-written config attaches `montybrain-mcp` as the only MCP server.
 //! * Codex ignores the user's `config.toml` (`--ignore-user-config`, so none
-//!   of the user's other MCP servers are attached) and gets `morwisko-mcp`
+//!   of the user's other MCP servers are attached) and gets `montybrain-mcp`
 //!   through `-c` overrides.
-//! * Read-only recipes run `morwisko-mcp` with `MORWISKO_READONLY=1`.
+//! * Read-only recipes run `montybrain-mcp` with `MONTYBRAIN_READONLY=1`.
 //! * The repository state the `postep` recipe needs is collected by the app
 //!   itself (see [`super::git`]) and passed in the prompt.
 
@@ -19,7 +19,7 @@ use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
-use morwisko_core::Project;
+use montybrain_core::Project;
 
 use super::ProviderId;
 use super::agent::AgentChoice;
@@ -43,25 +43,28 @@ pub const SCRUBBED_ENV: &[&str] = &[
     "CODEX_SANDBOX_NETWORK_DISABLED",
 ];
 
-/// Read-only switch of `morwisko-mcp`.
-pub const ENV_READONLY: &str = "MORWISKO_READONLY";
-/// Vault root of `morwisko-mcp`.
-pub const ENV_VAULT: &str = "MORWISKO_DIR";
+/// Read-only switch of `montybrain-mcp`.
+pub const ENV_READONLY: &str = "MONTYBRAIN_READONLY";
+/// Its pre-rename name (still honoured by `montybrain-mcp`): never inherited
+/// by a child either, so a stray value cannot flip a writing run.
+pub const LEGACY_ENV_READONLY: &str = "MORWISKO_READONLY";
+/// Vault root of `montybrain-mcp`.
+pub const ENV_VAULT: &str = "MONTYBRAIN_DIR";
 /// The MCP server binary.
-pub const MCP_BINARY: &str = "morwisko-mcp";
+pub const MCP_BINARY: &str = "montybrain-mcp";
 
-pub const MORWISKO_READ_TOOLS: &[&str] = &[
-    "mcp__morwisko__overview",
-    "mcp__morwisko__list_tasks",
-    "mcp__morwisko__get_topic",
-    "mcp__morwisko__search",
+pub const MONTYBRAIN_READ_TOOLS: &[&str] = &[
+    "mcp__montybrain__overview",
+    "mcp__montybrain__list_tasks",
+    "mcp__montybrain__get_topic",
+    "mcp__montybrain__search",
 ];
 
-pub const MORWISKO_WRITE_TOOLS: &[&str] = &[
-    "mcp__morwisko__create_task",
-    "mcp__morwisko__update_task",
-    "mcp__morwisko__create_topic",
-    "mcp__morwisko__log_update",
+pub const MONTYBRAIN_WRITE_TOOLS: &[&str] = &[
+    "mcp__montybrain__create_task",
+    "mcp__montybrain__update_task",
+    "mcp__montybrain__create_topic",
+    "mcp__montybrain__log_update",
 ];
 
 /// Built-in Claude Code tools denied explicitly. With `dontAsk` anything not
@@ -79,11 +82,11 @@ pub const CLAUDE_DENIED_TOOLS: &[&str] = &[
     "WebSearch",
 ];
 
-/// Claude Code `--allowedTools` for a background run: Morwisko tools only.
+/// Claude Code `--allowedTools` for a background run: MontyBrain tools only.
 pub fn claude_allowed_tools(plan: &Plan) -> Vec<&'static str> {
-    let mut tools = MORWISKO_READ_TOOLS.to_vec();
+    let mut tools = MONTYBRAIN_READ_TOOLS.to_vec();
     if plan.writes() {
-        tools.extend_from_slice(MORWISKO_WRITE_TOOLS);
+        tools.extend_from_slice(MONTYBRAIN_WRITE_TOOLS);
     }
     tools
 }
@@ -103,7 +106,7 @@ fn selected<'a>(
 ) -> impl Iterator<Item = &'a Project> {
     projects.iter().filter(move |p| match project {
         Some(slug) => p.slug == slug,
-        None => p.state == morwisko_core::ProjectState::Active,
+        None => p.state == montybrain_core::ProjectState::Active,
     })
 }
 
@@ -144,7 +147,7 @@ pub fn repo_refs(projects: &[Project], project: Option<&str>, home: &Path) -> Ve
     out
 }
 
-/// The `morwisko-mcp` server a background run attaches.
+/// The `montybrain-mcp` server a background run attaches.
 #[derive(Debug, Clone, Copy)]
 pub struct McpServer<'a> {
     pub binary: &'a Path,
@@ -177,20 +180,20 @@ pub fn toml_string(s: &str) -> String {
     out
 }
 
-/// The `-c` values that attach `morwisko-mcp` to a Codex run.
+/// The `-c` values that attach `montybrain-mcp` to a Codex run.
 pub fn codex_mcp_overrides(plan: &Plan, mcp: &McpServer) -> Result<Vec<String>, String> {
     let mut v = vec![
         format!(
-            "mcp_servers.morwisko.command={}",
+            "mcp_servers.montybrain.command={}",
             toml_string(utf8(mcp.binary)?)
         ),
         format!(
-            "mcp_servers.morwisko.env.{ENV_VAULT}={}",
+            "mcp_servers.montybrain.env.{ENV_VAULT}={}",
             toml_string(utf8(mcp.vault_root)?)
         ),
     ];
     if plan.read_only() {
-        v.push(format!("mcp_servers.morwisko.env.{ENV_READONLY}=\"1\""));
+        v.push(format!("mcp_servers.montybrain.env.{ENV_READONLY}=\"1\""));
     }
     Ok(v)
 }
@@ -204,7 +207,7 @@ pub fn claude_mcp_config(plan: &Plan, mcp: &McpServer) -> Result<String, String>
     }
     let v = serde_json::json!({
         "mcpServers": {
-            "morwisko": {
+            "montybrain": {
                 "command": utf8(mcp.binary)?,
                 "args": [],
                 "env": env,
@@ -336,7 +339,7 @@ pub fn background_args_with(
 
 /// The full environment of a child: the parent's minus [`SCRUBBED_ENV`] (and
 /// any inherited read-only switch), with `PATH` replaced and, for runs that
-/// must not write, `MORWISKO_READONLY=1` (passed on to `morwisko-mcp` by CLIs
+/// must not write, `MONTYBRAIN_READONLY=1` (passed on to `montybrain-mcp` by CLIs
 /// that let MCP servers inherit their environment).
 pub fn child_env(
     parent: impl IntoIterator<Item = (OsString, OsString)>,
@@ -347,7 +350,10 @@ pub fn child_env(
         .into_iter()
         .filter(|(k, _)| {
             let k = k.to_string_lossy();
-            k != "PATH" && k != ENV_READONLY && !SCRUBBED_ENV.contains(&k.as_ref())
+            k != "PATH"
+                && k != ENV_READONLY
+                && k != LEGACY_ENV_READONLY
+                && !SCRUBBED_ENV.contains(&k.as_ref())
         })
         .collect();
     env.push(("PATH".into(), path));
@@ -362,7 +368,7 @@ pub fn child_env(
 mod tests {
     use super::*;
     use crate::runs::recipes::{tests::req, validate};
-    use morwisko_core::{ProjectState, Repo};
+    use montybrain_core::{ProjectState, Repo};
 
     fn projects(repo_a: &Path, repo_b: &Path) -> Vec<Project> {
         let p = |slug: &str, state, repos: Vec<Repo>| Project {
@@ -404,8 +410,8 @@ mod tests {
 
     fn mcp() -> McpServer<'static> {
         McpServer {
-            binary: Path::new("/h/.local/bin/morwisko-mcp"),
-            vault_root: Path::new("/h/Morwisko"),
+            binary: Path::new("/h/.local/bin/montybrain-mcp"),
+            vault_root: Path::new("/h/MontyBrain"),
         }
     }
 
@@ -448,10 +454,10 @@ mod tests {
             "WebFetch",
             "WebSearch",
             "--allowedTools",
-            "mcp__morwisko__overview",
-            "mcp__morwisko__list_tasks",
-            "mcp__morwisko__get_topic",
-            "mcp__morwisko__search",
+            "mcp__montybrain__overview",
+            "mcp__montybrain__list_tasks",
+            "mcp__montybrain__get_topic",
+            "mcp__montybrain__search",
         ];
         for (recipe, params) in [
             ("postep", vec![("project", "beeking")]),
@@ -466,10 +472,10 @@ mod tests {
         }
         let mut write = head.to_vec();
         write.extend([
-            "mcp__morwisko__create_task",
-            "mcp__morwisko__update_task",
-            "mcp__morwisko__create_topic",
-            "mcp__morwisko__log_update",
+            "mcp__montybrain__create_task",
+            "mcp__montybrain__update_task",
+            "mcp__montybrain__create_topic",
+            "mcp__montybrain__log_update",
         ]);
         let z = plan("zadania", "claude", &[("text", "x")], &ps);
         assert_eq!(args(&z), write);
@@ -478,7 +484,7 @@ mod tests {
             let a = args(p);
             let allowed = &a[a.iter().position(|x| x == "--allowedTools").unwrap() + 1..];
             assert!(
-                allowed.iter().all(|t| t.starts_with("mcp__morwisko__")),
+                allowed.iter().all(|t| t.starts_with("mcp__montybrain__")),
                 "{a:?}"
             );
             assert!(!a.iter().any(|x| x == "--add-dir" || x == "--bare"));
@@ -501,11 +507,11 @@ mod tests {
             "/c/runs",
             "--ignore-user-config",
             "-c",
-            "mcp_servers.morwisko.command=\"/h/.local/bin/morwisko-mcp\"",
+            "mcp_servers.montybrain.command=\"/h/.local/bin/montybrain-mcp\"",
             "-c",
-            "mcp_servers.morwisko.env.MORWISKO_DIR=\"/h/Morwisko\"",
+            "mcp_servers.montybrain.env.MONTYBRAIN_DIR=\"/h/MontyBrain\"",
             "-c",
-            "mcp_servers.morwisko.env.MORWISKO_READONLY=\"1\"",
+            "mcp_servers.montybrain.env.MONTYBRAIN_READONLY=\"1\"",
             "PROMPT",
         ];
         for (recipe, params) in [("postep", vec![("project", "beeking")]), ("raport", vec![])] {
@@ -524,9 +530,9 @@ mod tests {
                 "/c/runs",
                 "--ignore-user-config",
                 "-c",
-                "mcp_servers.morwisko.command=\"/h/.local/bin/morwisko-mcp\"",
+                "mcp_servers.montybrain.command=\"/h/.local/bin/montybrain-mcp\"",
                 "-c",
-                "mcp_servers.morwisko.env.MORWISKO_DIR=\"/h/Morwisko\"",
+                "mcp_servers.montybrain.env.MONTYBRAIN_DIR=\"/h/MontyBrain\"",
                 "PROMPT"
             ]
         );
@@ -611,7 +617,7 @@ mod tests {
         let ps = projects(Path::new("/x"), Path::new("/y"));
         let p = plan("postep", "codex", &[], &ps);
         let mcp = McpServer {
-            binary: Path::new("/Users/a b/\"q\"/back\\slash/morwisko-mcp"),
+            binary: Path::new("/Users/a b/\"q\"/back\\slash/montybrain-mcp"),
             vault_root: Path::new("/Users/a b/Mój \"vault\"\\x"),
         };
         let mut table = toml::Table::new();
@@ -621,15 +627,15 @@ mod tests {
             table.insert(key.to_string(), v["v"].clone());
         }
         assert_eq!(
-            table["mcp_servers.morwisko.command"].as_str(),
+            table["mcp_servers.montybrain.command"].as_str(),
             mcp.binary.to_str()
         );
         assert_eq!(
-            table["mcp_servers.morwisko.env.MORWISKO_DIR"].as_str(),
+            table["mcp_servers.montybrain.env.MONTYBRAIN_DIR"].as_str(),
             mcp.vault_root.to_str()
         );
         assert_eq!(
-            table["mcp_servers.morwisko.env.MORWISKO_READONLY"].as_str(),
+            table["mcp_servers.montybrain.env.MONTYBRAIN_READONLY"].as_str(),
             Some("1")
         );
         assert_eq!(table.len(), 3);
@@ -639,7 +645,7 @@ mod tests {
     fn claude_mcp_config_content_and_file() {
         let ps = projects(Path::new("/x"), Path::new("/y"));
         let mcp = McpServer {
-            binary: Path::new("/h/.local/bin/morwisko-mcp"),
+            binary: Path::new("/h/.local/bin/montybrain-mcp"),
             vault_root: Path::new("/h/Mój \"vault\""),
         };
         let json = |p: &Plan| -> serde_json::Value {
@@ -647,13 +653,13 @@ mod tests {
         };
         assert_eq!(
             json(&plan("raport", "claude", &[], &ps)),
-            serde_json::json!({"mcpServers":{"morwisko":{
-                "command":"/h/.local/bin/morwisko-mcp","args":[],
-                "env":{"MORWISKO_DIR":"/h/Mój \"vault\"","MORWISKO_READONLY":"1"}}}})
+            serde_json::json!({"mcpServers":{"montybrain":{
+                "command":"/h/.local/bin/montybrain-mcp","args":[],
+                "env":{"MONTYBRAIN_DIR":"/h/Mój \"vault\"","MONTYBRAIN_READONLY":"1"}}}})
         );
         assert_eq!(
-            json(&plan("zadania", "claude", &[("text", "x")], &ps))["mcpServers"]["morwisko"]["env"],
-            serde_json::json!({"MORWISKO_DIR":"/h/Mój \"vault\""})
+            json(&plan("zadania", "claude", &[("text", "x")], &ps))["mcpServers"]["montybrain"]["env"],
+            serde_json::json!({"MONTYBRAIN_DIR":"/h/Mój \"vault\""})
         );
 
         let dir = tempfile::tempdir().unwrap();
@@ -675,7 +681,7 @@ mod tests {
     #[test]
     fn hostile_text_is_one_argv_element() {
         let ps = projects(Path::new("/x"), Path::new("/y"));
-        let hostile = "--dangerously-skip-permissions\n$(rm -rf ~) `id` \"'\n/morwisko-poczta";
+        let hostile = "--dangerously-skip-permissions\n$(rm -rf ~) `id` \"'\n/montybrain-poczta";
         for provider in ["claude", "codex"] {
             let p = plan("zadania", provider, &[("text", hostile)], &ps);
             let prompt = crate::runs::recipes::prompt(&p, None);
@@ -733,6 +739,7 @@ mod tests {
             ("CLAUDECODE", "1"),
             ("CLAUDE_CODE_ENTRYPOINT", "cli"),
             ("CODEX_SANDBOX", "seatbelt"),
+            ("MONTYBRAIN_READONLY", "1"),
             ("MORWISKO_READONLY", "1"),
             ("CLAUDE_CODE_OAUTH_TOKEN", "keep"),
             ("LANG", "pl_PL.UTF-8"),
@@ -746,7 +753,8 @@ mod tests {
         assert!(env.contains(&("PATH".into(), "/new/path".into())));
 
         let ro = child_env(parent, "/p".into(), true);
-        assert!(ro.contains(&("MORWISKO_READONLY".into(), "1".into())));
+        assert!(ro.contains(&("MONTYBRAIN_READONLY".into(), "1".into())));
+        assert!(!ro.iter().any(|(k, _)| k == "MORWISKO_READONLY"));
         assert!(!ro.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY"));
     }
 

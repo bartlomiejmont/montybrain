@@ -1,6 +1,6 @@
 //! The usage example from docs/core-api.md, run against a temp vault.
 
-use morwisko_core::*;
+use montybrain_core::*;
 
 fn assert_send_sync<T: Send + Sync + Clone>() {}
 
@@ -8,7 +8,7 @@ fn assert_send_sync<T: Send + Sync + Clone>() {}
 fn docs_example_runs() -> Result<()> {
     assert_send_sync::<Vault>();
     let dir = tempfile::tempdir().unwrap();
-    let vault = Vault::init(dir.path().join("Morwisko"))?;
+    let vault = Vault::init(dir.path().join("MontyBrain"))?;
     vault.normalize()?;
 
     let p = vault.create_project(NewProject {

@@ -1,6 +1,6 @@
-//! # morwisko-core
+//! # montybrain-core
 //!
-//! Plain-Markdown vault for Morwisko: projects → topics → tasks, with a journal
+//! Plain-Markdown vault for MontyBrain: projects → topics → tasks, with a journal
 //! per topic. This crate owns the on-disk format (see `docs/format.md`) and is the
 //! only thing that should write vault files.
 //!
@@ -35,7 +35,8 @@ pub use model::*;
 pub use query::{SearchHit, Snapshot, TaskFilter, TodayItem, TodayReason};
 pub use slug::{fold, slugify, unique_slug};
 pub use vault::{
-    ENV_VAR, INBOX_FILE, LOCK_FILE, META_DIR, PROJECT_FILE, TMP_SUFFIX, TOPICS_DIR, Vault,
+    DEFAULT_DIR_NAME, ENV_VAR, INBOX_FILE, LEGACY_DIR_NAME, LEGACY_ENV_VAR, LEGACY_META_DIR,
+    LEGACY_TMP_SUFFIX, LOCK_FILE, META_DIR, PROJECT_FILE, TMP_SUFFIX, TOPICS_DIR, Vault, meta_dir,
 };
 #[cfg(feature = "watch")]
 pub use watch::{DEFAULT_DEBOUNCE, VaultWatcher, is_ignored};

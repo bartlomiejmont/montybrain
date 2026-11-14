@@ -1,11 +1,11 @@
 ---
-name: morwisko-zadania
-description: "Dodawaj i aktualizuj zadania w Morwisku (lokalne centrum dowodzenia użytkownika, serwer MCP `morwisko`) na podstawie polecenia albo analizy wątku. Używaj, gdy użytkownik prosi: „dodaj zadanie”, „zapisz to w Morwisku”, „zrób z tego zadania”, „przejrzyj ten wątek i wypisz, co zostało do zrobienia”, „oznacz jako zrobione”, „przenieś do tematu…”, także dla wklejonego tekstu, notatek ze spotkania lub wskazanego wątku T3."
+name: montybrain-zadania
+description: "Dodawaj i aktualizuj zadania w MontyBrain (lokalne centrum dowodzenia użytkownika, serwer MCP `montybrain`) na podstawie polecenia albo analizy wątku. Używaj, gdy użytkownik prosi: „dodaj zadanie”, „zapisz to w MontyBrain”, „zrób z tego zadania”, „przejrzyj ten wątek i wypisz, co zostało do zrobienia”, „oznacz jako zrobione”, „przenieś do tematu…”, także dla wklejonego tekstu, notatek ze spotkania lub wskazanego wątku T3."
 ---
 
-# Zadania w Morwisku
+# Zadania w MontyBrain
 
-Morwisko trzyma pracę użytkownika w plikach Markdown: Projekt → Temat → Zadanie, plus Skrzynka na rzeczy bez projektu. Piszesz do niego wyłącznie przez narzędzia serwera MCP `morwisko`: `overview`, `list_tasks`, `search`, `get_topic`, `create_task`, `update_task`, `create_topic`, `log_update`. Nie edytuj plików w `~/Morwisko` ręcznie, jeśli serwer jest dostępny. Jeśli narzędzi `morwisko` nie ma w tej sesji, powiedz to wprost i zakończ; nie zapisuj zadań gdzie indziej.
+MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat → Zadanie, plus Skrzynka na rzeczy bez projektu. Piszesz do niego wyłącznie przez narzędzia serwera MCP `montybrain`: `overview`, `list_tasks`, `search`, `get_topic`, `create_task`, `update_task`, `create_topic`, `log_update`. Nie edytuj plików w `~/MontyBrain` ręcznie, jeśli serwer jest dostępny. Jeśli narzędzi `montybrain` nie ma w tej sesji, powiedz to wprost i zakończ; nie zapisuj zadań gdzie indziej.
 
 ## Dwa tryby
 

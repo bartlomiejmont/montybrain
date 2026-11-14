@@ -2290,7 +2290,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "morwisko-core"
+name = "montybrain-core"
 version = "0.2.0"
 dependencies = [
  "chrono",
@@ -2303,11 +2303,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "morwisko-desktop"
+name = "montybrain-desktop"
 version = "0.2.0"
 dependencies = [
  "mac-notification-sys",
- "morwisko-core",
+ "montybrain-core",
  "objc2-app-kit",
  "rustix",
  "serde",
@@ -2323,10 +2323,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "morwisko-mcp"
+name = "montybrain-mcp"
 version = "0.2.0"
 dependencies = [
- "morwisko-core",
+ "montybrain-core",
  "rmcp",
  "serde",
  "serde_json",

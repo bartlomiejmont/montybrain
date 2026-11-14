@@ -2,7 +2,7 @@
 //! let only the main window reach the agent-run and project-update commands. Runs the real
 //! context (config + capabilities) on Tauri's mock runtime.
 
-use morwisko_desktop::commands;
+use montybrain_desktop::commands;
 use tauri::ipc::{CallbackFn, InvokeBody, InvokeResponseBody};
 use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder};
 use tauri::webview::InvokeRequest;

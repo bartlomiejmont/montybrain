@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 fn wait_for(rx: &mpsc::Receiver<Vec<PathBuf>>, pred: impl Fn(&PathBuf) -> bool) -> Vec<PathBuf> {
     let deadline = Instant::now() + Duration::from_secs(10);

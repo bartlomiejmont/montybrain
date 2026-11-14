@@ -26,8 +26,8 @@ import { updateStore, useUpdates } from "../store/updates";
 import { useVault, useView } from "../store/vault";
 import "./map.css";
 
-const VIEW_PREF = "morwisko.map.view";
-const FILTER_PREF = "morwisko.map.filters";
+const VIEW_PREF = "montybrain.map.view";
+const FILTER_PREF = "montybrain.map.filters";
 const MAX_CURVES = 8;
 
 interface Filters {

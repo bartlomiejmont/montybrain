@@ -27,19 +27,40 @@ use crate::validate::{Multi, link, multiline, one_line, strict_line};
 use crate::verify::{Expect, check};
 
 /// Environment variable overriding the vault location.
-pub const ENV_VAR: &str = "MORWISKO_DIR";
+pub const ENV_VAR: &str = "MONTYBRAIN_DIR";
+/// The pre-rename name of [`ENV_VAR`], still honoured when [`ENV_VAR`] is unset.
+pub const LEGACY_ENV_VAR: &str = "MORWISKO_DIR";
 /// Inbox file name.
 pub const INBOX_FILE: &str = "skrzynka.md";
 /// Project metadata file name inside a project directory.
 pub const PROJECT_FILE: &str = "projekt.md";
 /// Directory holding topic files inside a project directory.
 pub const TOPICS_DIR: &str = "tematy";
-/// Hidden directory for Morwisko's own bookkeeping (lock file).
-pub const META_DIR: &str = ".morwisko";
-/// Advisory lock file inside [`META_DIR`].
+/// Hidden directory for MontyBrain's own bookkeeping (lock file, links).
+/// See [`meta_dir`] for which one a given vault uses.
+pub const META_DIR: &str = ".montybrain";
+/// The pre-rename bookkeeping directory. A vault that already has it keeps
+/// using it (and never gets a [`META_DIR`] created next to it), so the app,
+/// the MCP server and an older binary still running all lock the same file.
+pub const LEGACY_META_DIR: &str = ".morwisko";
+/// Advisory lock file inside the vault's meta directory.
 pub const LOCK_FILE: &str = "lock";
 /// Suffix of temporary files written during atomic saves.
-pub const TMP_SUFFIX: &str = ".morwisko-tmp";
+pub const TMP_SUFFIX: &str = ".montybrain-tmp";
+/// [`TMP_SUFFIX`] of older binaries (ignored by the watcher like our own).
+pub const LEGACY_TMP_SUFFIX: &str = ".morwisko-tmp";
+
+/// The bookkeeping directory of the vault at `root`: [`META_DIR`] when it
+/// exists, else an existing [`LEGACY_META_DIR`], else [`META_DIR`] (created
+/// on first use). Nothing is ever moved or renamed.
+pub fn meta_dir(root: &Path) -> PathBuf {
+    let new = root.join(META_DIR);
+    if new.is_dir() {
+        return new;
+    }
+    let legacy = root.join(LEGACY_META_DIR);
+    if legacy.is_dir() { legacy } else { new }
+}
 
 type Clock = Arc<dyn Fn() -> NaiveDateTime + Send + Sync>;
 
@@ -261,13 +282,29 @@ fn stat(path: &Path, rel: &Path, warnings: &mut Vec<LoadWarning>) -> Option<fs::
 // ---------------------------------------------------------------------------
 
 struct LockGuard {
-    file: File,
+    /// Released in reverse order of acquisition.
+    files: Vec<File>,
 }
 
 impl Drop for LockGuard {
     fn drop(&mut self) {
-        let _ = self.file.unlock();
+        for file in self.files.iter().rev() {
+            let _ = file.unlock();
+        }
     }
+}
+
+fn lock_file_in(dir: &Path) -> Result<File> {
+    fs::create_dir_all(dir).map_err(|e| Error::io(dir, e))?;
+    let path = dir.join(LOCK_FILE);
+    let file = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .map_err(|e| Error::io(&path, e))?;
+    file.lock().map_err(|e| Error::io(&path, e))?;
+    Ok(file)
 }
 
 /// State of one locked mutation.
@@ -536,11 +573,32 @@ fn continuation_lines(links: &[String], notes: &str) -> Vec<String> {
     out
 }
 
-fn resolve_root(env: Option<std::ffi::OsString>, home: Option<PathBuf>) -> Result<PathBuf> {
-    if let Some(dir) = env.filter(|v| !v.is_empty()) {
+/// Default vault folder name in the home directory.
+pub const DEFAULT_DIR_NAME: &str = "MontyBrain";
+/// The pre-rename default folder, used when it exists and [`DEFAULT_DIR_NAME`] does not.
+pub const LEGACY_DIR_NAME: &str = "Morwisko";
+
+/// `env` (new variable), else `legacy_env`, else `~/MontyBrain` if it exists,
+/// else `~/Morwisko` if it exists, else `~/MontyBrain` (to be created).
+fn resolve_root(
+    env: Option<std::ffi::OsString>,
+    legacy_env: Option<std::ffi::OsString>,
+    home: Option<PathBuf>,
+    exists: impl Fn(&Path) -> bool,
+) -> Result<PathBuf> {
+    if let Some(dir) = env
+        .filter(|v| !v.is_empty())
+        .or_else(|| legacy_env.filter(|v| !v.is_empty()))
+    {
         return Ok(PathBuf::from(dir));
     }
-    home.map(|h| h.join("Morwisko")).ok_or(Error::NoVaultDir)
+    let home = home.ok_or(Error::NoVaultDir)?;
+    let new = home.join(DEFAULT_DIR_NAME);
+    if exists(&new) {
+        return Ok(new);
+    }
+    let legacy = home.join(LEGACY_DIR_NAME);
+    Ok(if exists(&legacy) { legacy } else { new })
 }
 
 // ---------------------------------------------------------------------------
@@ -548,9 +606,16 @@ fn resolve_root(env: Option<std::ffi::OsString>, home: Option<PathBuf>) -> Resul
 // ---------------------------------------------------------------------------
 
 impl Vault {
-    /// `$MORWISKO_DIR` if set (and non-empty), else `~/Morwisko`.
+    /// `$MONTYBRAIN_DIR` if set (and non-empty), else `$MORWISKO_DIR`, else
+    /// `~/MontyBrain` if it exists, else `~/Morwisko` if it exists, else
+    /// `~/MontyBrain`. Nothing is moved or copied.
     pub fn default_root() -> Result<PathBuf> {
-        resolve_root(std::env::var_os(ENV_VAR), std::env::home_dir())
+        resolve_root(
+            std::env::var_os(ENV_VAR),
+            std::env::var_os(LEGACY_ENV_VAR),
+            std::env::home_dir(),
+            |p| p.is_dir(),
+        )
     }
 
     /// Open an existing vault directory (nothing is created).
@@ -571,11 +636,12 @@ impl Vault {
         Self::open(Self::default_root()?)
     }
 
-    /// Create the vault skeleton if missing (`<root>/`, `skrzynka.md`, `.morwisko/`)
-    /// and open it. Never touches existing files.
+    /// Create the vault skeleton if missing (`<root>/`, `skrzynka.md` and the
+    /// [`meta_dir`], `.montybrain/` for a new vault) and open it. Never
+    /// touches existing files.
     pub fn init(root: impl Into<PathBuf>) -> Result<Vault> {
         let root = root.into();
-        fs::create_dir_all(root.join(META_DIR)).map_err(|e| Error::io(&root, e))?;
+        fs::create_dir_all(meta_dir(&root)).map_err(|e| Error::io(&root, e))?;
         let inbox = root.join(INBOX_FILE);
         match OpenOptions::new().write(true).create_new(true).open(&inbox) {
             Ok(_) => {}
@@ -638,18 +704,20 @@ impl Vault {
         truncate_minute((self.clock)())
     }
 
+    /// Lock the vault for one mutation. The lock file lives in
+    /// [`meta_dir`]; when a vault has both directories (only possible by
+    /// hand), the legacy lock is taken first as well, so an older binary
+    /// that only knows `.morwisko/lock` is still excluded. Every process
+    /// takes the locks in the same order, so this cannot deadlock.
     fn lock(&self) -> Result<LockGuard> {
-        let dir = self.root.join(META_DIR);
-        fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
-        let path = dir.join(LOCK_FILE);
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(&path)
-            .map_err(|e| Error::io(&path, e))?;
-        file.lock().map_err(|e| Error::io(&path, e))?;
-        Ok(LockGuard { file })
+        let primary = meta_dir(&self.root);
+        let legacy = self.root.join(LEGACY_META_DIR);
+        let mut files = Vec::with_capacity(2);
+        if primary != legacy && legacy.is_dir() {
+            files.push(lock_file_in(&legacy)?);
+        }
+        files.push(lock_file_in(&primary)?);
+        Ok(LockGuard { files })
     }
 
     fn txn(&self) -> Result<Txn<'_>> {
@@ -1758,19 +1826,125 @@ mod tests {
     #[test]
     fn root_resolution() {
         let home = Some(PathBuf::from("/home/u"));
+        let none = |_: &Path| false;
+        let new = PathBuf::from("/home/u/MontyBrain");
+        let old = PathBuf::from("/home/u/Morwisko");
+        // The new variable wins over the legacy one; empty values are unset.
         assert_eq!(
-            resolve_root(Some("/data/v".into()), home.clone()).unwrap(),
+            resolve_root(
+                Some("/data/v".into()),
+                Some("/old".into()),
+                home.clone(),
+                none
+            )
+            .unwrap(),
             PathBuf::from("/data/v")
         );
         assert_eq!(
-            resolve_root(Some("".into()), home.clone()).unwrap(),
-            PathBuf::from("/home/u/Morwisko")
+            resolve_root(Some("".into()), Some("/old".into()), home.clone(), none).unwrap(),
+            PathBuf::from("/old")
         );
         assert_eq!(
-            resolve_root(None, home).unwrap(),
-            PathBuf::from("/home/u/Morwisko")
+            resolve_root(None, Some("".into()), home.clone(), none).unwrap(),
+            new
         );
-        assert!(matches!(resolve_root(None, None), Err(Error::NoVaultDir)));
+        // Neither folder exists: the new one (to be created).
+        assert_eq!(resolve_root(None, None, home.clone(), none).unwrap(), new);
+        // Only the old folder exists: keep using it.
+        let only_old = |p: &Path| p == Path::new("/home/u/Morwisko");
+        assert_eq!(
+            resolve_root(None, None, home.clone(), only_old).unwrap(),
+            old
+        );
+        // Both exist: the new one wins.
+        let both = |_: &Path| true;
+        assert_eq!(resolve_root(None, None, home.clone(), both).unwrap(), new);
+        // A variable still wins over an existing folder.
+        assert_eq!(
+            resolve_root(None, Some("/old".into()), home, both).unwrap(),
+            PathBuf::from("/old")
+        );
+        assert!(matches!(
+            resolve_root(None, None, None, none),
+            Err(Error::NoVaultDir)
+        ));
+    }
+
+    #[test]
+    fn meta_dir_keeps_a_legacy_vault_on_its_old_directory() {
+        // A new vault gets `.montybrain/`.
+        let dir = tempfile::tempdir().unwrap();
+        let v = Vault::init(dir.path()).unwrap();
+        assert!(dir.path().join(META_DIR).is_dir());
+        assert!(!dir.path().join(LEGACY_META_DIR).exists());
+        drop(v.lock().unwrap());
+        assert!(dir.path().join(META_DIR).join(LOCK_FILE).is_file());
+
+        // An existing vault with `.morwisko/` keeps it: init and locking
+        // never create `.montybrain/` next to it.
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(LEGACY_META_DIR)).unwrap();
+        assert_eq!(meta_dir(dir.path()), dir.path().join(LEGACY_META_DIR));
+        let v = Vault::init(dir.path()).unwrap();
+        let guard = v.lock().unwrap();
+        assert_eq!(guard.files.len(), 1);
+        drop(guard);
+        assert!(!dir.path().join(META_DIR).exists());
+        assert!(dir.path().join(LEGACY_META_DIR).join(LOCK_FILE).is_file());
+
+        // Both present (only by hand): `.montybrain/` is the meta dir, and
+        // the legacy lock is taken too.
+        fs::create_dir_all(dir.path().join(META_DIR)).unwrap();
+        assert_eq!(meta_dir(dir.path()), dir.path().join(META_DIR));
+        let guard = v.lock().unwrap();
+        assert_eq!(guard.files.len(), 2);
+        drop(guard);
+        assert!(dir.path().join(META_DIR).join(LOCK_FILE).is_file());
+    }
+
+    /// What an older binary does: lock `<root>/.morwisko/lock` on its own.
+    fn hold_legacy_lock(root: &Path) -> File {
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(root.join(LEGACY_META_DIR).join(LOCK_FILE))
+            .unwrap();
+        file.lock().unwrap();
+        file
+    }
+
+    fn locks_while_held(v: Vault, held: File) -> bool {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let t = std::thread::spawn(move || {
+            let _g = v.lock().unwrap();
+            tx.send(()).unwrap();
+        });
+        let early = rx
+            .recv_timeout(std::time::Duration::from_millis(300))
+            .is_ok();
+        held.unlock().unwrap();
+        if !early {
+            rx.recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+        }
+        t.join().unwrap();
+        early
+    }
+
+    #[test]
+    fn a_legacy_lock_held_by_an_older_binary_excludes_us() {
+        // Legacy vault: we lock the very same file.
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(LEGACY_META_DIR)).unwrap();
+        let v = Vault::init(dir.path()).unwrap();
+        let held = hold_legacy_lock(dir.path());
+        assert!(!locks_while_held(v, held));
+
+        // Both directories: the legacy lock is still honoured.
+        fs::create_dir_all(dir.path().join(META_DIR)).unwrap();
+        let v = Vault::open(dir.path()).unwrap();
+        let held = hold_legacy_lock(dir.path());
+        assert!(!locks_while_held(v, held));
     }
 
     #[test]

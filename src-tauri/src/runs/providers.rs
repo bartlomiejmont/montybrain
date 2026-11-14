@@ -25,7 +25,7 @@ pub fn candidate_dirs(home: &Path) -> Vec<PathBuf> {
     ]
 }
 
-/// Where `morwisko-mcp` is looked up before PATH: where `install.sh` puts
+/// Where `montybrain-mcp` is looked up before PATH: where `install.sh` puts
 /// it, then next to the app's own executable (for a future bundled copy).
 pub fn mcp_candidate_dirs(home: &Path) -> Vec<PathBuf> {
     let mut v = vec![home.join(".local/bin")];

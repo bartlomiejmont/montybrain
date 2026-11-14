@@ -32,7 +32,7 @@ const task = (id: string | null, project: string, t: string, notes = "", line = 
 describe("references", () => {
   it("reads every form, the waits line, and skips code", () => {
     const text = [
-      "Zależy od [[checkout]] i od [[morwisko/mapa]], zadanie ^abc123.",
+      "Zależy od [[checkout]] i od [[montybrain/mapa]], zadanie ^abc123.",
       "Czeka na: [[whenubuy/platnosci]]",
       "Powiązane: [[ab-testy]]",
       "```",
@@ -43,7 +43,7 @@ describe("references", () => {
     const refs = parseRefs(text, "whenubuy");
     expect(refs.map((r) => [r.target, r.waits, r.standalone, r.line])).toEqual([
       [{ kind: "topic", project: "whenubuy", slug: "checkout" }, false, false, 0],
-      [{ kind: "topic", project: "morwisko", slug: "mapa" }, false, false, 0],
+      [{ kind: "topic", project: "montybrain", slug: "mapa" }, false, false, 0],
       [{ kind: "task", id: "abc123" }, false, false, 0],
       [{ kind: "topic", project: "whenubuy", slug: "platnosci" }, true, true, 1],
       [{ kind: "topic", project: "whenubuy", slug: "ab-testy" }, false, true, 2],
@@ -85,16 +85,16 @@ describe("references", () => {
   });
 
   it("appends and removes exactly one standalone line", () => {
-    const target = topic("morwisko", "mapa");
-    const before = "Integracja gotowa.\nBlokuje nas KRS.\n```\nCzeka na: [[morwisko/mapa]]\n```";
+    const target = topic("montybrain", "mapa");
+    const before = "Integracja gotowa.\nBlokuje nas KRS.\n```\nCzeka na: [[montybrain/mapa]]\n```";
     const added = appendRefLine(before, "waits", target, "whenubuy");
-    expect(added).toBe(`${before}\nCzeka na: [[morwisko/mapa]]`);
+    expect(added).toBe(`${before}\nCzeka na: [[montybrain/mapa]]`);
     // The one in the code block is not the line that makes the edge.
-    expect(removeRefLine(added, "waits", { kind: "topic", project: "morwisko", slug: "mapa" }, "whenubuy")).toBe(before);
-    expect(removeRefLine(before, "waits", { kind: "topic", project: "morwisko", slug: "mapa" }, "whenubuy")).toBeNull();
-    expect(appendRefLine("", "related", target, "whenubuy")).toBe("Powiązane: [[morwisko/mapa]]");
+    expect(removeRefLine(added, "waits", { kind: "topic", project: "montybrain", slug: "mapa" }, "whenubuy")).toBe(before);
+    expect(removeRefLine(before, "waits", { kind: "topic", project: "montybrain", slug: "mapa" }, "whenubuy")).toBeNull();
+    expect(appendRefLine("", "related", target, "whenubuy")).toBe("Powiązane: [[montybrain/mapa]]");
     // In prose: not removable.
-    expect(removeRefLine("Patrz [[morwisko/mapa]].", "related", { kind: "topic", project: "morwisko", slug: "mapa" }, "x")).toBeNull();
+    expect(removeRefLine("Patrz [[montybrain/mapa]].", "related", { kind: "topic", project: "montybrain", slug: "mapa" }, "x")).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use morwisko_core::TaskLocation;
+use montybrain_core::TaskLocation;
 use serde::Serialize;
 use tauri::{
     AppHandle, Emitter, LogicalPosition, Manager, PhysicalSize, Runtime, WebviewUrl, WebviewWindow,
@@ -208,12 +208,32 @@ pub fn active_shortcut<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
 
 /// Called once from `setup`, after the vault state is managed.
 pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let fallback = app
-        .path()
-        .app_config_dir()
-        .unwrap_or_else(|_| std::env::temp_dir().join("morwisko-config"));
-    let config_dir =
-        settings::resolve_config_dir(std::env::var_os(settings::ENV_CONFIG_DIR), fallback);
+    let config_dir = match settings::config_dir_override() {
+        Some(dir) => dir,
+        None => {
+            let dir = app
+                .path()
+                .app_config_dir()
+                .unwrap_or_else(|_| std::env::temp_dir().join("montybrain-config"));
+            // First start after the rename: copy the old app's state once.
+            // Only for the platform dir; an env override is never migrated.
+            if let Some(old) = settings::legacy_config_dir(&dir) {
+                match settings::migrate_config(&dir, &old) {
+                    Ok(copied) if !copied.is_empty() => crate::log(&format!(
+                        "config: copied {} from {}",
+                        copied.join(", "),
+                        old.display()
+                    )),
+                    Ok(_) => {}
+                    Err(e) => crate::log(&format!(
+                        "config: migration from {} failed: {e}",
+                        old.display()
+                    )),
+                }
+            }
+            dir
+        }
+    };
     crate::log(&format!("config: {}", config_dir.display()));
     let s = Settings::load(&config_dir.join(settings::SETTINGS_FILE));
     let shortcut = s.shortcut.clone();
@@ -247,6 +267,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     if let Err(e) = crate::tray::create(app) {
         crate::log(&format!("tray failed: {e}"));
     }
+    carry_over_autostart(app);
     crate::waiting::start(app, &config_dir);
     reminders::start(app, config_dir.clone());
     crate::updates::start(app, &config_dir);
@@ -505,7 +526,7 @@ enum ReturnTo {
     App(i32),
 }
 
-/// pid of the frontmost app, when it is not Morwisko itself.
+/// pid of the frontmost app, when it is not MontyBrain itself.
 #[cfg(target_os = "macos")]
 fn previous_app() -> Option<i32> {
     use objc2_app_kit::NSWorkspace;
@@ -868,8 +889,48 @@ pub fn set_autostart<R: Runtime>(
     let res = if enabled { al.enable() } else { al.disable() };
     res.map_err(|e| format!("Nie udało się zmienić uruchamiania przy logowaniu: {e}"))?;
     crate::log(&format!("autostart: {enabled}"));
+    // Either way the pre-rename login item must not keep starting the old app.
+    remove_legacy_autostart(app);
     changed(app);
     Ok(settings_view(app))
+}
+
+/// Removes the pre-rename app's login item when it is ours (logged, never
+/// fatal).
+fn remove_legacy_autostart<R: Runtime>(app: &AppHandle<R>) {
+    let Ok(home) = app.path().home_dir() else {
+        return;
+    };
+    match crate::legacy_autostart::remove(&home) {
+        Ok(true) => crate::log("autostart: removed the old Morwisko login item"),
+        Ok(false) => {}
+        Err(e) => crate::log(&format!("autostart: cannot remove the old login item: {e}")),
+    }
+}
+
+/// First start of the bundled app after the rename: an old login item that
+/// is ours becomes the new one (autostart stays on, pointing at this app).
+/// Dev builds leave login items alone.
+fn carry_over_autostart<R: Runtime>(app: &AppHandle<R>) {
+    let Ok(home) = app.path().home_dir() else {
+        return;
+    };
+    if !crate::legacy_autostart::present(&home)
+        || !std::env::current_exe().is_ok_and(|e| crate::legacy_autostart::runs_from_bundle(&e))
+    {
+        return;
+    }
+    let al = app.autolaunch();
+    if !al.is_enabled().unwrap_or(false)
+        && let Err(e) = al.enable()
+    {
+        crate::log(&format!(
+            "autostart: cannot carry the old login item over: {e}"
+        ));
+        return;
+    }
+    crate::log("autostart: carried over from the old Morwisko login item");
+    remove_legacy_autostart(app);
 }
 
 /// Settings changed: tell the UI, refresh the tray, re-check reminders.

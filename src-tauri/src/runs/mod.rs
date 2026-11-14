@@ -1,4 +1,4 @@
-//! Actions: agent runs of the Morwisko skills on the user's own subscription
+//! Actions: agent runs of the MontyBrain skills on the user's own subscription
 //! (Claude Code or Codex CLI, logged in with a subscription, never an API key).
 //!
 //! The webview only ever sends a recipe id, a provider, a mode and validated
@@ -227,7 +227,7 @@ pub struct RunInfo {
 
 /// Local "now" in the format of [`RunEvent::at`].
 pub fn now_string() -> String {
-    morwisko_core::chrono::Local::now()
+    montybrain_core::chrono::Local::now()
         .format("%Y-%m-%dT%H:%M:%S")
         .to_string()
 }
@@ -265,16 +265,17 @@ impl<R: Runtime> RunSink for TauriSink<R> {
     }
 }
 
-/// Where run files live: `$MORWISKO_CONFIG_DIR/cache` when that is set (dev
+/// Where run files live: `$MONTYBRAIN_CONFIG_DIR/cache` (or the legacy
+/// `$MORWISKO_CONFIG_DIR`) when that is set (dev
 /// and test runs), else the platform app-cache dir
-/// (`~/Library/Caches/pl.morwisko.desktop`).
+/// (`~/Library/Caches/pl.montybrain.desktop`).
 fn cache_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
-    match std::env::var_os(crate::settings::ENV_CONFIG_DIR) {
-        Some(v) if !v.is_empty() => PathBuf::from(v).join("cache"),
-        _ => app
+    match crate::settings::config_dir_override() {
+        Some(dir) => dir.join("cache"),
+        None => app
             .path()
             .app_cache_dir()
-            .unwrap_or_else(|_| std::env::temp_dir().join("morwisko-cache")),
+            .unwrap_or_else(|_| std::env::temp_dir().join("montybrain-cache")),
     }
 }
 

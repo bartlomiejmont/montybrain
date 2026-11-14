@@ -8,7 +8,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 struct Case {
     name: &'static str,

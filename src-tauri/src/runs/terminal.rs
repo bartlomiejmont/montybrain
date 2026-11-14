@@ -55,9 +55,9 @@ pub fn script(
     let unset = SCRUBBED_ENV.join(" ");
     Ok(format!(
         "#!/bin/bash\n\
-# Morwisko: sesja agenta otwarta z aplikacji. Plik tymczasowy, można go usunąć.\n\
+# MontyBrain: sesja agenta otwarta z aplikacji. Plik tymczasowy, można go usunąć.\n\
 export PATH={path}\":$PATH\"\n\
-unset {unset} MORWISKO_READONLY\n\
+unset {unset} MONTYBRAIN_READONLY MORWISKO_READONLY\n\
 cd {cwd} 2>/dev/null || cd \"$HOME\" || exit 1\n\
 prompt=\"$(cat {prompt})\" || exit 1\n\
 rm -f {prompt}\n\
@@ -158,7 +158,7 @@ mod tests {
         let s = script(
             Path::new("/Users/x/.local/bin/claude"),
             &[],
-            Path::new("/Users/x/Library/Caches/pl.morwisko.desktop/terminal/r1.prompt.txt"),
+            Path::new("/Users/x/Library/Caches/pl.montybrain.desktop/terminal/r1.prompt.txt"),
             Path::new("/Users/x/Projects/it's mine"),
             "/Users/x/.local/bin:/usr/bin:/bin",
         )
@@ -166,14 +166,14 @@ mod tests {
         assert_eq!(
             s,
             "#!/bin/bash\n\
-# Morwisko: sesja agenta otwarta z aplikacji. Plik tymczasowy, można go usunąć.\n\
+# MontyBrain: sesja agenta otwarta z aplikacji. Plik tymczasowy, można go usunąć.\n\
 export PATH='/Users/x/.local/bin:/usr/bin:/bin'\":$PATH\"\n\
 unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX \
 OPENAI_API_KEY CODEX_API_KEY CLAUDECODE CLAUDE_CODE_ENTRYPOINT CODEX_SANDBOX \
-CODEX_SANDBOX_NETWORK_DISABLED MORWISKO_READONLY\n\
+CODEX_SANDBOX_NETWORK_DISABLED MONTYBRAIN_READONLY MORWISKO_READONLY\n\
 cd '/Users/x/Projects/it'\\''s mine' 2>/dev/null || cd \"$HOME\" || exit 1\n\
-prompt=\"$(cat '/Users/x/Library/Caches/pl.morwisko.desktop/terminal/r1.prompt.txt')\" || exit 1\n\
-rm -f '/Users/x/Library/Caches/pl.morwisko.desktop/terminal/r1.prompt.txt'\n\
+prompt=\"$(cat '/Users/x/Library/Caches/pl.montybrain.desktop/terminal/r1.prompt.txt')\" || exit 1\n\
+rm -f '/Users/x/Library/Caches/pl.montybrain.desktop/terminal/r1.prompt.txt'\n\
 exec '/Users/x/.local/bin/claude' \"$prompt\"\n"
         );
     }
@@ -235,7 +235,7 @@ exec '/Users/x/.local/bin/claude' \"$prompt\"\n"
 
         let canary = tmp.path().join("pwned");
         let prompt = format!(
-            "/morwisko-zadania x\n\"; touch {c}; echo \"\n$(touch {c}) `touch {c}` '\\''\n--flag\n\n",
+            "/montybrain-zadania x\n\"; touch {c}; echo \"\n$(touch {c}) `touch {c}` '\\''\n--flag\n\n",
             c = canary.display()
         );
         let script_path = launch(
@@ -250,7 +250,7 @@ exec '/Users/x/.local/bin/claude' \"$prompt\"\n"
                 "/usr/bin/env".into(),
                 "ANTHROPIC_API_KEY=sk-ant".into(),
                 "CLAUDECODE=1".into(),
-                "MORWISKO_READONLY=1".into(),
+                "MONTYBRAIN_READONLY=1".into(),
                 "/bin/bash".into(),
             ],
         )
@@ -286,7 +286,12 @@ exec '/Users/x/.local/bin/claude' \"$prompt\"\n"
         );
         assert!(!canary.exists() && !cwd.join("pwned").exists());
         let env = std::fs::read_to_string(tmp.path().join("argv.txt.env")).unwrap();
-        for var in ["ANTHROPIC_API_KEY", "CLAUDECODE", "MORWISKO_READONLY"] {
+        for var in [
+            "ANTHROPIC_API_KEY",
+            "CLAUDECODE",
+            "MONTYBRAIN_READONLY",
+            "MORWISKO_READONLY",
+        ] {
             assert!(
                 !env.lines().any(|l| l.starts_with(&format!("{var}="))),
                 "{var} leaked"

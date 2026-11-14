@@ -1,23 +1,24 @@
-# morwisko-mcp
+# montybrain-mcp
 
 Stdio [MCP](https://modelcontextprotocol.io) server that lets coding agents (Claude Code, Codex)
-read and update the user's Morwisko vault: projects, topics, tasks and journal, stored as
-Markdown files. It builds on `morwisko-core` and uses the official Rust SDK `rmcp` 3.10.
+read and update the user's MontyBrain vault: projects, topics, tasks and journal, stored as
+Markdown files. It builds on `montybrain-core` and uses the official Rust SDK `rmcp` 3.10.
 
-On every tool call the server opens the vault (`$MORWISKO_DIR`, default `~/Morwisko`), runs
+On every tool call the server opens the vault (`$MONTYBRAIN_DIR`, default `~/MontyBrain`, or `~/Morwisko` when only that exists; the
+pre-rename `MORWISKO_DIR` / `MORWISKO_READONLY` still work), runs
 `normalize()` so hand-written tasks get ids (skipped in read-only mode, see below), and loads a fresh snapshot, so it always sees edits
 made by the user or by the desktop app. stdout is the protocol channel; logs go to stderr
 (`RUST_LOG=debug` for more). There are deliberately no delete tools in this version.
 
 ## Read-only mode
 
-When the environment variable `MORWISKO_READONLY` is `1` or `true` (case-insensitive), the server
+When the environment variable `MONTYBRAIN_READONLY` is `1` or `true` (case-insensitive), the server
 writes nothing: `create_task`, `update_task`, `create_topic` and `log_update` return a tool error
 starting with `read-only run:` before touching the vault, and the read tools skip `normalize()`
 (hand-written tasks without an id are shown as they are instead of getting one). The server
-`instructions` say so, so the agent knows not to try. The Morwisko desktop app uses this for its
+`instructions` say so, so the agent knows not to try. The MontyBrain desktop app uses this for its
 report-only background runs, e.g. for Codex:
-`codex exec -c 'mcp_servers.morwisko.env.MORWISKO_READONLY="1"' …`.
+`codex exec -c 'mcp_servers.montybrain.env.MONTYBRAIN_READONLY="1"' …`.
 
 ## Tools
 
@@ -54,35 +55,35 @@ accepted too. Dates: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`.
 ## Build
 
 ```sh
-cargo build --release -p morwisko-mcp     # binary: target/release/morwisko-mcp
-cargo test -p morwisko-mcp                # spawns the binary against a temp vault
+cargo build --release -p montybrain-mcp     # binary: target/release/montybrain-mcp
+cargo test -p montybrain-mcp                # spawns the binary against a temp vault
 ```
 
 ## Registration
 
-Use the absolute path of the built binary. The server needs no arguments; set `MORWISKO_DIR`
-only if the vault is not `~/Morwisko`.
+Use the absolute path of the built binary. The server needs no arguments; set `MONTYBRAIN_DIR`
+only if the vault is not `~/MontyBrain`.
 
 Claude Code (syntax checked against `claude mcp add --help`; the command itself was not run):
 
 ```sh
-claude mcp add --scope user morwisko -- /ABS/PATH/TO/morwisko-mcp
+claude mcp add --scope user montybrain -- /ABS/PATH/TO/montybrain-mcp
 # with a custom vault directory:
-claude mcp add --scope user -e MORWISKO_DIR=/path/to/vault morwisko -- /ABS/PATH/TO/morwisko-mcp
+claude mcp add --scope user -e MONTYBRAIN_DIR=/path/to/vault montybrain -- /ABS/PATH/TO/montybrain-mcp
 ```
 
 Codex (`codex mcp add` syntax checked against `codex mcp add --help`; the command itself was not run):
 
 ```sh
-codex mcp add morwisko -- /ABS/PATH/TO/morwisko-mcp
-codex mcp add --env MORWISKO_DIR=/path/to/vault morwisko -- /ABS/PATH/TO/morwisko-mcp
+codex mcp add montybrain -- /ABS/PATH/TO/montybrain-mcp
+codex mcp add --env MONTYBRAIN_DIR=/path/to/vault montybrain -- /ABS/PATH/TO/montybrain-mcp
 ```
 
 Equivalent `~/.codex/config.toml` entry (table layout written from memory of the Codex docs,
 not verified against this Codex version):
 
 ```toml
-[mcp_servers.morwisko]
-command = "/ABS/PATH/TO/morwisko-mcp"
-# env = { MORWISKO_DIR = "/path/to/vault" }
+[mcp_servers.montybrain]
+command = "/ABS/PATH/TO/montybrain-mcp"
+# env = { MONTYBRAIN_DIR = "/path/to/vault" }
 ```

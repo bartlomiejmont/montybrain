@@ -1,22 +1,36 @@
 //! App settings: how the app behaves on this machine, not vault data.
 //!
-//! Stored as `settings.json` in the config dir (`$MORWISKO_CONFIG_DIR` when set,
+//! Stored as `settings.json` in the config dir (`$MONTYBRAIN_CONFIG_DIR` when set,
 //! else the platform app-config dir, e.g. `~/Library/Application Support/
-//! pl.morwisko.desktop`). A missing or unreadable file means defaults; the file
+//! pl.montybrain.desktop`). A missing or unreadable file means defaults; the file
 //! is rewritten atomically on every change.
 
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use morwisko_core::TaskLocation;
+use montybrain_core::TaskLocation;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::runs::agent::Agents;
 use crate::updates::schedule::{self, AutoUpdate, UpdateSources};
 
 /// Env var that overrides the config dir (tests, dev runs).
-pub const ENV_CONFIG_DIR: &str = "MORWISKO_CONFIG_DIR";
+pub const ENV_CONFIG_DIR: &str = "MONTYBRAIN_CONFIG_DIR";
+/// The pre-rename name of [`ENV_CONFIG_DIR`], honoured when that is unset.
+pub const LEGACY_ENV_CONFIG_DIR: &str = "MORWISKO_CONFIG_DIR";
+/// The config dir name (bundle identifier) before the rename.
+pub const LEGACY_IDENTIFIER: &str = "pl.morwisko.desktop";
+/// Files copied once from the old config dir. Not caches (run files live in
+/// the cache dir and are left behind). `settings.json` goes last: its
+/// presence marks the migration done, so an interrupted copy is redone.
+pub const MIGRATED_FILES: [&str; 5] = [
+    "updates.json",
+    "reminders.json",
+    "waiting.json",
+    "drift.json",
+    SETTINGS_FILE,
+];
 pub const SETTINGS_FILE: &str = "settings.json";
 pub const DEFAULT_SHORTCUT: &str = "Ctrl+Alt+Space";
 pub const DEFAULT_DIGEST_HOUR: u8 = 9;
@@ -214,13 +228,57 @@ impl Settings {
     }
 }
 
-/// The config dir: `$MORWISKO_CONFIG_DIR` if non-empty, else `fallback`
-/// (the platform app-config dir).
-pub fn resolve_config_dir(env_value: Option<std::ffi::OsString>, fallback: PathBuf) -> PathBuf {
-    match env_value {
-        Some(v) if !v.is_empty() => PathBuf::from(v),
-        _ => fallback,
+/// The first non-empty of a new env variable and its legacy name (the new one
+/// wins).
+pub fn env_with_legacy(
+    value: Option<std::ffi::OsString>,
+    legacy: Option<std::ffi::OsString>,
+) -> Option<std::ffi::OsString> {
+    value
+        .filter(|v| !v.is_empty())
+        .or_else(|| legacy.filter(|v| !v.is_empty()))
+}
+
+/// `$MONTYBRAIN_CONFIG_DIR`, else `$MORWISKO_CONFIG_DIR` (non-empty only).
+pub fn config_dir_override() -> Option<PathBuf> {
+    env_with_legacy(
+        std::env::var_os(ENV_CONFIG_DIR),
+        std::env::var_os(LEGACY_ENV_CONFIG_DIR),
+    )
+    .map(PathBuf::from)
+}
+
+/// The pre-rename config dir next to `new_dir`
+/// (`…/Application Support/pl.morwisko.desktop`).
+pub fn legacy_config_dir(new_dir: &Path) -> Option<PathBuf> {
+    new_dir.parent().map(|p| p.join(LEGACY_IDENTIFIER))
+}
+
+/// One-time copy of the old app's state: when `new_dir` has no
+/// `settings.json` and `old_dir` exists, copies [`MIGRATED_FILES`] that exist
+/// there and not yet here (writing default settings when the old app had
+/// none, which marks the migration done). `old_dir` is only read. Returns
+/// the names copied (empty = nothing done: already migrated or no old dir).
+pub fn migrate_config(new_dir: &Path, old_dir: &Path) -> io::Result<Vec<&'static str>> {
+    if new_dir.join(SETTINGS_FILE).exists() || !old_dir.is_dir() || new_dir == old_dir {
+        return Ok(Vec::new());
     }
+    let mut copied = Vec::new();
+    for name in MIGRATED_FILES {
+        let (from, to) = (old_dir.join(name), new_dir.join(name));
+        if !from.is_file() || to.exists() {
+            continue;
+        }
+        let bytes = std::fs::read(&from)?;
+        write_atomic(&to, &bytes)?;
+        copied.push(name);
+    }
+    // The old app never saved settings: write the defaults (what a missing
+    // file means anyway) so the migration counts as done and is not redone.
+    if !new_dir.join(SETTINGS_FILE).exists() {
+        Settings::default().save(&new_dir.join(SETTINGS_FILE))?;
+    }
+    Ok(copied)
 }
 
 /// Writes via a temp file + rename so a crash never leaves half a file.
@@ -444,13 +502,136 @@ mod tests {
     }
 
     #[test]
-    fn config_dir_override() {
-        let fb = PathBuf::from("/fallback");
-        assert_eq!(resolve_config_dir(None, fb.clone()), fb);
-        assert_eq!(resolve_config_dir(Some("".into()), fb.clone()), fb);
+    fn env_with_legacy_prefers_the_new_name() {
+        assert_eq!(env_with_legacy(None, None), None);
         assert_eq!(
-            resolve_config_dir(Some("/tmp/x".into()), fb),
-            PathBuf::from("/tmp/x")
+            env_with_legacy(Some("/new".into()), Some("/old".into())),
+            Some("/new".into())
         );
+        assert_eq!(
+            env_with_legacy(None, Some("/old".into())),
+            Some("/old".into())
+        );
+        assert_eq!(
+            env_with_legacy(Some("".into()), Some("/old".into())),
+            Some("/old".into())
+        );
+        assert_eq!(env_with_legacy(Some("".into()), Some("".into())), None);
+    }
+
+    fn old_config(dir: &Path) {
+        std::fs::create_dir_all(dir).unwrap();
+        for name in MIGRATED_FILES {
+            std::fs::write(dir.join(name), format!("{{\"from\":\"{name}\"}}\n")).unwrap();
+        }
+        // Not migrated: a cache-like extra and the atomic-save temp.
+        std::fs::write(dir.join("other.json"), "{}").unwrap();
+        std::fs::create_dir_all(dir.join("cache")).unwrap();
+    }
+
+    fn listing(dir: &Path) -> Vec<(String, Vec<u8>)> {
+        let mut out: Vec<_> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| {
+                let e = e.unwrap();
+                let bytes = if e.path().is_file() {
+                    std::fs::read(e.path()).unwrap()
+                } else {
+                    Vec::new()
+                };
+                (e.file_name().to_string_lossy().into_owned(), bytes)
+            })
+            .collect();
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn legacy_config_dir_is_next_to_the_new_one() {
+        assert_eq!(
+            legacy_config_dir(Path::new("/L/Application Support/pl.montybrain.desktop")),
+            Some(PathBuf::from("/L/Application Support/pl.morwisko.desktop"))
+        );
+    }
+
+    #[test]
+    fn migrate_config_copies_once_and_leaves_the_old_dir_alone() {
+        let tmp = tempfile::tempdir().unwrap();
+        let old = tmp.path().join("pl.morwisko.desktop");
+        let new = tmp.path().join("pl.montybrain.desktop");
+        old_config(&old);
+        let before = listing(&old);
+
+        let copied = migrate_config(&new, &old).unwrap();
+        assert_eq!(copied, MIGRATED_FILES.to_vec());
+        for name in MIGRATED_FILES {
+            assert_eq!(
+                std::fs::read(new.join(name)).unwrap(),
+                std::fs::read(old.join(name)).unwrap()
+            );
+        }
+        assert!(!new.join("other.json").exists());
+        assert!(!new.join("cache").exists());
+        assert_eq!(listing(&old), before, "the old dir is untouched");
+
+        // Already migrated: a later start changes nothing, even after the
+        // new app wrote its own settings and the old one changed.
+        std::fs::write(new.join(SETTINGS_FILE), "{\"mine\":1}\n").unwrap();
+        std::fs::write(old.join("waiting.json"), "{\"newer\":1}\n").unwrap();
+        std::fs::remove_file(new.join("drift.json")).unwrap();
+        assert!(migrate_config(&new, &old).unwrap().is_empty());
+        assert_eq!(
+            std::fs::read_to_string(new.join(SETTINGS_FILE)).unwrap(),
+            "{\"mine\":1}\n"
+        );
+        assert!(!new.join("drift.json").exists());
+        assert_ne!(
+            std::fs::read(new.join("waiting.json")).unwrap(),
+            std::fs::read(old.join("waiting.json")).unwrap()
+        );
+    }
+
+    #[test]
+    fn migrate_config_without_an_old_dir_does_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let new = tmp.path().join("pl.montybrain.desktop");
+        let old = tmp.path().join("pl.morwisko.desktop");
+        assert!(migrate_config(&new, &old).unwrap().is_empty());
+        assert!(!new.exists(), "a fresh install creates nothing here");
+    }
+
+    #[test]
+    fn migrate_config_copies_what_exists_and_marks_itself_done() {
+        let tmp = tempfile::tempdir().unwrap();
+        let old = tmp.path().join("old");
+        let new = tmp.path().join("new");
+        // The old app never saved settings; it has a waiting list only.
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("waiting.json"), "{\"w\":1}\n").unwrap();
+        std::fs::write(old.join("drift.json"), "{\"d\":1}\n").unwrap();
+        // An interrupted earlier attempt already copied drift.json and the
+        // new app changed it since: not overwritten.
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::write(new.join("drift.json"), "{\"kept\":1}\n").unwrap();
+        let copied = migrate_config(&new, &old).unwrap();
+        assert_eq!(copied, vec!["waiting.json"]);
+        assert_eq!(
+            std::fs::read_to_string(new.join("drift.json")).unwrap(),
+            "{\"kept\":1}\n"
+        );
+        // Default settings mark it done: nothing is copied again.
+        assert_eq!(
+            Settings::load(&new.join(SETTINGS_FILE)),
+            Settings::default()
+        );
+        std::fs::remove_file(new.join("waiting.json")).unwrap();
+        assert!(migrate_config(&new, &old).unwrap().is_empty());
+        assert!(!new.join("waiting.json").exists());
+        assert!(
+            !old.join(SETTINGS_FILE).exists(),
+            "the old dir is only read"
+        );
+        // Same dir is a no-op.
+        assert!(migrate_config(&old, &old).unwrap().is_empty());
     }
 }

@@ -7,7 +7,7 @@
 //! backend (`mac-notification-sys`, the crate under `notify-rust`) ourselves,
 //! synchronously on the calling (scheduler) thread:
 //!
-//! * the notification is attributed to Morwisko by binding the bundle id
+//! * the notification is attributed to MontyBrain by binding the bundle id
 //!   (`tauri.conf.json` identifier; `com.apple.Terminal` in dev, like the
 //!   plugin does) via `set_application`;
 //! * it is sent with `asynchronous(true)` and no buttons, so nothing waits for
@@ -145,10 +145,10 @@ mod tests {
     #[test]
     fn binds_bundle_id_once_then_sends_each() {
         let f = Fake::default();
-        let n = MacNotifier::new(&f, "pl.morwisko.desktop".into());
+        let n = MacNotifier::new(&f, "pl.montybrain.desktop".into());
         n.deliver("a", "1").unwrap();
         n.deliver("b", "2").unwrap();
-        assert_eq!(*f.bind_calls.lock().unwrap(), ["pl.morwisko.desktop"]);
+        assert_eq!(*f.bind_calls.lock().unwrap(), ["pl.montybrain.desktop"]);
         assert_eq!(f.sent.lock().unwrap().len(), 2);
     }
 
@@ -181,8 +181,8 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn real_backend_reports_an_unknown_bundle_id() {
-        let n = MacNotifier::new(SysBackend, "pl.morwisko.no-such-app.test".into());
+        let n = MacNotifier::new(SysBackend, "pl.montybrain.no-such-app.test".into());
         let err = n.deliver("never shown", "never shown").unwrap_err();
-        assert!(err.contains("pl.morwisko.no-such-app.test"), "{err}");
+        assert!(err.contains("pl.montybrain.no-such-app.test"), "{err}");
     }
 }

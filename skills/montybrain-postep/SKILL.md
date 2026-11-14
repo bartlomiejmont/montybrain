@@ -1,15 +1,15 @@
 ---
-name: morwisko-postep
-description: "Sprawdź postęp otwartych zadań z Morwiska (serwer MCP `morwisko`) w repozytoriach projektu i zdaj raport: co wygląda na zrobione, co jest w toku, co stoi. Używaj przy prośbach „co mam otwarte”, „sprawdź postęp”, „jak stoją zadania”, „przejrzyj otwarte zadania w projekcie…”, „co z tego jest już zrobione w kodzie”. Domyślnie tylko czyta: niczego nie zmienia w Morwisku ani w repozytoriach."
+name: montybrain-postep
+description: "Sprawdź postęp otwartych zadań z MontyBrain (serwer MCP `montybrain`) w repozytoriach projektu i zdaj raport: co wygląda na zrobione, co jest w toku, co stoi. Używaj przy prośbach „co mam otwarte”, „sprawdź postęp”, „jak stoją zadania”, „przejrzyj otwarte zadania w projekcie…”, „co z tego jest już zrobione w kodzie”. Domyślnie tylko czyta: niczego nie zmienia w MontyBrain ani w repozytoriach."
 ---
 
 # Postęp otwartych zadań
 
-Zestawiasz dwie rzeczy: otwarte zadania w Morwisku i faktyczny stan repozytoriów projektu. Z Morwiska korzystasz przez narzędzia serwera MCP `morwisko` (`overview`, `list_tasks`, `get_topic`, `search`). Jeśli tych narzędzi nie ma w sesji, powiedz to wprost i zakończ.
+Zestawiasz dwie rzeczy: otwarte zadania w MontyBrain i faktyczny stan repozytoriów projektu. Z MontyBrain korzystasz przez narzędzia serwera MCP `montybrain` (`overview`, `list_tasks`, `get_topic`, `search`). Jeśli tych narzędzi nie ma w sesji, powiedz to wprost i zakończ.
 
 ## Zasady
 
-- **Tylko odczyt.** Nie zmieniaj zadań, tematów ani dziennika i nie modyfikuj repozytoriów (żadnych commitów, checkoutów, pull, stash, instalacji). Wyjątek: użytkownik w tej samej prośbie wyraźnie kazał zaktualizować Morwisko; wtedy na końcu, po pokazaniu listy zmian i potwierdzeniu, zapisz ustalenia raportu: nowe tematy (`create_topic`, potem `log_update` z dowodami), wpisy, statusy i opisy istniejących tematów (`log_update`), statusy zadań (`update_task`) i brakujące zadania (`create_task`).
+- **Tylko odczyt.** Nie zmieniaj zadań, tematów ani dziennika i nie modyfikuj repozytoriów (żadnych commitów, checkoutów, pull, stash, instalacji). Wyjątek: użytkownik w tej samej prośbie wyraźnie kazał zaktualizować MontyBrain; wtedy na końcu, po pokazaniu listy zmian i potwierdzeniu, zapisz ustalenia raportu: nowe tematy (`create_topic`, potem `log_update` z dowodami), wpisy, statusy i opisy istniejących tematów (`log_update`), statusy zadań (`update_task`) i brakujące zadania (`create_task`).
 - **Dowody zamiast domysłów.** „Zrobione” piszesz tylko wtedy, gdy widzisz to w repozytorium (commit, zmieniony plik, zmergowana gałąź). Gdy nie da się tego stwierdzić, napisz „nie da się potwierdzić z repozytorium”.
 - Nie uruchamiaj testów, buildów ani skryptów projektu, chyba że użytkownik o to poprosi.
 
@@ -27,6 +27,6 @@ Zestawiasz dwie rzeczy: otwarte zadania w Morwisku i faktyczny stan repozytorió
 4. **Dopasuj.** Dla każdego otwartego zadania oceń: **wygląda na zrobione** (jest dowód w repozytorium), **w toku** (jest gałąź, commity lub niezacommitowane zmiany, ale brak domknięcia), **bez śladu pracy**, **zablokowane** (z notatek lub statusu), **nie dotyczy kodu** (nie da się ocenić z repozytorium).
 5. **Raport** po polsku, zwięźle, według projektów i tematów:
    - przy każdym zadaniu: tytuł, `^id`, ocena i jedno zdanie z dowodem (commit, gałąź, plik);
-   - na końcu: zadania po terminie i na najbliższe dni oraz krótka lista „co proponuję zrobić w Morwisku”: najpierw tematy (strumienie pracy widoczne w repozytoriach, których nie ma jeszcze w Morwisku, i tematy do zaktualizowania), potem zadania do zamknięcia lub dodania. To propozycje: niczego nie zapisujesz bez prośby.
+   - na końcu: zadania po terminie i na najbliższe dni oraz krótka lista „co proponuję zrobić w MontyBrain”: najpierw tematy (strumienie pracy widoczne w repozytoriach, których nie ma jeszcze w MontyBrain, i tematy do zaktualizowania), potem zadania do zamknięcia lub dodania. To propozycje: niczego nie zapisujesz bez prośby.
 
-Gdy repozytorium nie istnieje pod podaną ścieżką albo nie masz do niego dostępu, napisz to przy danym projekcie i oprzyj tę część raportu wyłącznie na Morwisku.
+Gdy repozytorium nie istnieje pod podaną ścieżką albo nie masz do niego dostępu, napisz to przy danym projekcie i oprzyj tę część raportu wyłącznie na MontyBrain.

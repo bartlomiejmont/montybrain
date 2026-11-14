@@ -7,7 +7,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 const TOPIC: &str = "whenubuy/tematy/ab-testy.md";
 
@@ -21,7 +21,7 @@ fn setup() -> (tempfile::TempDir, Vault) {
 #[test]
 fn references_in_a_summary_are_plain_text() {
     let (_d, v) = setup();
-    let summary = "Wariant B na 20% ruchu, patrz [[checkout]] i [[morwisko/mapa]].\nCzeka na: [[whenubuy/platnosci]]\nPowiązane: ^d4e5f6";
+    let summary = "Wariant B na 20% ruchu, patrz [[checkout]] i [[montybrain/mapa]].\nCzeka na: [[whenubuy/platnosci]]\nPowiązane: ^d4e5f6";
     let t = v
         .update_topic(
             "whenubuy",
@@ -58,7 +58,7 @@ fn appending_and_removing_one_line_keeps_the_rest_byte_exact() {
         .summary
         .clone();
     // What the map's "Połącz z…" sends: the summary plus one standalone line.
-    let added = format!("{before}\nCzeka na: [[morwisko/mapa]]");
+    let added = format!("{before}\nCzeka na: [[montybrain/mapa]]");
     v.update_topic(
         "whenubuy",
         "ab-testy",
@@ -91,7 +91,7 @@ fn appending_and_removing_one_line_keeps_the_rest_byte_exact() {
         .iter()
         .position(|l| *l == last_summary_line)
         .unwrap();
-    expected.insert(at + 1, "Czeka na: [[morwisko/mapa]]");
+    expected.insert(at + 1, "Czeka na: [[montybrain/mapa]]");
     assert_eq!(strip(&with_line), expected.join("\n"));
     // Removing exactly that line: the file is the original again (bar the date).
     v.update_topic(
@@ -113,7 +113,7 @@ fn references_in_task_notes_round_trip() {
         project: "whenubuy".into(),
         topic: "ab-testy".into(),
     };
-    let notes = "Czeka na: ^d4e5f6\nPowiązane: [[morwisko/mapa]] i [[checkout]]";
+    let notes = "Czeka na: ^d4e5f6\nPowiązane: [[montybrain/mapa]] i [[checkout]]";
     let t = v
         .create_task(
             &loc,

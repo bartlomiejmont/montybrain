@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from "react";
 
 import { api } from "../api";
-import type { MorwiskoApi } from "../api/api";
+import type { MontyBrainApi } from "../api/api";
 import type { ProjectDrift, WaitView } from "../api/types";
 
 export interface ListSnapshot<T> {
@@ -49,11 +49,11 @@ function createListStore<T>(load: () => Promise<T[]>, listen: (cb: () => void) =
   };
 }
 
-export function createDriftStore(a: Pick<MorwiskoApi, "listDrift" | "onDriftChanged" | "onChange">) {
+export function createDriftStore(a: Pick<MontyBrainApi, "listDrift" | "onDriftChanged" | "onChange">) {
   return createListStore<ProjectDrift>(() => a.listDrift(), (cb) => a.onDriftChanged(cb), (cb) => a.onChange(() => cb()));
 }
 
-export function createWaitingStore(a: Pick<MorwiskoApi, "listWaiting" | "onWaitingChanged" | "onChange">) {
+export function createWaitingStore(a: Pick<MontyBrainApi, "listWaiting" | "onWaitingChanged" | "onChange">) {
   return createListStore<WaitView>(() => a.listWaiting(), (cb) => a.onWaitingChanged(cb), (cb) => a.onChange(() => cb()));
 }
 

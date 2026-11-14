@@ -53,10 +53,10 @@ describe("board grouping", () => {
   });
 
   it("scopes to one project and falls back to all active ones for an unknown slug", () => {
-    const one = groupTasks(snap, "morwisko");
-    expect(TASK_COLUMNS.flatMap((c) => one[c]).every((t) => t.location.kind !== "inbox" && t.location.project === "morwisko")).toBe(true);
+    const one = groupTasks(snap, "montybrain");
+    expect(TASK_COLUMNS.flatMap((c) => one[c]).every((t) => t.location.kind !== "inbox" && t.location.project === "montybrain")).toBe(true);
     expect(effectiveScope(snap, "nie-ma")).toBe(ALL_PROJECTS);
-    expect(effectiveScope(snap, "morwisko")).toBe("morwisko");
+    expect(effectiveScope(snap, "montybrain")).toBe("montybrain");
   });
 
   it("shows a pending move in the new column at once; a rolled back move returns", () => {

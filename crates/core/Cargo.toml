@@ -1,6 +1,6 @@
 [package]
-name = "morwisko-core"
-description = "Markdown vault model, parser and lossless writer for Morwisko"
+name = "montybrain-core"
+description = "Markdown vault model, parser and lossless writer for MontyBrain"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

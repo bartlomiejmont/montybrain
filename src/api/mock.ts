@@ -2,7 +2,7 @@
 // browser (`pnpm dev`) and in unit tests. It follows core's semantics where the
 // UI can observe them: slugs, ids, done stamps, `today`, journal order, search.
 
-import type { MorwiskoApi } from "./api";
+import type { MontyBrainApi } from "./api";
 import { buildFixtures } from "./fixtures";
 import { createMockRuns, type MockRunOptions } from "./mock-runs";
 import { addMapDemo, buildLargeFixture } from "./mock-map";
@@ -130,7 +130,7 @@ function locationOrder(loc: TaskLocation): string {
 
 const clone = <T>(v: T): T => structuredClone(v);
 
-export function createMockApi(opts: MockOptions = {}): MorwiskoApi & { snapshotForTests(): Snapshot } {
+export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapshotForTests(): Snapshot } {
   const now = opts.now ?? (() => new Date());
   const latency = opts.latencyMs ?? 0;
   const db: Snapshot = clone(opts.snapshot ?? (opts.map === "large" ? buildLargeFixture(toIsoDate(now())) : buildFixtures(toIsoDate(now()), toIsoMinute(now()))));
@@ -153,7 +153,7 @@ export function createMockApi(opts: MockOptions = {}): MorwiskoApi & { snapshotF
     agent_suggestions: { claude: ["opus", "sonnet", "fable"], codex: ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"] },
     waiting_days: 2,
     vault_path: db.root,
-    config_path: "~/Library/Application Support/pl.morwisko.desktop",
+    config_path: "~/Library/Application Support/pl.montybrain.desktop",
     version: "0.1.0",
     ...opts.settings,
   };
@@ -179,11 +179,11 @@ export function createMockApi(opts: MockOptions = {}): MorwiskoApi & { snapshotF
     });
     db.topics.push(
       topic("wydanie-android", "whenubuy", "Wydanie Androida 2.5", "waiting", "Build 2.5.0 czeka na akceptację w Google Play.", `${day(-1)}T17:40`),
-      topic("strona-cennik", "morwisko", "Strona z cennikiem", "in_progress", "Szkic sekcji z planami; brakuje porównania z konkurencją.", `${day(-10)}T09:00`),
+      topic("strona-cennik", "montybrain", "Strona z cennikiem", "in_progress", "Szkic sekcji z planami; brakuje porównania z konkurencją.", `${day(-10)}T09:00`),
     );
     db.journal.push(
       { project: "whenubuy", topic: "wydanie-android", at: `${day(-1)}T17:40`, author: "ja", text: "Czeka: akceptacja w Google Play", line: 901 },
-      { project: "morwisko", topic: "strona-cennik", at: `${day(-10)}T09:00`, author: "claude-code", text: "Szkic sekcji z planami.", line: 902 },
+      { project: "montybrain", topic: "strona-cennik", at: `${day(-10)}T09:00`, author: "claude-code", text: "Szkic sekcji z planami.", line: 902 },
     );
     db.tasks.push({ id: "v1a2t3", title: "Rozliczyć VAT z księgową", status: "doing", priority: "normal", due: null, done: null, links: [], notes: "", location: { kind: "project", project: "whenubuy" }, line: 903 });
   }
@@ -348,7 +348,7 @@ export function createMockApi(opts: MockOptions = {}): MorwiskoApi & { snapshotF
     if (repo && !p.repos.some((r) => r.name === repo)) throw invalid(`unknown repo "${repo}" for project ${p.slug}`);
   }
 
-  const api: MorwiskoApi & { snapshotForTests(): Snapshot } = {
+  const api: MontyBrainApi & { snapshotForTests(): Snapshot } = {
     mode: "mock",
     snapshotForTests: () => clone(db),
 

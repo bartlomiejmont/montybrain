@@ -4,7 +4,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 fn proj_loc(p: &str) -> TaskLocation {
     TaskLocation::Project { project: p.into() }

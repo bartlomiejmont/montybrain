@@ -7,7 +7,7 @@ use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 
 use crate::error::{Error, Result};
-use crate::vault::{META_DIR, TMP_SUFFIX, Vault};
+use crate::vault::{LEGACY_META_DIR, LEGACY_TMP_SUFFIX, META_DIR, TMP_SUFFIX, Vault};
 
 /// Default debounce interval.
 pub const DEFAULT_DEBOUNCE: Duration = Duration::from_millis(300);
@@ -23,13 +23,14 @@ impl std::fmt::Debug for VaultWatcher {
     }
 }
 
-/// True for paths the watcher should not report: anything under `.morwisko/`,
-/// atomic-save temp files, editor swap/backup files and `.DS_Store`.
+/// True for paths the watcher should not report: anything under `.montybrain/`
+/// or the legacy `.morwisko/`, atomic-save temp files (ours and an older
+/// binary's), editor swap/backup files and `.DS_Store`.
 pub fn is_ignored(rel: &Path) -> bool {
     if rel
         .components()
         .next()
-        .is_some_and(|first| first.as_os_str() == META_DIR)
+        .is_some_and(|first| first.as_os_str() == META_DIR || first.as_os_str() == LEGACY_META_DIR)
     {
         return true;
     }
@@ -37,6 +38,7 @@ pub fn is_ignored(rel: &Path) -> bool {
         return false;
     };
     name.ends_with(TMP_SUFFIX)
+        || name.ends_with(LEGACY_TMP_SUFFIX)
         || name.ends_with('~')
         || name.ends_with(".swp")
         || name.ends_with(".swx")
@@ -95,8 +97,11 @@ mod tests {
 
     #[test]
     fn ignore_rules() {
+        assert!(is_ignored(Path::new(".montybrain/lock")));
         assert!(is_ignored(Path::new(".morwisko/lock")));
+        assert!(is_ignored(Path::new(".morwisko/links.json")));
         assert!(is_ignored(Path::new("p/tematy/.a.md.123.0.morwisko-tmp")));
+        assert!(is_ignored(Path::new("p/tematy/.a.md.123.0.montybrain-tmp")));
         assert!(is_ignored(Path::new("p/tematy/a.md~")));
         assert!(is_ignored(Path::new("p/.a.md.swp")));
         assert!(!is_ignored(Path::new("p/tematy/a.md")));

@@ -20,8 +20,8 @@ use std::sync::Mutex;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::time::Duration;
 
-use morwisko_core::chrono::{Local, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Timelike};
-use morwisko_core::{ProjectState, Snapshot, Task, TaskLocation, TaskStatus};
+use montybrain_core::chrono::{Local, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Timelike};
+use montybrain_core::{ProjectState, Snapshot, Task, TaskLocation, TaskStatus};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -57,7 +57,7 @@ impl Fired {
     }
 
     pub fn insert(&mut self, key: String, at: NaiveDateTime) {
-        self.fired.insert(key, morwisko_core::minute::format(&at));
+        self.fired.insert(key, montybrain_core::minute::format(&at));
     }
 
     /// Drops entries fired more than [`KEEP_DAYS`] ago (or unreadable ones).
@@ -67,7 +67,7 @@ impl Fired {
         let cutoff = now - TimeDelta::days(KEEP_DAYS);
         let before = self.fired.len();
         self.fired
-            .retain(|_, at| morwisko_core::minute::parse(at).is_some_and(|t| t >= cutoff));
+            .retain(|_, at| montybrain_core::minute::parse(at).is_some_and(|t| t >= cutoff));
         self.fired.len() != before
     }
 
@@ -122,7 +122,7 @@ impl Plan {
     }
 }
 
-pub fn due_key(task_id: &str, due: &morwisko_core::Due) -> String {
+pub fn due_key(task_id: &str, due: &montybrain_core::Due) -> String {
     format!("due:{task_id}@{due}")
 }
 
@@ -220,9 +220,9 @@ pub fn plan(snap: &Snapshot, now: NaiveDateTime, fired: &Fired, cfg: Config) -> 
 
 fn priority_rank(t: &Task) -> u8 {
     match t.priority {
-        morwisko_core::Priority::High => 0,
-        morwisko_core::Priority::Normal => 1,
-        morwisko_core::Priority::Low => 2,
+        montybrain_core::Priority::High => 0,
+        montybrain_core::Priority::Normal => 1,
+        montybrain_core::Priority::Low => 2,
     }
 }
 
@@ -302,7 +302,7 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, config_dir: PathBuf) {
     let app = app.clone();
     let path = state_path(&config_dir);
     let spawned = std::thread::Builder::new()
-        .name("morwisko-reminders".into())
+        .name("montybrain-reminders".into())
         .spawn(move || {
             let mut tracker = Tracker::new(Fired::load(&path));
             let mut wait = FIRST_CHECK;
@@ -482,7 +482,7 @@ fn show<R: Runtime>(app: &AppHandle<R>, note: &Note) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morwisko_core::{Due, Priority, Project, Topic, TopicStatus};
+    use montybrain_core::{Due, Priority, Project, Topic, TopicStatus};
     use std::collections::HashMap;
 
     fn keys(plan: &Plan) -> HashMap<&str, NoteKind> {
@@ -493,7 +493,7 @@ mod tests {
     }
 
     fn at(s: &str) -> NaiveDateTime {
-        morwisko_core::minute::parse(s).unwrap()
+        montybrain_core::minute::parse(s).unwrap()
     }
 
     fn task(id: &str, title: &str, due: Option<&str>, loc: TaskLocation) -> Task {

@@ -23,13 +23,13 @@ export function buildFixtures(today: string, now: string): Snapshot {
       path: "whenubuy/projekt.md",
     },
     {
-      slug: "morwisko",
-      name: "Morwisko",
+      slug: "montybrain",
+      name: "MontyBrain",
       color: "#818cf8",
       state: "active",
-      repos: [{ name: "morwisko", path: "/Users/ja/Projects/morwisko" }],
+      repos: [{ name: "montybrain", path: "/Users/ja/Projects/montybrain" }],
       description: "Lokalne centrum dowodzenia: projekty, tematy, zadania w plikach Markdown.",
-      path: "morwisko/projekt.md",
+      path: "montybrain/projekt.md",
     },
     {
       slug: "remont-kuchni",
@@ -109,22 +109,22 @@ export function buildFixtures(today: string, now: string): Snapshot {
     ),
     topic("whenubuy", "onboarding", "Onboarding nowych użytkowników", "done", "Wdrożone w wersji 2.4.", at(-20, "18:30")),
     topic(
-      "morwisko",
+      "montybrain",
       "aplikacja-desktopowa",
       "Aplikacja desktopowa",
       "in_progress",
       "Szkielet Tauri, widoki Dziś i projektu, pełna edycja.",
       at(0, nowTime),
-      "morwisko",
+      "montybrain",
     ),
     topic(
-      "morwisko",
+      "montybrain",
       "serwer-mcp",
       "Serwer MCP",
       "in_progress",
       "Narzędzia do odczytu i zapisu zadań dla agentów.",
       at(0, "08:12"),
-      "morwisko",
+      "montybrain",
     ),
     topic("remont-kuchni", "wybor-blatu", "Wybór blatu", "waiting", "Czekam na wycenę konglomeratu.", at(-12, "19:00")),
   ];
@@ -194,12 +194,12 @@ export function buildFixtures(today: string, now: string): Snapshot {
 
     task(tp("whenubuy", "onboarding"), "o1n2b3", "Ekran powitalny z wyborem kategorii", { status: "done", done: d(-21) }),
 
-    task(tp("morwisko", "aplikacja-desktopowa"), "c3v4b5", "Widok projektu z rozwijanymi tematami", { status: "doing" }),
-    task(tp("morwisko", "aplikacja-desktopowa"), "n6m7q8", "Tryb mock w przeglądarce do zrzutów ekranu", { status: "done", done: d(0) }),
-    task(tp("morwisko", "aplikacja-desktopowa"), "e9r0t1", "Ikona w pasku menu z licznikiem", { priority: "low" }),
+    task(tp("montybrain", "aplikacja-desktopowa"), "c3v4b5", "Widok projektu z rozwijanymi tematami", { status: "doing" }),
+    task(tp("montybrain", "aplikacja-desktopowa"), "n6m7q8", "Tryb mock w przeglądarce do zrzutów ekranu", { status: "done", done: d(0) }),
+    task(tp("montybrain", "aplikacja-desktopowa"), "e9r0t1", "Ikona w pasku menu z licznikiem", { priority: "low" }),
 
-    task(tp("morwisko", "serwer-mcp"), "y2u3i4", "Narzędzie add_journal_entry z opcjonalną zmianą statusu", { status: "doing" }),
-    task(tp("morwisko", "serwer-mcp"), "a5s6d7", "Opisać instalację w Claude Code", { due: d(3) }),
+    task(tp("montybrain", "serwer-mcp"), "y2u3i4", "Narzędzie add_journal_entry z opcjonalną zmianą statusu", { status: "doing" }),
+    task(tp("montybrain", "serwer-mcp"), "a5s6d7", "Opisać instalację w Claude Code", { due: d(3) }),
 
     task(tp("remont-kuchni", "wybor-blatu"), "f8g9h0", "Zadzwonić do kamieniarza", { status: "blocked" }),
   ];
@@ -214,9 +214,9 @@ export function buildFixtures(today: string, now: string): Snapshot {
   });
 
   const journal: JournalEntry[] = [
-    j("morwisko", "aplikacja-desktopowa", at(0, nowTime), "claude-code", "Widok Dziś i lista tematów działają na danych z mocka."),
-    j("morwisko", "aplikacja-desktopowa", at(-1, "21:15"), "ja", "Ustalony wygląd: ciemny, minimalny, kolor projektu jako jedyny akcent."),
-    j("morwisko", "serwer-mcp", at(0, "08:12"), "agent", "Dodane narzędzia list_tasks i update_task. Testy zielone."),
+    j("montybrain", "aplikacja-desktopowa", at(0, nowTime), "claude-code", "Widok Dziś i lista tematów działają na danych z mocka."),
+    j("montybrain", "aplikacja-desktopowa", at(-1, "21:15"), "ja", "Ustalony wygląd: ciemny, minimalny, kolor projektu jako jedyny akcent."),
+    j("montybrain", "serwer-mcp", at(0, "08:12"), "agent", "Dodane narzędzia list_tasks i update_task. Testy zielone."),
     j("whenubuy", "ab-testy-cen", at(0, "09:41"), "agent", "Wariant B: +3,1% konwersji po 4 dniach, przedział ufności jeszcze szeroki."),
     j("whenubuy", "ab-testy-cen", at(-2, "15:30"), "ja", "Ruch podzielony 80/20, flagi włączone na produkcji."),
     j(
@@ -232,7 +232,7 @@ export function buildFixtures(today: string, now: string): Snapshot {
   ];
 
   return {
-    root: "/Users/ja/Morwisko",
+    root: "/Users/ja/MontyBrain",
     projects,
     topics,
     tasks,

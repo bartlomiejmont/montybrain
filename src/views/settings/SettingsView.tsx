@@ -224,14 +224,14 @@ function AutoUpdates({ s, onError }: { s: AppSettings; onError: (msg: string | n
           );
         })
       )}
-      <p className="set-hint set-foot">Działa tylko wtedy, gdy Morwisko jest uruchomione.</p>
+      <p className="set-hint set-foot">Działa tylko wtedy, gdy MontyBrain jest uruchomiony.</p>
     </section>
   );
 }
 
 const AGENT_HINT = {
   claude: "Puste pole: model z ustawień Claude Code.",
-  codex: "Puste pole: domyślny model Codexa. Morwisko nie wczytuje twojej konfiguracji Codexa.",
+  codex: "Puste pole: domyślny model Codexa. MontyBrain nie wczytuje twojej konfiguracji Codexa.",
 } as const;
 
 /** Model and effort per agent; empty = the CLI's default. */
@@ -444,7 +444,7 @@ export function SettingsView() {
             <h2 className="group-head" id="set-g-sys">
               System
             </h2>
-            <Row id="set-autostart" label="Uruchamiaj przy logowaniu" hint="Morwisko startuje w tle, ikoną w pasku menu.">
+            <Row id="set-autostart" label="Uruchamiaj przy logowaniu" hint="MontyBrain startuje w tle, ikoną w pasku menu.">
               <Switch on={s.autostart} labelledBy="set-autostart" onChange={(v) => applyRow(() => api.setAutostart(v))} />
             </Row>
             {s.autostart_error && <div className="set-note danger">{s.autostart_error}</div>}

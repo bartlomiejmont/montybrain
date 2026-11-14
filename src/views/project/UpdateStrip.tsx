@@ -79,7 +79,7 @@ import { driftStore, useDrift } from "../../store/signals";
 import { presetAction } from "../actions/preset";
 import "./update.css";
 
-const PROVIDER_PREF = "morwisko.aktualizacja.provider";
+const PROVIDER_PREF = "montybrain.aktualizacja.provider";
 const DEFAULT_AUTO: AutoUpdate = { schedule: { kind: "off" }, provider: "claude", on_result: "propose" };
 const DEFAULT_SOURCES: UpdateSources = { history: false, history_days: 14 };
 /** Typed requests per project: survive navigating away and back (module scope, like Akcje's form). */
@@ -275,7 +275,7 @@ function AutoPanel({
         />
       )}
       <h3 className="upd-panel-head">Automatycznie</h3>
-      <p className="upd-auto-note">Każde sprawdzenie zużywa limit wybranej subskrypcji. Działa tylko, gdy Morwisko jest uruchomione.</p>
+      <p className="upd-auto-note">Każde sprawdzenie zużywa limit wybranej subskrypcji. Działa tylko, gdy MontyBrain jest uruchomiony.</p>
       <div className="upd-auto-row">
         <span className="upd-auto-label">Harmonogram</span>
         <div className="upd-auto-controls">
@@ -1360,7 +1360,7 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
           : last?.outcome.kind === "cancelled"
             ? `${what} przerwane.`
             : last?.request
-              ? "Gotowe: odpowiedź bez zmian w Morwisku."
+              ? "Gotowe: odpowiedź bez zmian w MontyBrain."
               : "Gotowe: bez zmian.",
       );
       watched.current = null;

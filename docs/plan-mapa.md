@@ -21,7 +21,7 @@ Skala, dla której projektujemy: do 5 projektów, do 40 tematów, do 300 zadań 
 Płótno z przesuwaniem i powiększaniem, a na nim wyspy projektów.
 
 ```
-+--- WhenUBuy ● -----------------------+    +--- Morwisko ● -------------+
++--- WhenUBuy ● -----------------------+    +--- MontyBrain ● -------------+
 |  │  Płatności      w toku   3  ⏳ 2↔ |    |  │  Mapa        w toku   2 |
 |  │  Checkout       czeka    1        |    |  │  MCP         w toku     |
 |  │  A/B testy      planowany         |    +----------------------------+

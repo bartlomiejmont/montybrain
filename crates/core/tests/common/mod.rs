@@ -3,8 +3,8 @@
 use std::fs;
 use std::path::Path;
 
-use morwisko_core::Vault;
-use morwisko_core::chrono::{NaiveDate, NaiveDateTime};
+use montybrain_core::Vault;
+use montybrain_core::chrono::{NaiveDate, NaiveDateTime};
 
 pub const NOW: &str = "2026-11-14 09:15";
 

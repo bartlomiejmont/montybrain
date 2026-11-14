@@ -1,4 +1,4 @@
-//! End-to-end tests: spawn the real `morwisko-mcp` binary on a temp vault and speak
+//! End-to-end tests: spawn the real `montybrain-mcp` binary on a temp vault and speak
 //! JSON-RPC over stdio.
 
 use std::io::{BufRead, BufReader, Write};
@@ -7,7 +7,7 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Receiver, channel};
 use std::time::Duration;
 
-use morwisko_core::*;
+use montybrain_core::*;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -40,9 +40,9 @@ impl Client {
 
     /// Starts the server on `root` (which may be missing) inside `dir`.
     fn spawn(dir: TempDir, root: PathBuf, env: &[(&str, &str)]) -> Client {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_morwisko-mcp"))
-            .env("MORWISKO_DIR", &root)
-            .env_remove("MORWISKO_READONLY")
+        let mut child = Command::new(env!("CARGO_BIN_EXE_montybrain-mcp"))
+            .env("MONTYBRAIN_DIR", &root)
+            .env_remove("MONTYBRAIN_READONLY")
             .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -75,7 +75,7 @@ impl Client {
             "initialize",
             json!({"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"0"}}),
         );
-        assert_eq!(init["result"]["serverInfo"]["name"], "morwisko");
+        assert_eq!(init["result"]["serverInfo"]["name"], "montybrain");
         c.send(json!({"jsonrpc":"2.0","method":"notifications/initialized"}));
         c
     }
@@ -549,7 +549,7 @@ fn survives_garbage_arguments() {
         "{v}"
     );
     let o = c.ok("overview", json!({}));
-    assert!(o.contains("# Morwisko overview"));
+    assert!(o.contains("# MontyBrain overview"));
 }
 
 // ---------------------------------------------------------------------------
@@ -783,7 +783,7 @@ fn tree(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
 #[test]
 fn read_only_mode_refuses_writes_and_writes_nothing() {
     for value in ["1", "true", " TRUE "] {
-        let mut c = Client::start_with_env(seed, &[("MORWISKO_READONLY", value)]);
+        let mut c = Client::start_with_env(seed, &[("MONTYBRAIN_READONLY", value)]);
         let before = tree(&c.root);
 
         let init = c.request(
@@ -839,7 +839,7 @@ fn read_only_mode_refuses_writes_and_writes_nothing() {
 #[test]
 fn read_only_off_values_keep_writes_enabled() {
     for value in ["0", "", "false", "yes"] {
-        let mut c = Client::start_with_env(seed, &[("MORWISKO_READONLY", value)]);
+        let mut c = Client::start_with_env(seed, &[("MONTYBRAIN_READONLY", value)]);
         let init = c.request(
             "initialize",
             json!({"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"0"}}),
@@ -875,12 +875,12 @@ fn all_paths(dir: &Path) -> Vec<PathBuf> {
 
 #[test]
 fn read_only_start_creates_nothing() {
-    // An existing but empty vault directory: no skeleton (`.morwisko/`,
+    // An existing but empty vault directory: no skeleton (`.montybrain/`,
     // `skrzynka.md`) is created, and reads work on the empty vault.
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("vault");
     std::fs::create_dir_all(&root).unwrap();
-    let mut c = Client::spawn(dir, root.clone(), &[("MORWISKO_READONLY", "1")]);
+    let mut c = Client::spawn(dir, root.clone(), &[("MONTYBRAIN_READONLY", "1")]);
     let o = c.ok("overview", json!({}));
     assert!(!o.is_empty());
     c.ok("list_tasks", json!({}));
@@ -900,7 +900,7 @@ fn read_only_start_creates_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().to_path_buf();
     let root = base.join("brak");
-    let mut c = Client::spawn(dir, root.clone(), &[("MORWISKO_READONLY", "1")]);
+    let mut c = Client::spawn(dir, root.clone(), &[("MONTYBRAIN_READONLY", "1")]);
     for (tool, args) in [
         ("overview", json!({})),
         ("list_tasks", json!({})),

@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 const CRLF_PROJECT: &str = "---\r\nnazwa: Okna CRLF\r\nstan: wstrzymany\r\n---\r\nOpis\r\n\r\n## Zadania\r\n- [ ] Pierwsze ^ccccc1\r\n- [ ] Drugie ^ccccc2\r\n  - https://example.com/crlf\r\n";
 

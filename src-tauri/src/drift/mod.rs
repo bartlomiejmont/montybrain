@@ -15,7 +15,7 @@
 //!   project's last update check.
 //!
 //! A branch is matched to a topic ([`match_branch`]) by an explicit link
-//! ([`links`], `.morwisko/links.json` in the vault), else by its name appearing
+//! ([`links`], `.montybrain/links.json` in the vault), else by its name appearing
 //! in the topic's summary or journal, else by shared word stems with the
 //! topic's title and slug. Nothing here starts an agent.
 
@@ -28,8 +28,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::time::Duration;
 
-use morwisko_core::chrono::{NaiveDate, NaiveDateTime, TimeDelta};
-use morwisko_core::{ProjectState, Snapshot, fold};
+use montybrain_core::chrono::{NaiveDate, NaiveDateTime, TimeDelta};
+use montybrain_core::{ProjectState, Snapshot, fold};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -83,7 +83,7 @@ pub struct RepoObs {
 /// One project's last collection.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectObs {
-    #[serde(with = "morwisko_core::minute")]
+    #[serde(with = "montybrain_core::minute")]
     pub collected_at: NaiveDateTime,
     /// The check `new_commits` counts from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -116,7 +116,7 @@ impl DriftFile {
 
     /// Records a collection (and when its branches and worktrees were seen).
     pub fn record(&mut self, project: &str, obs: ProjectObs) {
-        let at = morwisko_core::minute::format(&obs.collected_at);
+        let at = montybrain_core::minute::format(&obs.collected_at);
         for r in obs.repos.iter().filter(|r| r.ok) {
             for b in &r.branches {
                 self.seen
@@ -559,7 +559,7 @@ pub fn analyse(
     let topics = TopicInfo::of(snap, project);
     let mut out = ProjectDrift {
         project: project.to_string(),
-        collected_at: obs.map(|o| morwisko_core::minute::format(&o.collected_at)),
+        collected_at: obs.map(|o| montybrain_core::minute::format(&o.collected_at)),
         branches: Vec::new(),
         unknown: Vec::new(),
         spread: Vec::new(),
@@ -686,7 +686,7 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, config_dir: &Path) {
     });
     let app = app.clone();
     let spawned = std::thread::Builder::new()
-        .name("morwisko-drift".into())
+        .name("montybrain-drift".into())
         .spawn(move || {
             let mut wait = FIRST;
             loop {

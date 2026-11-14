@@ -18,7 +18,7 @@ pub enum Error {
     },
     #[error("vault directory does not exist: {}", .0.display())]
     VaultNotFound(PathBuf),
-    #[error("cannot determine the vault directory: set MORWISKO_DIR or HOME")]
+    #[error("cannot determine the vault directory: set MONTYBRAIN_DIR or HOME")]
     NoVaultDir,
     #[error("project not found: {0}")]
     ProjectNotFound(String),

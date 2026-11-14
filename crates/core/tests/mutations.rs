@@ -3,7 +3,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 const TOPIC: &str = "whenubuy/tematy/ab-testy.md";
 const UPD_OLD: &str = "-zaktualizowano: 2026-11-13T14:02";

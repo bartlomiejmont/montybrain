@@ -359,7 +359,7 @@ fn is_list_item(text: &str) -> bool {
 /// validation. Feed lines in order; [`FenceScanner::feed`] says whether a line is
 /// code.
 ///
-/// Rules (a CommonMark subset tailored to Morwisko's line-based structure, where
+/// Rules (a CommonMark subset tailored to MontyBrain's line-based structure, where
 /// every structural line starts in column 0):
 /// * a fence opens on a line with at most 3 spaces of indentation and at least three
 ///   backticks or tildes, and closes on a line (again at most 3 spaces) made of at

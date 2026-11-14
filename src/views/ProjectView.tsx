@@ -28,7 +28,7 @@ export function ProjectView({ route }: ViewProps) {
   const focusTopic = route.query.get("temat");
   const project = view.snapshot.projects.find((p) => p.slug === slug);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(focusTopic ? [focusTopic] : []));
-  const [showDoneTopics, setShowDoneTopics] = useStoredFlag(`morwisko.doneTopics.${slug}`, false);
+  const [showDoneTopics, setShowDoneTopics] = useStoredFlag(`montybrain.doneTopics.${slug}`, false);
   // Selection mode ("Zaznacz"): one status for many topics, without expanding them.
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);

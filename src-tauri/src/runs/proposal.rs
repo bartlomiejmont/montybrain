@@ -15,7 +15,7 @@
 //! ]}
 //! ```
 //!
-//! The app, not the agent, applies accepted changes through `morwisko-core`.
+//! The app, not the agent, applies accepted changes through `montybrain-core`.
 //! Everything in the answer is untrusted:
 //!
 //! * a missing, duplicated, unclosed, oversized or malformed block is "no
@@ -24,19 +24,21 @@
 //! * every item is checked on its own (unknown fields, kinds and statuses,
 //!   caps on count and text lengths, ids and topics that must exist **in this
 //!   project**, tasks that must be open, the same free-text rules core applies
-//!   before writing, see [`morwisko_core::check`]); a bad item is dropped with
+//!   before writing, see [`montybrain_core::check`]); a bad item is dropped with
 //!   a visible reason ([`Dropped`]) instead of failing the whole proposal;
 //! * each kept [`Change`] records the state it was based on, so applying it
 //!   later can detect that its target changed in the meantime ([`check_current`]).
 
-use morwisko_core::{
+use montybrain_core::{
     Snapshot, Task, TaskLocation, TaskStatus, Topic, TopicStatus, check, fold, is_valid_id, slugify,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// The info string of the fenced block with the proposed changes.
-pub const FENCE_INFO: &str = "morwisko-zmiany";
+pub const FENCE_INFO: &str = "montybrain-zmiany";
+/// The pre-rename info string, still accepted (prompts ask for [`FENCE_INFO`]).
+pub const LEGACY_FENCE_INFO: &str = "morwisko-zmiany";
 /// Changes per proposal; further items are dropped.
 pub const MAX_CHANGES: usize = 20;
 /// A larger block is not parsed at all.
@@ -300,7 +302,7 @@ fn split(answer: &str) -> Split {
             fence_line(lines[j])
                 .is_some_and(|(c2, n2, info2)| c2 == c && n2 >= n && info2.is_empty())
         });
-        let ours = info == FENCE_INFO;
+        let ours = info == FENCE_INFO || info == LEGACY_FENCE_INFO;
         match close {
             Some(j) => {
                 if ours {
@@ -380,11 +382,11 @@ fn capped(field: &str, s: &str, max: usize) -> Result<(), String> {
 }
 
 /// Core's rejection message, shortened for the UI.
-fn core_rejects(field: &str, e: morwisko_core::Error) -> String {
+fn core_rejects(field: &str, e: montybrain_core::Error) -> String {
     let msg = e.to_string();
     let msg = msg.strip_prefix("invalid input: ").unwrap_or(&msg);
     format!(
-        "{} nie może zostać zapisany w tej postaci: naruszałby format pliku Morwiska ({msg}).",
+        "{} nie może zostać zapisany w tej postaci: naruszałby format pliku MontyBrain ({msg}).",
         field_name(field)
     )
 }
@@ -1168,7 +1170,7 @@ pub fn refresh_vault_part(fp: &str, before: &str, vault: &str) -> Option<String>
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use morwisko_core::{Priority, Project, ProjectState};
+    use montybrain_core::{Priority, Project, ProjectState};
 
     pub(crate) fn task(id: &str, title: &str, status: TaskStatus, loc: TaskLocation) -> Task {
         Task {
@@ -1198,7 +1200,7 @@ pub(crate) mod tests {
             name: slug.to_uppercase(),
             color: None,
             state: ProjectState::Active,
-            repos: vec![morwisko_core::Repo {
+            repos: vec![montybrain_core::Repo {
                 name: "app".into(),
                 path: format!("/r/{slug}"),
             }],
@@ -1257,6 +1259,25 @@ pub(crate) mod tests {
 
     fn answer(json: &str) -> String {
         format!("Raport: webhook gotowy.\n\n```{FENCE_INFO}\n{json}\n```\n")
+    }
+
+    #[test]
+    fn the_legacy_fence_info_is_still_accepted() {
+        let text = "Raport.\n\n```morwisko-zmiany\n{\"changes\":[]}\n```\n";
+        let s = split(text);
+        assert_eq!(s.report, "Raport.");
+        assert_eq!(s.blocks, vec!["{\"changes\":[]}".to_string()]);
+        assert!(!s.unclosed);
+        // The same through the full parser.
+        let json = r#"{"changes": [{"kind": "task_status", "task": "^aaaaa1", "status": "done", "reason": "Commit abc."}]}"#;
+        let p = parse(
+            &format!("Raport.\n\n```morwisko-zmiany\n{json}\n```\n"),
+            &snap(),
+            "beeking",
+        );
+        assert_eq!(p.problem, None);
+        assert_eq!(p.report, "Raport.");
+        assert_eq!(p.changes.len(), 1);
     }
 
     fn parse_json(json: &str) -> Proposal {

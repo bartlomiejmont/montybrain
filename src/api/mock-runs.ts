@@ -4,7 +4,7 @@
 //  - text containing "dużo" / "many"   → ~400 log lines before the answer;
 //  - `codex: "missing"` option (URL `?codex=off`) → Codex is unavailable with a `problem`;
 //  - `claude: "missing"` (URL `?update=unavailable`) → Claude Code is unavailable too;
-//  - recipe `aktualizacja` ends with a `morwisko-zmiany` block; the proposal itself is
+//  - recipe `aktualizacja` ends with a `montybrain-zmiany` block; the proposal itself is
 //    built by mock-updates.ts from the fixtures when the run ends;
 //  - only one background run at a time (a second start rejects).
 
@@ -30,7 +30,7 @@ export const MOCK_RECIPES: Recipe[] = [
     id: "postep",
     title: "Otwarte zadania i postęp",
     description: "Przegląda otwarte zadania i dziennik, i opisuje, na czym stoisz.",
-    skill: "morwisko-podsumowanie",
+    skill: "montybrain-podsumowanie",
     modes: ["background", "terminal"],
     background_writes: false,
     proposes: false,
@@ -41,7 +41,7 @@ export const MOCK_RECIPES: Recipe[] = [
     id: "raport",
     title: "Raport z dnia lub tygodnia",
     description: "Składa raport z dziennika i zamkniętych zadań.",
-    skill: "morwisko-podsumowanie",
+    skill: "montybrain-podsumowanie",
     modes: ["background", "terminal"],
     background_writes: false,
     proposes: false,
@@ -54,8 +54,8 @@ export const MOCK_RECIPES: Recipe[] = [
   {
     id: "zadania",
     title: "Zadania z notatek",
-    description: "Zamienia wklejone notatki na zadania w Morwisku.",
-    skill: "morwisko-zadania",
+    description: "Zamienia wklejone notatki na zadania w MontyBrain.",
+    skill: "montybrain-zadania",
     modes: ["background", "terminal"],
     background_writes: true,
     proposes: false,
@@ -69,7 +69,7 @@ export const MOCK_RECIPES: Recipe[] = [
     id: "poczta",
     title: "Poczta → zadania",
     description: "Przeszukuje pocztę i proponuje z niej zadania. Wymaga terminala.",
-    skill: "morwisko-poczta",
+    skill: "montybrain-poczta",
     modes: ["terminal"],
     background_writes: false,
     proposes: false,
@@ -83,7 +83,7 @@ export const MOCK_RECIPES: Recipe[] = [
     id: "aktualizacja",
     title: "Aktualizacja projektu",
     description: "Porównuje repozytoria z tematami i zadaniami; proponuje nowe tematy i zmiany do akceptacji.",
-    skill: "morwisko-postep",
+    skill: "montybrain-postep",
     modes: ["background", "terminal"],
     background_writes: false,
     proposes: true,
@@ -93,8 +93,8 @@ export const MOCK_RECIPES: Recipe[] = [
   {
     id: "zlecenie",
     title: "Zlecenie dla agenta",
-    description: "Twoje polecenie dla projektu, np. rozpisanie tematu na podstawie historii rozmów. Agent korzysta z Morwiska, repozytoriów i historii rozmów; zmiany proponuje do akceptacji.",
-    skill: "morwisko-postep",
+    description: "Twoje polecenie dla projektu, np. rozpisanie tematu na podstawie historii rozmów. Agent korzysta z MontyBrain, repozytoriów i historii rozmów; zmiany proponuje do akceptacji.",
+    skill: "montybrain-postep",
     modes: ["background", "terminal"],
     background_writes: false,
     proposes: true,
@@ -156,10 +156,10 @@ function resultFor(req: RunRequest, recipeTitle: string): string {
     return `# Raport: ${period}\n\nW ${scope} zamknięto **4 zadania**, a dziennik zawiera 6 nowych wpisów.\n\n## Zrobione\n\n- Odnowiono certyfikat domeny \`whenubuy.pl\`\n- Wysłano dokumenty rejestrowe do Przelewy24\n  - potwierdzenie przyszło w ciągu godziny\n  - brak uwag po stronie banku\n- Zamknięto zaległe uwagi z App Store Review\n\n## Na jutro\n\n1. Dokończyć dashboard konwersji dla wariantu B\n2. Ustalić próg istotności statystycznej z Tomkiem\n3. Przejrzeć nowe zgłoszenia\n\nZmiana w \`BoardView.tsx\`:\n\n\`\`\`ts\nconst done = tasks.filter((t) => t.status === "done");\n\`\`\`\n\nŹródło: <script>alert(1)</script> [link](javascript:alert(1)) — pokazane jako tekst.`;
   }
   if (req.recipe === "aktualizacja") {
-    return `W projekcie „${req.params.project}” jedno zadanie wygląda na skończone, jedno trwa.\n\n- **Webhook zwrotów** — commit \`a1c9f02\` „Obsługa refundów” na \`main\`, testy przechodzą.\n- **Testy BLIK** — gałąź \`feature/blik-e2e\`, bez merge.\n\n\`\`\`morwisko-zmiany\n{"changes": [{"kind": "task_status", "task": "h4j5k6", "status": "done", "reason": "Commit a1c9f02."}]}\n\`\`\``;
+    return `W projekcie „${req.params.project}” jedno zadanie wygląda na skończone, jedno trwa.\n\n- **Webhook zwrotów** — commit \`a1c9f02\` „Obsługa refundów” na \`main\`, testy przechodzą.\n- **Testy BLIK** — gałąź \`feature/blik-e2e\`, bez merge.\n\n\`\`\`montybrain-zmiany\n{"changes": [{"kind": "task_status", "task": "h4j5k6", "status": "done", "reason": "Commit a1c9f02."}]}\n\`\`\``;
   }
   if (req.recipe === "zlecenie") {
-    return `Nie mam w tym trybie dostępu do poczty ani Slacka, więc opieram się na Morwisku, repozytoriach i historii rozmów.\n\n- W historii są dwie sesje o tym temacie (Claude Code z 10.11, Codex z 12.11).\n- W repozytorium: gałąź \`feature/blik-e2e\`, bez merge.\n\n\`\`\`morwisko-zmiany\n{"changes": []}\n\`\`\``;
+    return `Nie mam w tym trybie dostępu do poczty ani Slacka, więc opieram się na MontyBrain, repozytoriach i historii rozmów.\n\n- W historii są dwie sesje o tym temacie (Claude Code z 10.11, Codex z 12.11).\n- W repozytorium: gałąź \`feature/blik-e2e\`, bez merge.\n\n\`\`\`montybrain-zmiany\n{"changes": []}\n\`\`\``;
   }
   if (req.recipe === "zadania") {
     return `Dodałem **3 zadania** w ${scope}:\n\n1. Zadzwonić do księgowej w sprawie VAT (jutro)\n2. Przygotować ofertę dla nowego klienta\n3. Odpisać na pytania z rekrutacji\n\nJedno zdanie z notatek było zbyt ogólne („ogarnąć sprawy”) i zostało pominięte.`;

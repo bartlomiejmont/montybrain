@@ -1,6 +1,6 @@
 //! MCP tool definitions.
 
-use morwisko_core::{
+use montybrain_core::{
     NewJournalEntry, NewTask, NewTopic, Priority, Snapshot, TaskFilter, TaskLocation, TaskPatch,
     Vault,
 };
@@ -20,9 +20,9 @@ use crate::resolve::{
 };
 
 const INSTRUCTIONS: &str = "\
-Morwisko is the user's local command center: projects contain topics, topics and projects contain \
+MontyBrain is the user's local command center: projects contain topics, topics and projects contain \
 tasks, and every topic has a status, a short summary and a journal. Everything is stored as Markdown \
-files that the user also edits by hand and sees in the Morwisko desktop app. \
+files that the user also edits by hand and sees in the MontyBrain desktop app. \
 Etiquette: (1) call `overview` at the start of work to see what is going on today. \
 (2) After meaningful progress on a topic, call `log_update` with a short, factual entry written in \
 Polish (the user's language); use its `status`/`summary` to keep the topic current. \
@@ -42,14 +42,23 @@ one. The journal is not read for connections.";
 
 /// Appended to [`INSTRUCTIONS`] when the server runs read-only.
 const READ_ONLY_INSTRUCTIONS: &str = "\n\nREAD-ONLY RUN: this session was started with \
-MORWISKO_READONLY set. Only `overview`, `get_topic`, `list_tasks` and `search` work; `create_task`, \
+MONTYBRAIN_READONLY set. Only `overview`, `get_topic`, `list_tasks` and `search` work; `create_task`, \
 `update_task`, `create_topic` and `log_update` are refused and nothing in the vault can be changed. \
 Do not try to write: report what you would change instead.";
 
 /// Env var that switches the server to read-only mode (`1` or `true`).
-pub const ENV_READONLY: &str = "MORWISKO_READONLY";
+pub const ENV_READONLY: &str = "MONTYBRAIN_READONLY";
+/// The pre-rename name of [`ENV_READONLY`], still honoured.
+pub const LEGACY_ENV_READONLY: &str = "MORWISKO_READONLY";
 
-/// Whether an `MORWISKO_READONLY` value turns read-only mode on: `1` or `true`
+/// Read-only when either variable turns it on. Unlike the other renamed
+/// variables, the new name does not override the old one here: a switch that
+/// restricts writes fails safe.
+pub fn read_only_from_vars(value: Option<&str>, legacy: Option<&str>) -> bool {
+    read_only_from_env(value) || read_only_from_env(legacy)
+}
+
+/// Whether an `MONTYBRAIN_READONLY` value turns read-only mode on: `1` or `true`
 /// (case-insensitive, surrounding whitespace ignored). Anything else is off.
 pub fn read_only_from_env(value: Option<&str>) -> bool {
     value.is_some_and(|v| {
@@ -60,19 +69,19 @@ pub fn read_only_from_env(value: Option<&str>) -> bool {
 
 /// Opens the vault for a read-only session without creating anything. The
 /// error is the message every tool returns when there is no vault.
-pub fn open_read_only(root: morwisko_core::Result<std::path::PathBuf>) -> Result<Vault, String> {
-    let root = root.map_err(|e| format!("Morwisko vault not found: {e}."))?;
+pub fn open_read_only(root: montybrain_core::Result<std::path::PathBuf>) -> Result<Vault, String> {
+    let root = root.map_err(|e| format!("MontyBrain vault not found: {e}."))?;
     Vault::open(&root).map_err(|_| {
         format!(
-            "Morwisko vault not found at {}. This read-only session does not create it: open the \
-Morwisko app once (or point MORWISKO_DIR at the vault) and try again. Nothing was read or changed.",
+            "MontyBrain vault not found at {}. This read-only session does not create it: open the \
+MontyBrain app once (or point MONTYBRAIN_DIR at the vault) and try again. Nothing was read or changed.",
             root.display()
         )
     })
 }
 
 #[derive(Clone)]
-pub struct Morwisko {
+pub struct MontyBrain {
     /// `Err` (read-only sessions only): there is no vault; every tool returns this message.
     vault: Result<Vault, String>,
     /// Write tools refuse and read tools skip `normalize()`: nothing is written.
@@ -81,9 +90,9 @@ pub struct Morwisko {
 
 type ToolResult = Result<CallToolResult, ErrorData>;
 
-fn ce(e: morwisko_core::Error) -> String {
+fn ce(e: montybrain_core::Error) -> String {
     match e {
-        morwisko_core::Error::TaskNotFound(id) => format!(
+        montybrain_core::Error::TaskNotFound(id) => format!(
             "No task with id '{id}'. Find ids with list_tasks or search (ids look like ^k3f9a2)."
         ),
         other => other.to_string(),
@@ -92,9 +101,9 @@ fn ce(e: morwisko_core::Error) -> String {
 
 /// Error of a mutation. Core validates everything and verifies the result before
 /// writing, so any error other than an I/O failure means nothing was written.
-fn mutation_err(e: morwisko_core::Error) -> String {
+fn mutation_err(e: montybrain_core::Error) -> String {
     match e {
-        morwisko_core::Error::Io { .. } => format!(
+        montybrain_core::Error::Io { .. } => format!(
             "{} The write failed part-way, so the change may be partially applied: check with \
 list_tasks, search or get_topic before retrying.",
             ce(e)
@@ -283,7 +292,7 @@ pub struct LogUpdateArgs {
 // Server
 // ---------------------------------------------------------------------------
 
-impl Morwisko {
+impl MontyBrain {
     pub fn new(vault: Vault) -> Self {
         Self {
             vault: Ok(vault),
@@ -331,13 +340,13 @@ impl Morwisko {
         Ok(match res {
             Ok(Ok(s)) => text(s, false),
             Ok(Err(e)) => text(e, true),
-            Err(e) => text(format!("Internal error in morwisko-mcp: {e}"), true),
+            Err(e) => text(format!("Internal error in montybrain-mcp: {e}"), true),
         })
     }
 }
 
 #[tool_router]
-impl Morwisko {
+impl MontyBrain {
     #[tool(
         description = "Session-start briefing of the user's work as compact Markdown: today's date, \
 projects with their topics (status, one-line summary, open-task count), a Today block (overdue, due \
@@ -557,7 +566,7 @@ fields you pass change. Edits and the move are applied together or not at all.",
             let snap = fresh(v, false)?;
             let id = a.id.trim().trim_start_matches('^').to_string();
             let Some(current) = snap.task(&id) else {
-                return Err(ce(morwisko_core::Error::TaskNotFound(id)));
+                return Err(ce(montybrain_core::Error::TaskNotFound(id)));
             };
             if a.clear_due.unwrap_or(false) && nonempty(a.due.clone()).is_some() {
                 return Err("Pass either `due` or `clear_due`, not both.".into());
@@ -631,7 +640,7 @@ user's projects unasked.",
                 Some(r) => match p
                     .repos
                     .iter()
-                    .find(|x| morwisko_core::fold(&x.name) == morwisko_core::fold(&r))
+                    .find(|x| montybrain_core::fold(&x.name) == montybrain_core::fold(&r))
                 {
                     Some(x) => Some(x.name.clone()),
                     None => {
@@ -742,12 +751,12 @@ fn resolve_move(
 }
 
 #[tool_handler]
-impl ServerHandler for Morwisko {
+impl ServerHandler for MontyBrain {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(
-                Implementation::new("morwisko", env!("CARGO_PKG_VERSION"))
-                    .with_title("Morwisko command center"),
+                Implementation::new("montybrain", env!("CARGO_PKG_VERSION"))
+                    .with_title("MontyBrain command center"),
             )
             .with_instructions(if self.read_only {
                 format!("{INSTRUCTIONS}{READ_ONLY_INSTRUCTIONS}")
@@ -770,5 +779,15 @@ mod tests {
             assert!(!read_only_from_env(Some(off)), "{off:?}");
         }
         assert!(!read_only_from_env(None));
+    }
+
+    #[test]
+    fn legacy_read_only_variable_still_works() {
+        use super::read_only_from_vars;
+        assert!(read_only_from_vars(None, Some("1")));
+        assert!(read_only_from_vars(Some("1"), None));
+        assert!(read_only_from_vars(Some("0"), Some("true")), "fails safe");
+        assert!(!read_only_from_vars(None, None));
+        assert!(!read_only_from_vars(Some(""), Some("0")));
     }
 }

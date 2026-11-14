@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Morwisko — lokalne centrum dowodzenia na macOS</title>
+    <title>MontyBrain — lokalne centrum dowodzenia na macOS</title>
     <meta
       name="description"
-      content="Lokalne okno na macOS: projekty, tematy, zadania i dziennik w plikach Markdown w ~/Morwisko. Ten sam folder czyta serwer MCP dla Claude Code i Codexa."
+      content="Lokalne okno na macOS: projekty, tematy, zadania i dziennik w plikach Markdown w ~/MontyBrain. Ten sam folder czyta serwer MCP dla Claude Code i Codexa."
     />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -18,13 +18,13 @@
         <main class="content" id="tresc">
           <header class="hero">
             <p class="eyebrow">macOS · Tauri 2 + React · ok. 13 MB</p>
-            <h1>Morwisko</h1>
+            <h1>MontyBrain</h1>
             <p class="lead">
-              Lokalne okno na macOS do projektów, tematów, zadań i dziennika. Wszystko leży w plikach Markdown, domyślnie w <code>~/Morwisko</code>. Ten sam folder czyta serwer MCP, więc agent w Claude Code albo Codexie widzi te zadania i może je aktualizować.
+              Lokalne okno na macOS do projektów, tematów, zadań i dziennika. Wszystko leży w plikach Markdown, domyślnie w <code>~/MontyBrain</code>. Ten sam folder czyta serwer MCP, więc agent w Claude Code albo Codexie widzi te zadania i może je aktualizować.
             </p>
             <ul class="facts">
               <li>Bez konta i chmury. Po zamknięciu aplikacji zostają pliki <code>.md</code></li>
-              <li>Okno na macOS oraz binarka <code>morwisko-mcp</code></li>
+              <li>Okno na macOS oraz binarka <code>montybrain-mcp</code></li>
               <li>Zapis agenta widać w otwartym oknie od razu. Agent widzi dysk przy następnym wywołaniu</li>
             </ul>
 
@@ -34,7 +34,7 @@
                   src="img/tablica.png"
                   width="2200"
                   height="1600"
-                  alt="Okno Morwisko na widoku Tablica: kolumny Do zrobienia, W toku, Zablokowane i zwinięta Zrobione, w nich karty zadań z projektem i tematem. Po lewej pasek boczny z widokami Dziś, Skrzynka, Tablica i listą projektów."
+                  alt="Okno MontyBrain na widoku Tablica: kolumny Do zrobienia, W toku, Zablokowane i zwinięta Zrobione, w nich karty zadań z projektem i tematem. Po lewej pasek boczny z widokami Dziś, Skrzynka, Tablica i listą projektów."
                 />
               </button>
               <figcaption>
@@ -46,7 +46,7 @@
               <p class="toc-inline-label">Spis treści</p>
               <div class="toc-inline-links">
                 <a href="#po-co">Dla kogo i po co</a>
-                <a href="#dzien">Dzień z Morwiskiem</a>
+                <a href="#dzien">Dzień z MontyBrain</a>
                 <a href="#sciagawka">Ściągawka</a>
                 <a href="#instalacja">Instalacja i MCP</a>
                 <a href="#ograniczenia">Ograniczenia</a>
@@ -57,7 +57,7 @@
           <section id="po-co">
             <h2>Dla kogo i po co</h2>
             <p>
-              Morwisko jest dla jednej osoby, która prowadzi naraz kilka rzeczy: własny program, zlecenie, sprawy poza kodem. Zadania, terminy i krótki dziennik są w jednym folderze, obok repozytoriów. Na początku sesji agent woła <code>overview</code> i dostaje stan na dziś. Po robocie dopisuje wpis albo zamyka zadanie, bez przeklejania kontekstu do czatu.
+              MontyBrain jest dla jednej osoby, która prowadzi naraz kilka rzeczy: własny program, zlecenie, sprawy poza kodem. Zadania, terminy i krótki dziennik są w jednym folderze, obok repozytoriów. Na początku sesji agent woła <code>overview</code> i dostaje stan na dziś. Po robocie dopisuje wpis albo zamyka zadanie, bez przeklejania kontekstu do czatu.
             </p>
             <p>
               Nie ma konta, synchronizacji ani osobnej bazy. Pliki da się czytać i poprawiać w edytorze oraz trzymać w Gicie. Aplikacja powstała do własnego użytku: nie ma tu kont, cennika ani wspólnej pracy kilku osób.
@@ -65,9 +65,9 @@
           </section>
 
           <section id="dzien">
-            <h2>Dzień z Morwiskiem</h2>
+            <h2>Dzień z MontyBrain</h2>
             <p>
-              Poniżej jest jeden przebieg na danych demo: projekty WhenUBuy, Morwisko i Remont kuchni. Każdy krok to jedna czynność i widok, który po niej zostaje.
+              Poniżej jest jeden przebieg na danych demo: projekty WhenUBuy, MontyBrain i Remont kuchni. Każdy krok to jedna czynność i widok, który po niej zostaje.
             </p>
 
             <article class="step" id="krok-dzis">
@@ -81,7 +81,7 @@
                     src="img/dzis.png"
                     width="2200"
                     height="2560"
-                    alt="Okno Morwisko na widoku Dziś. Pasek boczny: Dziś 8, Skrzynka 4, Tablica, projekty Morwisko 4, Remont kuchni 1, WhenUBuy 9, Archiwum 1. W treści: Po terminie 2, Na dziś 2, W toku 2, Zablokowane 2 oraz pełna lista Ostatnie aktualizacje."
+                    alt="Okno MontyBrain na widoku Dziś. Pasek boczny: Dziś 8, Skrzynka 4, Tablica, projekty MontyBrain 4, Remont kuchni 1, WhenUBuy 9, Archiwum 1. W treści: Po terminie 2, Na dziś 2, W toku 2, Zablokowane 2 oraz pełna lista Ostatnie aktualizacje."
                   />
                 </button>
                 <figcaption>
@@ -89,7 +89,7 @@
                 </figcaption>
               </figure>
               <p>
-                Dopóki proces działa, w pasku menu macOS jest ikona. Liczba przy niej liczy zadania po terminie, na dziś i w toku, bez zablokowanych. Kliknięcie otwiera menu: <span class="ui">Otwórz Morwisko</span>, <span class="ui">Szybkie zadanie…</span>, najwyżej sześć zadań (albo <span class="ui">Nic pilnego na dziś</span>), <span class="ui">Ustawienia…</span>, <span class="ui">Zakończ</span>.
+                Dopóki proces działa, w pasku menu macOS jest ikona. Liczba przy niej liczy zadania po terminie, na dziś i w toku, bez zablokowanych. Kliknięcie otwiera menu: <span class="ui">Otwórz MontyBrain</span>, <span class="ui">Szybkie zadanie…</span>, najwyżej sześć zadań (albo <span class="ui">Nic pilnego na dziś</span>), <span class="ui">Ustawienia…</span>, <span class="ui">Zakończ</span>.
               </p>
               <p>
                 O godzinie z ustawień (domyślnie 09:00) idzie jedno powiadomienie z zadaniami na dziś bez godziny i z zaległymi. W ustawieniach ta pozycja nazywa się <span class="ui">Podsumowanie dnia</span>. Tytuł samego powiadomienia jest inny: „Na dziś: …”, „Po terminie: …” albo oba naraz. Zadanie z godziną dostaje osobne powiadomienie o tej godzinie, z tytułem zadania.
@@ -110,7 +110,7 @@
                     src="img/szybkie-zadanie.png"
                     width="1160"
                     height="754"
-                    alt="Okno Szybkie zadanie szerokości 580 px. Pole: Napisać notatkę ze spotkania !wysoki @jutro. Chipy jutro i wysoki. Lista miejsc otwarta, Skrzynka oznaczona jako obecnie, dalej Morwisko, Remont kuchni i początek WhenUBuy."
+                    alt="Okno Szybkie zadanie szerokości 580 px. Pole: Napisać notatkę ze spotkania !wysoki @jutro. Chipy jutro i wysoki. Lista miejsc otwarta, Skrzynka oznaczona jako obecnie, dalej MontyBrain, Remont kuchni i początek WhenUBuy."
                   />
                 </button>
                 <figcaption>
@@ -257,14 +257,14 @@
             <article class="step" id="krok-agent">
               <h3><span class="step-num">09</span>Agent czyta overview i dopisuje dziennik</h3>
               <p>
-                Na starcie sesji agent woła <code>overview</code>. Poniżej jest wynik tego narzędzia dla danych demo, z binarki <code>morwisko-mcp</code>, 13 listopada 2026. Tekst jest po angielsku: statusy i priorytety to <code>in_progress</code>, <code>!high</code>, a dzień tygodnia to „Friday”. W pliku zostają polskie tokeny, <code>w-toku</code> i <code>!wysoki</code>. Godzina przy najnowszym wpisie to moment wywołania.
+                Na starcie sesji agent woła <code>overview</code>. Poniżej jest wynik tego narzędzia dla danych demo, z binarki <code>montybrain-mcp</code>, 13 listopada 2026. Tekst jest po angielsku: statusy i priorytety to <code>in_progress</code>, <code>!high</code>, a dzień tygodnia to „Friday”. W pliku zostają polskie tokeny, <code>w-toku</code> i <code>!wysoki</code>. Godzina przy najnowszym wpisie to moment wywołania.
               </p>
               <div class="code-block">
                 <div class="code-head">
                   <span>overview, dane demo, 13 listopada 2026</span>
                   <button type="button" class="copy-btn" data-copy-target="cmd-overview">Kopiuj</button>
                 </div>
-                <pre><code id="cmd-overview"># Morwisko overview · 2026-11-13, Friday
+                <pre><code id="cmd-overview"># MontyBrain overview · 2026-11-13, Friday
 
 ## Today
 Overdue:
@@ -274,8 +274,8 @@ Due today:
 - [ ] Odpowiedzieć na uwagi z App Store Review @2026-11-13 ^t5y6u7 · whenubuy / powiadomienia-push
 - [/] Przygotować dashboard konwersji dla wariantu B !high @2026-11-13T14:00 ^g7h8i9 · whenubuy / ab-testy-cen
 In progress:
-- [/] Widok projektu z rozwijanymi tematami ^c3v4b5 · morwisko / aplikacja-desktopowa
-- [/] Narzędzie add_journal_entry z opcjonalną zmianą statusu ^y2u3i4 · morwisko / serwer-mcp
+- [/] Widok projektu z rozwijanymi tematami ^c3v4b5 · montybrain / aplikacja-desktopowa
+- [/] Narzędzie add_journal_entry z opcjonalną zmianą statusu ^y2u3i4 · montybrain / serwer-mcp
 Blocked:
 - [!] Zadzwonić do kamieniarza ^f8g9h0 · remont-kuchni / wybor-blatu
 - [!] Wysłać dokumenty rejestrowe do Przelewy24 ^s1d2f3 · whenubuy / platnosci-stripe-przelewy24
@@ -284,7 +284,7 @@ Blocked:
 4 open task(s) (list_tasks with inbox_only).
 
 ## Projects
-### Morwisko (`morwisko`) · repos: morwisko
+### MontyBrain (`montybrain`) · repos: montybrain
 - Aplikacja desktopowa (`aplikacja-desktopowa`) · in_progress · 2 open — Szkielet Tauri, widoki Dziś i projektu, pełna edycja.
 - Serwer MCP (`serwer-mcp`) · in_progress · 2 open — Narzędzia do odczytu i zapisu zadań dla agentów.
 ### WhenUBuy (`whenubuy`) · repos: whenubuy-backend, whenubuy-mobile
@@ -298,10 +298,10 @@ Blocked:
 Paused projects: remont-kuchni
 
 ## Recent journal
-- 2026-11-13T21:11 · claude-code · morwisko / aplikacja-desktopowa · Widok Dziś i lista tematów działają na danych z mocka.
+- 2026-11-13T21:11 · claude-code · montybrain / aplikacja-desktopowa · Widok Dziś i lista tematów działają na danych z mocka.
 - 2026-11-13T09:41 · agent · whenubuy / ab-testy-cen · Wariant B: +3,1% konwersji po 4 dniach, przedział ufności jeszcze szeroki.
-- 2026-11-13T08:12 · agent · morwisko / serwer-mcp · Dodane narzędzia list_tasks i update_task. Testy zielone.
-- 2026-11-12T21:15 · ja · morwisko / aplikacja-desktopowa · Ustalony wygląd: ciemny, minimalny, kolor projektu jako jedyny akcent.
+- 2026-11-13T08:12 · agent · montybrain / serwer-mcp · Dodane narzędzia list_tasks i update_task. Testy zielone.
+- 2026-11-12T21:15 · ja · montybrain / aplikacja-desktopowa · Ustalony wygląd: ciemny, minimalny, kolor projektu jako jedyny akcent.
 - 2026-11-12T16:20 · ja · whenubuy / platnosci-stripe-przelewy24 · Przelewy24 poprosiło o aktualny odpis z KRS — zamówione, będzie w poniedziałek.
 - 2026-11-11T15:30 · ja · whenubuy / ab-testy-cen · Ruch podzielony 80/20, flagi włączone na produkcji.
 - 2026-11-10T11:05 · ja · whenubuy / powiadomienia-push · Build 2.5.0 wysłany do review.
@@ -332,7 +332,7 @@ Paused projects: remont-kuchni
             <article class="step" id="krok-ustawienia">
               <h3><span class="step-num">10</span>Ustawienia na tym komputerze</h3>
               <p>
-                W <span class="ui">Ustawienia</span> jest skrót <span class="ui">Szybkie zadanie</span>, przełącznik <span class="ui">Powiadomienia o terminach</span>, godzina <span class="ui">Podsumowanie dnia</span>, autostart <span class="ui">Uruchamiaj przy logowaniu</span> oraz <span class="ui">Folder danych</span>. Autostart jest domyślnie wyłączony. W danych demo folder to <code>/Users/ja/Morwisko</code>. Na twoim Macu domyślnie jest <code>~/Morwisko</code>, chyba że ustawisz <code>MORWISKO_DIR</code>.
+                W <span class="ui">Ustawienia</span> jest skrót <span class="ui">Szybkie zadanie</span>, przełącznik <span class="ui">Powiadomienia o terminach</span>, godzina <span class="ui">Podsumowanie dnia</span>, autostart <span class="ui">Uruchamiaj przy logowaniu</span> oraz <span class="ui">Folder danych</span>. Autostart jest domyślnie wyłączony. W danych demo folder to <code>/Users/ja/MontyBrain</code>. Na twoim Macu domyślnie jest <code>~/MontyBrain</code>, chyba że ustawisz <code>MONTYBRAIN_DIR</code>.
               </p>
               <figure>
                 <button type="button" class="shot-frame" aria-label="Powiększ zrzut ustawień">
@@ -340,7 +340,7 @@ Paused projects: remont-kuchni
                     src="img/ustawienia.png"
                     width="2200"
                     height="1600"
-                    alt="Ustawienia. Skrót Szybkie zadanie to Control Option Spacja. Powiadomienia o terminach włączone. Podsumowanie dnia o 09:00. Uruchamiaj przy logowaniu wyłączone. Folder danych /Users/ja/Morwisko. Wersja 0.1.0."
+                    alt="Ustawienia. Skrót Szybkie zadanie to Control Option Spacja. Powiadomienia o terminach włączone. Podsumowanie dnia o 09:00. Uruchamiaj przy logowaniu wyłączone. Folder danych /Users/ja/MontyBrain. Wersja 0.1.0."
                   />
                 </button>
                 <figcaption>
@@ -477,7 +477,7 @@ Paused projects: remont-kuchni
 
             <h3 id="narzedzia-mcp">Narzędzia serwera MCP</h3>
             <p>
-              Osiem narzędzi. Zapis idzie tą samą ścieżką co okno i bierze blokadę <code>.morwisko/lock</code>. Nie ma narzędzi do usuwania. <code>stdout</code> to protokół, logi idą na <code>stderr</code> (<code>RUST_LOG=debug</code>).
+              Osiem narzędzi. Zapis idzie tą samą ścieżką co okno i bierze blokadę <code>.montybrain/lock</code>. Nie ma narzędzi do usuwania. <code>stdout</code> to protokół, logi idą na <code>stderr</code> (<code>RUST_LOG=debug</code>).
             </p>
             <div class="table-wrap">
               <table>
@@ -535,19 +535,19 @@ Paused projects: remont-kuchni
 
             <h3 id="pliki">Układ plików</h3>
             <p>
-              Katalog to <code>~/Morwisko</code> albo <code>MORWISKO_DIR</code>. Czytanie zostawia nieznane sekcje, komentarze YAML, własne nagłówki <code>###</code> i dotychczasowe końce linii. Błąd w jednym pliku nie zatrzymuje reszty katalogu. Trafia na pasek <span class="ui">Ostrzeżenia</span>.
+              Katalog to <code>~/MontyBrain</code> albo <code>MONTYBRAIN_DIR</code>. Folder <code>~/Morwisko</code> sprzed zmiany nazwy działa dalej, gdy nie ma <code>~/MontyBrain</code>: aplikacja niczego nie przenosi. Czytanie zostawia nieznane sekcje, komentarze YAML, własne nagłówki <code>###</code> i dotychczasowe końce linii. Błąd w jednym pliku nie zatrzymuje reszty katalogu. Trafia na pasek <span class="ui">Ostrzeżenia</span>.
             </p>
             <div class="code-block">
               <div class="code-head">
                 <span>Katalog danych</span>
               </div>
-              <pre><code>~/Morwisko/
+              <pre><code>~/MontyBrain/
   skrzynka.md
   whenubuy/
     projekt.md
     tematy/
       ab-testy-cen.md
-  .morwisko/
+  .montybrain/
     lock</code></pre>
             </div>
 
@@ -671,7 +671,7 @@ Wariant B (ceny z końcówką ,99) idzie na 20% ruchu. Czekamy na tydzień danyc
           <section id="instalacja">
             <h2>Instalacja i MCP</h2>
             <p>
-              Jedno repozytorium: React, Tauri 2 i crate <code>morwisko-mcp</code>. Do zbudowania potrzeba Rusta, Node.js z <code>pnpm</code> i narzędzi Xcode. Polecenia odpalasz w katalogu repozytorium. W ścieżkach poniżej podmień <code>/ABS/PATH/TO/morwisko</code> na swój katalog.
+              Jedno repozytorium: React, Tauri 2 i crate <code>montybrain-mcp</code>. Do zbudowania potrzeba Rusta, Node.js z <code>pnpm</code> i narzędzi Xcode. Polecenia odpalasz w katalogu repozytorium. W ścieżkach poniżej podmień <code>/ABS/PATH/TO/montybrain</code> na swój katalog.
             </p>
 
             <h3>1. Aplikacja i serwer</h3>
@@ -682,24 +682,24 @@ Wariant B (ceny z końcówką ,99) idzie na 20% ruchu. Czekamy na tydzień danyc
               </div>
               <pre><code id="cmd-build">pnpm install
 pnpm tauri build
-cargo build --release -p morwisko-mcp
-cargo test -p morwisko-mcp</code></pre>
+cargo build --release -p montybrain-mcp
+cargo test -p montybrain-mcp</code></pre>
             </div>
             <p>
-              Aplikacja (ok. 13 MB) ląduje w <code>target/release/bundle/macos/Morwisko.app</code>, serwer w <code>target/release/morwisko-mcp</code>. W czasie pracy nad kodem okno uruchamia <code>pnpm tauri dev</code>.
+              Aplikacja (ok. 13 MB) ląduje w <code>target/release/bundle/macos/MontyBrain.app</code>, serwer w <code>target/release/montybrain-mcp</code>. W czasie pracy nad kodem okno uruchamia <code>pnpm tauri dev</code>.
             </p>
 
             <h3>2. Claude Code</h3>
             <p>
-              <code>--scope user</code> zapisuje serwer dla użytkownika. Bez <code>-e</code> serwer czyta <code>~/Morwisko</code>.
+              <code>--scope user</code> zapisuje serwer dla użytkownika. Bez <code>-e</code> serwer czyta <code>~/MontyBrain</code>.
             </p>
             <div class="code-block">
               <div class="code-head">
                 <span>claude mcp add</span>
                 <button type="button" class="copy-btn" data-copy-target="cmd-claude">Kopiuj</button>
               </div>
-              <pre><code id="cmd-claude">claude mcp add --scope user morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp
-claude mcp add --scope user -e MORWISKO_DIR=/sciezka/do/folderu morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp</code></pre>
+              <pre><code id="cmd-claude">claude mcp add --scope user montybrain -- /ABS/PATH/TO/montybrain/target/release/montybrain-mcp
+claude mcp add --scope user -e MONTYBRAIN_DIR=/sciezka/do/folderu montybrain -- /ABS/PATH/TO/montybrain/target/release/montybrain-mcp</code></pre>
             </div>
 
             <h3>3. Codex</h3>
@@ -711,16 +711,16 @@ claude mcp add --scope user -e MORWISKO_DIR=/sciezka/do/folderu morwisko -- /ABS
                 <span>codex mcp add</span>
                 <button type="button" class="copy-btn" data-copy-target="cmd-codex">Kopiuj</button>
               </div>
-              <pre><code id="cmd-codex">codex mcp add morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp
-codex mcp add --env MORWISKO_DIR=/sciezka/do/folderu morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp</code></pre>
+              <pre><code id="cmd-codex">codex mcp add montybrain -- /ABS/PATH/TO/montybrain/target/release/montybrain-mcp
+codex mcp add --env MONTYBRAIN_DIR=/sciezka/do/folderu montybrain -- /ABS/PATH/TO/montybrain/target/release/montybrain-mcp</code></pre>
             </div>
             <div class="code-block">
               <div class="code-head">
                 <span>~/.codex/config.toml</span>
                 <button type="button" class="copy-btn" data-copy-target="cmd-toml">Kopiuj</button>
               </div>
-              <pre><code id="cmd-toml">[mcp_servers.morwisko]
-command = "/ABS/PATH/TO/morwisko/target/release/morwisko-mcp"</code></pre>
+              <pre><code id="cmd-toml">[mcp_servers.montybrain]
+command = "/ABS/PATH/TO/montybrain/target/release/montybrain-mcp"</code></pre>
             </div>
           </section>
 
@@ -729,7 +729,7 @@ command = "/ABS/PATH/TO/morwisko/target/release/morwisko-mcp"</code></pre>
             <ul>
               <li>Skrót globalny, ikona w pasku menu i powiadomienia są napisane pod macOS.</li>
               <li>Jedno stanowisko i jeden folder. Nie ma synchronizacji między komputerami ani scalania dwóch zapisów tego samego pliku.</li>
-              <li>Okno i serwer MCP biorą blokadę <code>.morwisko/lock</code> na czas swojego zapisu. Edytor tekstu tej blokady nie bierze. Zapis z edytora w tej samej chwili może zostać nadpisany.</li>
+              <li>Okno i serwer MCP biorą blokadę <code>.montybrain/lock</code> na czas swojego zapisu. Edytor tekstu tej blokady nie bierze. Zapis z edytora w tej samej chwili może zostać nadpisany.</li>
               <li>Przypomnienia wymagają zgody macOS na powiadomienia. Odmowy aplikacja nie wykrywa. Powiadomienia wtedy po prostu nie przychodzą.</li>
               <li>Zamknięcie okna je chowa, proces zostaje, więc skrót i przypomnienia dalej działają. Proces kończy <span class="ui">Zakończ</span> w menu ikony albo <kbd>⌘Q</kbd>.</li>
               <li>Nie ma narzędzi MCP do usuwania zadań i tematów. Usuwasz je w oknie albo w pliku.</li>
@@ -737,7 +737,7 @@ command = "/ABS/PATH/TO/morwisko/target/release/morwisko-mcp"</code></pre>
           </section>
 
           <footer>
-            Morwisko. Pliki Markdown w <code>~/Morwisko</code>. Ta strona nie ładuje niczego z sieci.
+            MontyBrain. Pliki Markdown w <code>~/MontyBrain</code>. Ta strona nie ładuje niczego z sieci.
           </footer>
         </main>
 
@@ -746,7 +746,7 @@ command = "/ABS/PATH/TO/morwisko/target/release/morwisko-mcp"</code></pre>
           <ul>
             <li><a href="#po-co">Dla kogo i po co</a></li>
             <li>
-              <a href="#dzien">Dzień z Morwiskiem</a>
+              <a href="#dzien">Dzień z MontyBrain</a>
               <ul class="toc-sub">
                 <li><a href="#krok-dzis">01 · Dziś</a></li>
                 <li><a href="#krok-szybkie">02 · Szybkie zadanie</a></li>

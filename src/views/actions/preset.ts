@@ -3,7 +3,7 @@
 
 import { writePref } from "../../store/ui";
 
-export const RECIPE_PREF = "morwisko.akcje.recipe";
+export const RECIPE_PREF = "montybrain.akcje.recipe";
 
 const presets = new Map<string, Record<string, string>>();
 

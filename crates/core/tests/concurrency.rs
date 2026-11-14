@@ -8,7 +8,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 const THREADS: usize = 8;
 const PER_THREAD: usize = 15;

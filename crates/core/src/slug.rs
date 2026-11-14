@@ -170,7 +170,7 @@ mod tests {
     fn safe_components() {
         assert!(is_safe_component("whenubuy"));
         assert!(!is_safe_component("../x"));
-        assert!(!is_safe_component(".morwisko"));
+        assert!(!is_safe_component(".montybrain"));
         assert!(!is_safe_component("a/b"));
         assert!(!is_safe_component(""));
     }

@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use morwisko_core::chrono::NaiveDateTime;
+use montybrain_core::chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 use super::schedule::{AutoUpdate, UpdateSources, next_due};
@@ -66,7 +66,7 @@ pub enum Outcome {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateResult {
-    #[serde(with = "morwisko_core::minute")]
+    #[serde(with = "montybrain_core::minute")]
     pub at: NaiveDateTime,
     pub provider: Option<ProviderId>,
     pub trigger: TriggerKind,
@@ -94,7 +94,7 @@ pub enum ChangeStatus {
 pub struct ChangeOutcome {
     pub status: ChangeStatus,
     pub message: String,
-    #[serde(with = "morwisko_core::minute")]
+    #[serde(with = "montybrain_core::minute")]
     pub at: NaiveDateTime,
 }
 
@@ -122,7 +122,7 @@ pub struct StoredProposal {
     pub run_id: String,
     pub provider: ProviderId,
     pub trigger: TriggerKind,
-    #[serde(with = "morwisko_core::minute")]
+    #[serde(with = "montybrain_core::minute")]
     pub created_at: NaiveDateTime,
     /// The agent's report (Markdown, the block removed).
     pub report: String,
@@ -314,7 +314,7 @@ pub fn edit_change(
     p: &mut StoredProposal,
     index: usize,
     edit: &crate::runs::proposal::ChangeEdit,
-    snap: &morwisko_core::Snapshot,
+    snap: &montybrain_core::Snapshot,
     project: &str,
 ) -> Result<(), String> {
     let sc = p.changes.get(index).ok_or("Nie ma takiej propozycji.")?;
@@ -347,7 +347,7 @@ pub fn join_change(
     p: &mut StoredProposal,
     index: usize,
     topic: &str,
-    snap: &morwisko_core::Snapshot,
+    snap: &montybrain_core::Snapshot,
     project: &str,
 ) -> Result<Vec<String>, String> {
     let sc = p.changes.get(index).ok_or("Nie ma takiej propozycji.")?;
@@ -536,19 +536,19 @@ pub fn views(
 
 /// `Option<NaiveDateTime>` as `"YYYY-MM-DDTHH:MM"` or `null`.
 mod opt_minute {
-    use morwisko_core::chrono::NaiveDateTime;
+    use montybrain_core::chrono::NaiveDateTime;
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S: Serializer>(v: &Option<NaiveDateTime>, s: S) -> Result<S::Ok, S::Error> {
         match v {
-            Some(t) => s.serialize_str(&morwisko_core::minute::format(t)),
+            Some(t) => s.serialize_str(&montybrain_core::minute::format(t)),
             None => s.serialize_none(),
         }
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<NaiveDateTime>, D::Error> {
         let raw: Option<String> = Option::deserialize(d)?;
-        Ok(raw.and_then(|s| morwisko_core::minute::parse(&s)))
+        Ok(raw.and_then(|s| montybrain_core::minute::parse(&s)))
     }
 }
 
@@ -559,7 +559,7 @@ mod tests {
     use crate::updates::schedule::Schedule;
 
     fn at(s: &str) -> NaiveDateTime {
-        morwisko_core::minute::parse(s).unwrap()
+        montybrain_core::minute::parse(s).unwrap()
     }
 
     fn finished(trigger: TriggerKind) -> Finished<'static> {

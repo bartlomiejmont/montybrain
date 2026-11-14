@@ -24,7 +24,7 @@ import { useVault, useView } from "../../store/vault";
 import { RECIPE_PREF, takePreset } from "./preset";
 import { PROVIDER_NAME, RunPanel } from "./RunPanel";
 
-const providerPref = (recipe: string) => `morwisko.akcje.provider.${recipe}`;
+const providerPref = (recipe: string) => `montybrain.akcje.provider.${recipe}`;
 
 // Survive navigating away and back (module scope, like store/ui.ts).
 const formMemory = new Map<string, ParamValues>();
@@ -241,7 +241,7 @@ function RecipeForm({ recipe, providers, runningBackground }: { recipe: Recipe; 
         {recipe.proposes && <p className="act-hint">Propozycje pojawią się w widoku projektu, w pasku Aktualizacja.</p>}
         {recipe.background_writes && (
           <p className="act-hint act-warn">
-            Uruchomiona w tle, ta akcja dodaje zadania w Morwisku bez pytania. W terminalu agent najpierw je zaproponuje.
+            Uruchomiona w tle, ta akcja dodaje zadania w MontyBrain bez pytania. W terminalu agent najpierw je zaproponuje.
           </p>
         )}
         {failure && (
@@ -324,7 +324,7 @@ export function ActionsView() {
                         {MODE_LABEL[m]}
                       </span>
                     ))}
-                    {r.background_writes && <span className="act-badge warn">zapisuje w Morwisku</span>}
+                    {r.background_writes && <span className="act-badge warn">zapisuje w MontyBrain</span>}
                     {r.proposes && <span className="act-badge">zapis po akceptacji</span>}
                   </span>
                 </button>

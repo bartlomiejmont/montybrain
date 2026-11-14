@@ -7,7 +7,7 @@
 //!   parses and validates it against the vault as the run started and stores
 //!   it per project ([`store`], `updates.json` in the config dir).
 //! * The user applies selected changes ([`apply_changes`], Tauri command
-//!   `apply_update`); the app writes them through `morwisko-core`
+//!   `apply_update`); the app writes them through `montybrain-core`
 //!   ([`apply`]), skipping changes whose target changed in the meantime and
 //!   never applying a change twice.
 //! * Automatic update ([`schedule`], setting `auto_update` per project in
@@ -27,8 +27,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use morwisko_core::chrono::{Local, NaiveDateTime, Timelike};
-use morwisko_core::{ProjectState, Snapshot};
+use montybrain_core::chrono::{Local, NaiveDateTime, Timelike};
+use montybrain_core::{ProjectState, Snapshot};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -271,7 +271,7 @@ pub fn last_check<R: Runtime>(app: &AppHandle<R>, project: &str) -> Option<Strin
     st.projects
         .get(project)
         .and_then(|p| p.clock)
-        .map(|c| morwisko_core::minute::format(&c))
+        .map(|c| montybrain_core::minute::format(&c))
 }
 
 /// Every project's view, for `list_updates` and [`UPDATES_CHANGED`].
@@ -374,7 +374,7 @@ fn apply_locked<R: Runtime>(
 /// check, the next automatic check need not run just because of that.
 fn refresh_fingerprint(
     st: &mut store::ProjectUpdate,
-    vault: &morwisko_core::Vault,
+    vault: &montybrain_core::Vault,
     project: &str,
     before: Option<String>,
 ) {
@@ -844,7 +844,7 @@ pub fn start<R: Runtime>(app: &AppHandle<R>, config_dir: &std::path::Path) {
     app.manage(Updates::new(config_dir));
     let app = app.clone();
     let spawned = std::thread::Builder::new()
-        .name("morwisko-updates".into())
+        .name("montybrain-updates".into())
         .spawn(move || {
             std::thread::sleep(STARTUP_DELAY);
             loop {
@@ -893,7 +893,7 @@ mod tests {
     use std::cell::{Cell, RefCell};
 
     fn at(s: &str) -> NaiveDateTime {
-        morwisko_core::minute::parse(s).unwrap()
+        montybrain_core::minute::parse(s).unwrap()
     }
 
     struct Fake {
@@ -1137,7 +1137,7 @@ mod tests {
         );
         // No retry loop: nothing until the interval passed.
         for m in 1..180 {
-            let now = at("2026-11-14T12:00") + morwisko_core::chrono::TimeDelta::minutes(m);
+            let now = at("2026-11-14T12:00") + montybrain_core::chrono::TimeDelta::minutes(m);
             assert_eq!(
                 auto_tick(&fake, &store, &auto, &BTreeMap::new(), now),
                 TickOutcome::Idle
@@ -1467,7 +1467,7 @@ mod tests {
         let record = take_undo(&mut st, &token).unwrap();
         assert!(take_undo(&mut st, &token).is_err(), "at most once");
         let dir = tempfile::tempdir().unwrap();
-        let vault = morwisko_core::Vault::init(dir.path()).unwrap();
+        let vault = montybrain_core::Vault::init(dir.path()).unwrap();
         let r = apply::undo(&vault, "beeking", &record, st.proposal.as_mut());
         assert!(
             r.iter().all(|i| i.status == apply::UndoStatus::Undone),

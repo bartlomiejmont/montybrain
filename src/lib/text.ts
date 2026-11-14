@@ -1,4 +1,4 @@
-// Text helpers that mirror morwisko-core (`fold`, `slugify`) closely enough for
+// Text helpers that mirror montybrain-core (`fold`, `slugify`) closely enough for
 // the browser mock and client-side matching.
 
 const EXTRA: Record<string, string> = { ł: "l", Ł: "l", ß: "ss", æ: "ae", Æ: "ae", œ: "oe", Œ: "oe", ø: "o", Ø: "o" };

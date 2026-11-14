@@ -28,13 +28,16 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
-use morwisko_core::chrono::{DateTime, Local, NaiveDate, NaiveDateTime};
+use montybrain_core::chrono::{DateTime, Local, NaiveDate, NaiveDateTime};
 use serde_json::Value;
 
 use super::runner::{Chunk, read_line_capped};
 
-pub const ENV_CLAUDE: &str = "MORWISKO_CLAUDE_HISTORY_DIR";
-pub const ENV_CODEX: &str = "MORWISKO_CODEX_HISTORY_DIR";
+pub const ENV_CLAUDE: &str = "MONTYBRAIN_CLAUDE_HISTORY_DIR";
+pub const ENV_CODEX: &str = "MONTYBRAIN_CODEX_HISTORY_DIR";
+/// Pre-rename names of [`ENV_CLAUDE`] / [`ENV_CODEX`] (the new ones win).
+pub const LEGACY_ENV_CLAUDE: &str = "MORWISKO_CLAUDE_HISTORY_DIR";
+pub const LEGACY_ENV_CODEX: &str = "MORWISKO_CODEX_HISTORY_DIR";
 /// What replaces anything that looks like a secret.
 pub const SECRET: &str = "[usunięto: wygląda na sekret]";
 pub const EMAIL: &str = "[usunięto: e-mail]";
@@ -50,13 +53,16 @@ pub struct Roots {
 impl Roots {
     /// The env overrides when set (tests, dev runs), else the CLIs' defaults.
     pub fn from_env(home: &Path) -> Roots {
-        let pick = |var: &str, default: PathBuf| match std::env::var_os(var) {
-            Some(v) if !v.is_empty() => PathBuf::from(v),
-            _ => default,
+        Roots::from_vars(home, |var| std::env::var_os(var))
+    }
+
+    fn from_vars(home: &Path, var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Roots {
+        let pick = |new: &str, legacy: &str, default: PathBuf| {
+            crate::settings::env_with_legacy(var(new), var(legacy)).map_or(default, PathBuf::from)
         };
         Roots {
-            claude: pick(ENV_CLAUDE, home.join(".claude/projects")),
-            codex: pick(ENV_CODEX, home.join(".codex/sessions")),
+            claude: pick(ENV_CLAUDE, LEGACY_ENV_CLAUDE, home.join(".claude/projects")),
+            codex: pick(ENV_CODEX, LEGACY_ENV_CODEX, home.join(".codex/sessions")),
         }
     }
 }
@@ -613,7 +619,7 @@ fn claude_candidates(req: &Request, cutoff: SystemTime, out: &mut Vec<Candidate>
 }
 
 fn codex_candidates(req: &Request, cutoff: SystemTime, out: &mut Vec<Candidate>) {
-    let cutoff_day = mtime_local(cutoff).date() - morwisko_core::chrono::TimeDelta::days(1);
+    let cutoff_day = mtime_local(cutoff).date() - montybrain_core::chrono::TimeDelta::days(1);
     let num = |p: &Path| {
         p.file_name()
             .and_then(|n| n.to_str())
@@ -813,6 +819,11 @@ const FOCUS_STOPWORDS: &[&str] = &[
     "code",
     "claude",
     "codex",
+    "montybrain",
+    "montybraina",
+    "montybrainie",
+    "montybrainem",
+    // The pre-rename name, still found in older sessions.
     "morwisko",
     "morwisku",
     "morwiska",
@@ -1321,6 +1332,32 @@ mod tests {
     use std::os::unix::fs::symlink;
 
     const HOME: &str = "/Users/ala";
+
+    #[test]
+    fn history_roots_honour_new_then_legacy_variables() {
+        let home = Path::new(HOME);
+        let vars = |pairs: &'static [(&'static str, &'static str)]| {
+            move |k: &str| {
+                pairs
+                    .iter()
+                    .find(|(n, _)| *n == k)
+                    .map(|(_, v)| std::ffi::OsString::from(v))
+            }
+        };
+        let r = Roots::from_vars(home, vars(&[]));
+        assert_eq!(r.claude, home.join(".claude/projects"));
+        assert_eq!(r.codex, home.join(".codex/sessions"));
+        let r = Roots::from_vars(
+            home,
+            vars(&[
+                ("MORWISKO_CLAUDE_HISTORY_DIR", "/old/c"),
+                ("MORWISKO_CODEX_HISTORY_DIR", "/old/x"),
+                ("MONTYBRAIN_CODEX_HISTORY_DIR", "/new/x"),
+            ]),
+        );
+        assert_eq!(r.claude, PathBuf::from("/old/c"));
+        assert_eq!(r.codex, PathBuf::from("/new/x"));
+    }
 
     #[test]
     fn redaction_of_synthetic_secrets() {

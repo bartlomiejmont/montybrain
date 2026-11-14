@@ -1,16 +1,16 @@
-# `morwisko-core` API guide
+# `montybrain-core` API guide
 
 This guide is for the agents building the Tauri app (`src-tauri`) and the MCP server
 (`crates/mcp`). The file format is described in [`format.md`](format.md). Everything
-below is re-exported from the crate root: `use morwisko_core::*;`.
+below is re-exported from the crate root: `use montybrain_core::*;`.
 
 ```toml
 # Cargo.toml of a consumer inside the workspace
-morwisko-core = { workspace = true }                       # MCP server
-morwisko-core = { workspace = true, features = ["watch"] } # desktop app (file watcher)
+montybrain-core = { workspace = true }                       # MCP server
+montybrain-core = { workspace = true, features = ["watch"] } # desktop app (file watcher)
 ```
 
-The crate re-exports `chrono` as `morwisko_core::chrono`, so you get the same
+The crate re-exports `chrono` as `montybrain_core::chrono`, so you get the same
 `NaiveDate` and `NaiveDateTime` types. The API is synchronous. Each call does a little
 file I/O, so in async code (Tauri commands, an MCP runtime) run it on a blocking
 thread (`spawn_blocking`).
@@ -18,10 +18,11 @@ thread (`spawn_blocking`).
 ## Opening a vault
 
 ```rust
-Vault::default_root() -> Result<PathBuf>   // $MORWISKO_DIR (if non-empty) else ~/Morwisko
+Vault::default_root() -> Result<PathBuf>   // $MONTYBRAIN_DIR, else $MORWISKO_DIR (non-empty), else ~/MontyBrain if it exists, else ~/Morwisko if it exists, else ~/MontyBrain
 Vault::open(root: impl Into<PathBuf>) -> Result<Vault>   // must exist → else Error::VaultNotFound
 Vault::open_default() -> Result<Vault>
-Vault::init(root: impl Into<PathBuf>) -> Result<Vault>   // mkdir -p root + .morwisko/, create empty skrzynka.md if missing; never overwrites
+Vault::init(root: impl Into<PathBuf>) -> Result<Vault>   // mkdir -p root + meta_dir(root), create empty skrzynka.md if missing; never overwrites
+meta_dir(root: &Path) -> PathBuf           // .montybrain/ if present, else an existing legacy .morwisko/, else .montybrain/
 Vault::init_default() -> Result<Vault>
 vault.root() -> &Path
 vault.with_clock(impl Fn() -> NaiveDateTime + Send + Sync + 'static) -> Vault  // tests: fixed "now"
@@ -106,7 +107,7 @@ snap.task(id: &str) -> Option<&Task>                          // "^" prefix opti
 snap.tasks(filter: &TaskFilter) -> Vec<Task>                  // file order
 snap.journal_of(project: &str, topic: &str) -> Vec<JournalEntry>   // newest first
 snap.recent_journal(limit: usize) -> Vec<JournalEntry>        // across the vault, newest first
-snap.today(today: NaiveDate) -> Vec<TodayItem>                // use morwisko_core::local_today()
+snap.today(today: NaiveDate) -> Vec<TodayItem>                // use montybrain_core::local_today()
 snap.search(query: &str) -> Vec<SearchHit>
 ```
 
@@ -265,14 +266,14 @@ Behaviour worth knowing:
 
 ## Errors
 
-`morwisko_core::Error` (`thiserror`). It serializes as its display string, so it can
+`montybrain_core::Error` (`thiserror`). It serializes as its display string, so it can
 be returned from a Tauri command as is.
 
 | variant | when |
 |---------|------|
 | `Io { path, source }` | filesystem failure |
 | `VaultNotFound(PathBuf)` | `open`/`load`/mutation on a root that does not exist |
-| `NoVaultDir` | neither `MORWISKO_DIR` nor `HOME` is available |
+| `NoVaultDir` | neither `MONTYBRAIN_DIR` nor `HOME` is available |
 | `ProjectNotFound(String)` | unknown project slug |
 | `TopicNotFound { project, topic }` | unknown topic |
 | `TaskNotFound(String)` | no task with that id |
@@ -292,9 +293,9 @@ fn watch(&self, debounce: Duration, on_change: impl FnMut(Vec<PathBuf>) + Send +
 
 The watcher uses `notify` through `notify-debouncer-mini` and watches recursively.
 `on_change` runs on a background thread with the deduplicated paths that changed,
-relative to the vault root. It ignores `.morwisko/**`, `*.morwisko-tmp` (Morwisko's
-own temp files), `*~`, `*.swp`, `*.swx`, `*.tmp`, `.#*`, `.DS_Store` and vim's
-`4913`. Morwisko's own writes **are** reported, because the final rename is a real
+relative to the vault root. It ignores `.montybrain/**`, `.morwisko/**`, `*.montybrain-tmp` and
+`*.morwisko-tmp` (MontyBrain's own temp files, also of a binary from before the rename), `*~`, `*.swp`, `*.swx`, `*.tmp`, `.#*`, `.DS_Store` and vim's
+`4913`. MontyBrain's own writes **are** reported, because the final rename is a real
 change. A typical app handler: reload with `load()` (and `normalize()` if you want
 hand-added tasks to get ids right away), then emit an event to the UI. Normalize
 writes only when something changed, so it cannot cause a loop.
@@ -302,7 +303,7 @@ writes only when something changed, so it cannot cause a loop.
 ## Example
 
 ```rust
-use morwisko_core::*;
+use montybrain_core::*;
 
 fn demo() -> Result<()> {
     let vault = Vault::init_default()?;

@@ -68,7 +68,7 @@ describe("Dziś as an overview of topics", () => {
     expect(p24.reasons[0]!.text).toBe("Zablokowany od 2 dni — czy coś się ruszyło?");
     expect(p24.reasons[1]!.text).toBe("1 zadanie po terminie");
     // In progress, most recent first; the waiting one with what and when.
-    expect(keys(s.active)).toEqual(["topic:morwisko/aplikacja-desktopowa", "topic:morwisko/serwer-mcp"]);
+    expect(keys(s.active)).toEqual(["topic:montybrain/aplikacja-desktopowa", "topic:montybrain/serwer-mcp"]);
     expect(s.active[0]!.reasons[0]!.text).toBe("Ostatni wpis dziś");
     expect(keys(s.waiting)).toEqual(["topic:remont-kuchni/wybor-blatu"]);
     expect(s.waiting[0]!.reasons[0]!.text).toBe("Czeka na: wycena konglomeratu · sprawdzimy 17 lis");
@@ -107,7 +107,7 @@ describe("Dziś as an overview of topics", () => {
     const project = s.attention.find((r) => r.kind === "project")!;
     expect(project.reasons.map((r) => r.text)).toEqual(["4 propozycje czekają", "1 gałąź bez tematu", "12 nowych commitów od sprawdzenia"]);
     expect(s.attention[0]).toBe(project);
-    const mcp = s.attention.find((r) => r.key === "topic:morwisko/serwer-mcp")!;
+    const mcp = s.attention.find((r) => r.key === "topic:montybrain/serwer-mcp")!;
     expect(mcp.reasons.map((r) => r.text)).toEqual(["Bez wpisu od 9 dni"]);
     const ab = s.attention.find((r) => r.key === "topic:whenubuy/ab-testy-cen")!;
     expect(ab.reasons.map((r) => r.kind)).toEqual(["due_today", "spread", "moved"]);
@@ -122,9 +122,9 @@ describe("Dziś as an overview of topics", () => {
 
   it("paused and archived projects stay out", () => {
     const sn = snap();
-    sn.projects = sn.projects.map((p) => (p.slug === "morwisko" ? { ...p, state: "archived" } : p));
+    sn.projects = sn.projects.map((p) => (p.slug === "montybrain" ? { ...p, state: "archived" } : p));
     const s = buildToday({ snapshot: sn, today: TODAY, waiting: [], drift: [], updates: [] });
-    expect([...s.attention, ...s.active].some((r) => r.kind === "topic" && r.project === "morwisko")).toBe(false);
+    expect([...s.attention, ...s.active].some((r) => r.kind === "topic" && r.project === "montybrain")).toBe(false);
     expect(s.waiting.some((r) => r.key.includes("remont-kuchni")), "paused in the fixture").toBe(false);
   });
 

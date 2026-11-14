@@ -55,7 +55,7 @@ export function addMapDemo(db: Snapshot, today: string): void {
     t.summary = `${t.summary}\nCzeka na: [[firma/odpis-krs]]`;
   });
   set("whenubuy", "powiadomienia-push", (t) => {
-    t.summary = `${t.summary} Kolejkę wysyłki robimy jak w [[morwisko/serwer-mcp]].`;
+    t.summary = `${t.summary} Kolejkę wysyłki robimy jak w [[montybrain/serwer-mcp]].`;
   });
   set("whenubuy", "ab-testy-cen", (t) => {
     t.summary = `${t.summary}\nPowiązane: [[firma/ksiegowosc-vat]]\nStary plan był w [[whenubuy/stary-checkout]].`;
@@ -64,8 +64,8 @@ export function addMapDemo(db: Snapshot, today: string): void {
     topic("whenubuy", "checkout-mobilny", "Nowy checkout w aplikacji mobilnej z zapisanymi kartami i Apple Pay", "waiting", "Ekrany gotowe, czekamy na bramkę płatności.\nCzeka na: [[platnosci-stripe-przelewy24]]", d(-40), `${d(-2)}T10:00`),
     topic("whenubuy", "wyszukiwarka", "Wyszukiwarka produktów z podpowiedziami i literówkami", "in_progress", "Indeks w Meilisearch, trwa strojenie wag. Powiązane: [[ab-testy-cen]]", d(-35), `${d(-1)}T15:00`),
     topic("whenubuy", "alerty-cenowe", "Alerty cenowe e-mail i push dla obserwowanych produktów", "planned", "Do zaplanowania po wydaniu powiadomień push.\nPowiązane: [[powiadomienia-push]]", d(-20), `${d(-20)}T09:00`),
-    topic("morwisko", "mapa-mysli", "Mapa myśli: projekty, tematy i połączenia na jednym płótnie", "in_progress", "Układ wysp i odwołania w opisach.\nCzeka na: [[serwer-mcp-polaczenia]]", d(-6), `${d(0)}T11:00`),
-    topic("morwisko", "serwer-mcp-polaczenia", "Narzędzie MCP do odczytu połączeń między tematami", "planned", "Najpierw format odwołań.\nCzeka na: [[mapa-mysli]]", d(-5), `${d(-5)}T11:00`),
+    topic("montybrain", "mapa-mysli", "Mapa myśli: projekty, tematy i połączenia na jednym płótnie", "in_progress", "Układ wysp i odwołania w opisach.\nCzeka na: [[serwer-mcp-polaczenia]]", d(-6), `${d(0)}T11:00`),
+    topic("montybrain", "serwer-mcp-polaczenia", "Narzędzie MCP do odczytu połączeń między tematami", "planned", "Najpierw format odwołań.\nCzeka na: [[mapa-mysli]]", d(-5), `${d(-5)}T11:00`),
     topic("firma", "odpis-krs", "Odpis z KRS i weryfikacja kont u operatorów płatności", "waiting", "Zamówiony odpis, sąd ma termin do poniedziałku.\nCzeka na: [[umowy-dostawcy]]", d(-14), `${d(-1)}T09:00`),
     topic("firma", "umowy-dostawcy", "Umowy z dostawcami usług: hosting, poczta, płatności", "in_progress", "Brakuje podpisu na umowie z operatorem.", d(-30), `${d(-3)}T12:00`),
     topic("firma", "ksiegowosc-vat", "Księgowość i rozliczenie VAT za czwarty kwartał", "in_progress", "Biuro potrzebuje zestawienia transakcji.\nPowiązane: [[whenubuy/platnosci-stripe-przelewy24]]", d(-25), `${d(-2)}T16:00`),
@@ -118,5 +118,5 @@ export function buildLargeFixture(today: string): Snapshot {
     const status: TaskStatus = k % 2 === 0 ? "done" : k % 7 === 1 ? "doing" : "todo";
     tasks.push(task(`l${String(id++).padStart(5, "0")}`, t.project, t.slug, `${TASK_TITLES[k % TASK_TITLES.length]} — ${k + 1}`, status));
   }
-  return { root: "/Users/ja/Morwisko", projects, topics, tasks, journal: [], warnings: [] };
+  return { root: "/Users/ja/MontyBrain", projects, topics, tasks, journal: [], warnings: [] };
 }

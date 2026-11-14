@@ -1,13 +1,13 @@
 use super::links::{BranchKey, LinkStore};
 use super::*;
-use morwisko_core::{JournalEntry, Project, Repo, Topic, TopicStatus};
+use montybrain_core::{JournalEntry, Project, Repo, Topic, TopicStatus};
 
 fn d(s: &str) -> NaiveDate {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
 }
 
 fn at(s: &str) -> NaiveDateTime {
-    morwisko_core::minute::parse(s).unwrap()
+    montybrain_core::minute::parse(s).unwrap()
 }
 
 const SNAPSHOT: &str = "=== beeking / app ===
@@ -368,9 +368,26 @@ fn signals_of_a_project() {
 }
 
 #[test]
-fn link_store_round_trip_and_rules() {
+fn link_store_of_a_legacy_vault_stays_in_morwisko_dir() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join(".morwisko")).unwrap();
+    std::fs::write(
+        dir.path().join(".morwisko/links.json"),
+        r#"{"links":[{"project":"p","repo":"r","branch":"b","topic":"t"}],"ignored":[]}"#,
+    )
+    .unwrap();
+    let k = BranchKey::new("p", "r", "b");
+    assert_eq!(links::load(dir.path()).topic_of(&k), Some("t"));
+    let k2 = BranchKey::new("p", "r", "c");
+    links::update(dir.path(), |s| s.link(&k2, "u")).unwrap();
+    assert_eq!(links::load(dir.path()).links.len(), 2);
+    assert!(!dir.path().join(".montybrain").exists());
+}
+
+#[test]
+fn link_store_round_trip_and_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join(".montybrain")).unwrap();
     let k = BranchKey::new("beeking", "app", "feature/x");
     assert!(links::update(dir.path(), |s| s.link(&k, "a")).unwrap());
     assert!(
@@ -392,13 +409,13 @@ fn link_store_round_trip_and_rules() {
     assert_eq!(links::load(dir.path()).topic_of(&k), Some("b"));
     links::update(dir.path(), |s| s.unlink(&k, "b")).unwrap();
     assert!(links::load(dir.path()).topic_of(&k).is_none());
-    // The file lives in .morwisko/ (skipped by the loader and the watcher).
-    assert!(dir.path().join(".morwisko/links.json").is_file());
-    assert!(morwisko_core::is_ignored(std::path::Path::new(
-        ".morwisko/links.json"
+    // The file lives in .montybrain/ (skipped by the loader and the watcher).
+    assert!(dir.path().join(".montybrain/links.json").is_file());
+    assert!(montybrain_core::is_ignored(std::path::Path::new(
+        ".montybrain/links.json"
     )));
     // Unreadable → empty.
-    std::fs::write(dir.path().join(".morwisko/links.json"), "nie json").unwrap();
+    std::fs::write(dir.path().join(".montybrain/links.json"), "nie json").unwrap();
     assert_eq!(links::load(dir.path()), LinkStore::default());
 }
 

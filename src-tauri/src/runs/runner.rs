@@ -2,7 +2,7 @@
 //!
 //! A background run is the resolved CLI spawned directly (no shell) in its own
 //! process group, stdin `/dev/null`, cwd = the runs dir, with a constructed
-//! PATH and the API-key variables removed, attached to `morwisko-mcp` only
+//! PATH and the API-key variables removed, attached to `montybrain-mcp` only
 //! (see [`command`]). Before the CLI starts, the run's own thread collects the
 //! git snapshot a `postep` run needs ([`super::git`]). stdout is parsed line by
 //! line (each line bounded) into events; the tail of stderr is kept for the
@@ -20,7 +20,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
-use morwisko_core::{Project, Snapshot};
+use montybrain_core::{Project, Snapshot};
 
 use super::agent::{self, AgentChoice};
 use super::command::{McpConfigFile, McpServer};
@@ -189,7 +189,7 @@ pub struct RunnerConfig {
     pub search_dirs: Vec<PathBuf>,
     /// PATH of the app, searched after `search_dirs` (and `mcp_dirs`).
     pub path_var: Option<OsString>,
-    /// Where `morwisko-mcp` is looked up before PATH.
+    /// Where `montybrain-mcp` is looked up before PATH.
     pub mcp_dirs: Vec<PathBuf>,
     /// Fixed locations git is taken from for the repository snapshot.
     pub git_candidates: Vec<PathBuf>,
@@ -605,9 +605,9 @@ impl RunManager {
     // --- starting --------------------------------------------------------------
 
     /// Validates and starts a run. Errors before a run exists (validation,
-    /// missing CLI or `morwisko-mcp`, another background run) are `Err`; a
+    /// missing CLI or `montybrain-mcp`, another background run) are `Err`; a
     /// run that could not be spawned or opened ends as `failed`. `vault_root`
-    /// is the vault the app uses (handed to `morwisko-mcp`).
+    /// is the vault the app uses (handed to `montybrain-mcp`).
     pub fn start(
         self: &Arc<Self>,
         req: &RunRequest,
@@ -636,7 +636,7 @@ impl RunManager {
         }
     }
 
-    /// `morwisko-mcp`, looked up like the providers.
+    /// `montybrain-mcp`, looked up like the providers.
     fn resolve_mcp(&self) -> Result<PathBuf, String> {
         providers::find_in(
             command::MCP_BINARY,
@@ -646,8 +646,8 @@ impl RunManager {
         .ok_or_else(|| {
             format!(
                 "Nie znaleziono serwera MCP `{}` (szukano w ~/.local/bin, obok aplikacji i w PATH). \
-Akcje w tle łączą się z Morwiskiem tylko przez niego: uruchom `./install.sh` w katalogu \
-repozytorium Morwiska i spróbuj ponownie.",
+Akcje w tle łączą się z MontyBrain tylko przez niego: uruchom `./install.sh` w katalogu \
+repozytorium MontyBrain i spróbuj ponownie.",
                 command::MCP_BINARY
             )
         })
@@ -663,10 +663,10 @@ repozytorium Morwiska i spróbuj ponownie.",
     ) -> Result<RunInfo, String> {
         let mcp = self.resolve_mcp()?;
         let vault_root = std::path::absolute(vault_root)
-            .map_err(|e| format!("Nieprawidłowy katalog Morwiska: {e}"))?;
+            .map_err(|e| format!("Nieprawidłowy katalog MontyBrain: {e}"))?;
         if vault_root.to_str().is_none() {
             return Err(format!(
-                "Ścieżka Morwiska nie jest w UTF-8: {}",
+                "Ścieżka MontyBrain nie jest w UTF-8: {}",
                 vault_root.display()
             ));
         }
@@ -862,7 +862,7 @@ repozytorium Morwiska i spróbuj ponownie.",
                 plan.provider.name(),
                 binary.display(),
                 if plan.read_only() {
-                    " (Morwisko tylko do odczytu)"
+                    " (MontyBrain tylko do odczytu)"
                 } else {
                     ""
                 }
@@ -1401,7 +1401,7 @@ mod tests {
     use super::*;
     use crate::runs::recipes::tests::req;
     use crate::runs::{ProviderId, RunMode};
-    use morwisko_core::{ProjectState, Repo};
+    use montybrain_core::{ProjectState, Repo};
 
     #[derive(Default)]
     struct Collect {
@@ -1482,7 +1482,7 @@ mod tests {
             self.tmp.path().join("vault")
         }
         fn mcp(&self) -> PathBuf {
-            self.tmp.path().join("bin/morwisko-mcp")
+            self.tmp.path().join("bin/montybrain-mcp")
         }
         /// The MCP config the fake Claude saw, and whether it is gone now.
         fn mcp_config_seen(&self) -> (serde_json::Value, String, bool) {
@@ -1522,7 +1522,7 @@ stat -f %Lp \"$a\" > \"$FAKE_OUT/mcp.mode\"; echo \"$a\" > \"$FAKE_OUT/mcp.path\
             std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
         // Never executed by the fakes; only resolved.
-        let mcp = bin.join("morwisko-mcp");
+        let mcp = bin.join("montybrain-mcp");
         std::fs::write(&mcp, "#!/bin/sh\nexit 1\n").unwrap();
         std::fs::set_permissions(&mcp, std::fs::Permissions::from_mode(0o755)).unwrap();
         let mut cfg = RunnerConfig::new(
@@ -1566,8 +1566,8 @@ stat -f %Lp \"$a\" > \"$FAKE_OUT/mcp.mode\"; echo \"$a\" > \"$FAKE_OUT/mcp.path\
     }
 
     const CLAUDE_OK: &str = r#"cat <<'EOF'
-{"type":"system","subtype":"init","model":"m","mcp_servers":[{"name":"morwisko","status":"connected"}]}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__morwisko__overview","input":{}}]}}
+{"type":"system","subtype":"init","model":"m","mcp_servers":[{"name":"montybrain","status":"connected"}]}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__montybrain__overview","input":{}}]}}
 nie-json
 {"type":"assistant","message":{"content":[{"type":"text","text":"Raport: wszystko gra."}]}}
 EOF
@@ -1637,7 +1637,7 @@ while :; do sleep 0.05; done"#;
                 (
                     EventKind::Note,
                     format!(
-                        "Uruchamiam Claude Code w tle: {} (Morwisko tylko do odczytu)",
+                        "Uruchamiam Claude Code w tle: {} (MontyBrain tylko do odczytu)",
                         env.tmp.path().join("bin/claude").display()
                     )
                     .as_str()
@@ -1706,13 +1706,13 @@ while :; do sleep 0.05; done"#;
         .unwrap();
         assert_eq!(a, expected);
         assert!(!a.iter().any(|x| x == "--add-dir"));
-        // The MCP config: morwisko-mcp only, read-only, 0600, removed after the run.
+        // The MCP config: montybrain-mcp only, read-only, 0600, removed after the run.
         let (json, mode, removed) = env.mcp_config_seen();
         assert_eq!(
             json,
-            serde_json::json!({"mcpServers":{"morwisko":{
+            serde_json::json!({"mcpServers":{"montybrain":{
                 "command": env.mcp().to_str().unwrap(), "args": [],
-                "env": {"MORWISKO_DIR": env.vault().to_str().unwrap(), "MORWISKO_READONLY": "1"}}}})
+                "env": {"MONTYBRAIN_DIR": env.vault().to_str().unwrap(), "MONTYBRAIN_READONLY": "1"}}}})
         );
         assert_eq!(mode, "600");
         assert!(removed && !config.exists());
@@ -1724,7 +1724,7 @@ while :; do sleep 0.05; done"#;
         let child_env = env.read("env");
         assert!(!child_env.contains("sk-ant-secret") && !child_env.contains("sk-secret"));
         assert!(!child_env.lines().any(|l| l.starts_with("CLAUDECODE=")));
-        assert!(child_env.contains("MORWISKO_READONLY=1"));
+        assert!(child_env.contains("MONTYBRAIN_READONLY=1"));
         let path_line = child_env.lines().find(|l| l.starts_with("PATH=")).unwrap();
         assert!(
             path_line.ends_with(":/usr/bin:/bin:/usr/sbin:/sbin") && !path_line.contains("/evil")
@@ -1740,7 +1740,7 @@ while :; do sleep 0.05; done"#;
         let codex = r#"cat <<'EOF'
 {"type":"thread.started","thread_id":"t1"}
 {"type":"item.completed","item":{"id":"i0","type":"error","message":"deprecated config key"}}
-{"type":"item.started","item":{"id":"i1","type":"mcp_tool_call","server":"morwisko","tool":"create_task","arguments":{"title":"A"},"status":"in_progress"}}
+{"type":"item.started","item":{"id":"i1","type":"mcp_tool_call","server":"montybrain","tool":"create_task","arguments":{"title":"A"},"status":"in_progress"}}
 {"type":"item.completed","item":{"id":"i2","type":"agent_message","text":"Dodano 1 zadanie."}}
 {"type":"turn.completed","usage":{}}
 EOF
@@ -1776,22 +1776,22 @@ echo 'mcp gmail failed to start' >&2"#;
                 runs_dir.to_str().unwrap().into(),
                 "--ignore-user-config".into(),
                 "-c".into(),
-                format!("mcp_servers.morwisko.command=\"{}\"", env.mcp().display()),
+                format!("mcp_servers.montybrain.command=\"{}\"", env.mcp().display()),
                 "-c".into(),
                 format!(
-                    "mcp_servers.morwisko.env.MORWISKO_DIR=\"{}\"",
+                    "mcp_servers.montybrain.env.MONTYBRAIN_DIR=\"{}\"",
                     env.vault().display()
                 ),
             ]
         );
         assert!(
-            !a.iter().any(|x| x.contains("MORWISKO_READONLY")),
+            !a.iter().any(|x| x.contains("MONTYBRAIN_READONLY")),
             "writes allowed: {a:?}"
         );
         let prompt = a.last().unwrap();
-        assert!(prompt.starts_with("Użyj skilla morwisko-zadania."));
-        assert!(prompt.contains(recipes::skill_instructions("morwisko-zadania").unwrap()));
-        assert!(!env.read("env").contains("MORWISKO_READONLY"));
+        assert!(prompt.starts_with("Użyj skilla montybrain-zadania."));
+        assert!(prompt.contains(recipes::skill_instructions("montybrain-zadania").unwrap()));
+        assert!(!env.read("env").contains("MONTYBRAIN_READONLY"));
         // Codex gets no config file.
         assert!(!env.out().join("mcp.json").exists());
     }
@@ -1817,7 +1817,7 @@ exit 3"#;
         assert_eq!(info.events.last().unwrap().kind, EventKind::Error);
         let (json, _, removed) = env.mcp_config_seen();
         assert_eq!(
-            json["mcpServers"]["morwisko"]["env"]["MORWISKO_READONLY"],
+            json["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_READONLY"],
             "1"
         );
         assert!(removed, "MCP config left behind after a failed run");
@@ -2000,7 +2000,7 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"ok"}'"#;
         .unwrap();
         assert_eq!(
             prompt,
-            "/morwisko-postep Sprawdź postęp otwartych zadań w projekcie `beeking`."
+            "/montybrain-postep Sprawdź postęp otwartych zadań w projekcie `beeking`."
         );
         let updates = env.sink.updates.lock().unwrap().clone();
         assert_eq!(updates.len(), 1);
@@ -2051,7 +2051,8 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"ok"}'"#;
                 .start("raport", provider, "background", &[])
                 .unwrap_err();
             assert!(
-                e.contains("Nie znaleziono serwera MCP `morwisko-mcp`") && e.contains("install.sh"),
+                e.contains("Nie znaleziono serwera MCP `montybrain-mcp`")
+                    && e.contains("install.sh"),
                 "{e}"
             );
         }
@@ -2175,17 +2176,17 @@ echo '{{"type":"result","subtype":"success","is_error":false,"result":"{block}"}
                 .contains(proposal::FENCE_INFO)
         );
         assert!(!env.mgr.is_busy());
-        // Read-only, Morwisko tools only, the snapshot in the prompt.
+        // Read-only, MontyBrain tools only, the snapshot in the prompt.
         let a = argv(&env);
         assert!(a[1].contains(recipes::UPDATE_NO_WRITE) && a[1].contains("Pierwszy"));
         let allowed = &a[a.iter().position(|x| x == "--allowedTools").unwrap() + 1..];
-        assert_eq!(allowed, command::MORWISKO_READ_TOOLS);
+        assert_eq!(allowed, command::MONTYBRAIN_READ_TOOLS);
         let (json, _, _) = env.mcp_config_seen();
         assert_eq!(
-            json["mcpServers"]["morwisko"]["env"]["MORWISKO_READONLY"],
+            json["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_READONLY"],
             "1"
         );
-        assert!(env.read("env").contains("MORWISKO_READONLY=1"));
+        assert!(env.read("env").contains("MONTYBRAIN_READONLY=1"));
 
         let fin = env.sink.finished.lock().unwrap().clone();
         assert_eq!(fin.len(), 1);

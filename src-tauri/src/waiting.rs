@@ -14,8 +14,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use morwisko_core::chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeDelta};
-use morwisko_core::{ProjectState, Snapshot, TaskStatus, TopicStatus};
+use montybrain_core::chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeDelta};
+use montybrain_core::{ProjectState, Snapshot, TaskStatus, TopicStatus};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -190,7 +190,7 @@ fn fresh(now: NaiveDateTime, days: u8) -> WaitCheck {
         next: now.date() + TimeDelta::days(i64::from(days)),
         interval_days: days,
         confirmed: None,
-        since: morwisko_core::minute::format(&now),
+        since: montybrain_core::minute::format(&now),
     }
 }
 
@@ -216,7 +216,7 @@ pub fn schedule(
         .items
         .get(key)
         .map(|c| c.since.clone())
-        .unwrap_or_else(|| morwisko_core::minute::format(&now));
+        .unwrap_or_else(|| montybrain_core::minute::format(&now));
     store.items.insert(
         key.to_string(),
         WaitCheck {
@@ -234,7 +234,7 @@ pub fn confirm(store: &mut WaitStore, key: &str, now: NaiveDateTime) -> Result<(
         .get_mut(key)
         .ok_or("Ta pozycja już nie czeka.")?;
     c.next = now.date() + TimeDelta::days(i64::from(c.interval_days));
-    c.confirmed = Some(morwisko_core::minute::format(&now));
+    c.confirmed = Some(montybrain_core::minute::format(&now));
     Ok(())
 }
 
@@ -396,10 +396,10 @@ pub fn change<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morwisko_core::{JournalEntry, Project, Task, TaskLocation, Topic};
+    use montybrain_core::{JournalEntry, Project, Task, TaskLocation, Topic};
 
     fn at(s: &str) -> NaiveDateTime {
-        morwisko_core::minute::parse(s).unwrap()
+        montybrain_core::minute::parse(s).unwrap()
     }
 
     fn snap(topic_status: TopicStatus, task_status: TaskStatus) -> Snapshot {

@@ -3,12 +3,12 @@
 
 import { isTauri } from "@tauri-apps/api/core";
 
-import type { MorwiskoApi } from "./api";
+import type { MontyBrainApi } from "./api";
 import { createMockApi } from "./mock";
 import { UPDATE_SCENARIOS, type UpdateScenario } from "./mock-updates";
 import { createTauriApi } from "./tauri";
 
-export type { MorwiskoApi } from "./api";
+export type { MontyBrainApi } from "./api";
 export * from "./types";
 
 // Browser-mock switches for testing the „Akcje" view: ?codex=off (Codex unavailable),
@@ -45,6 +45,6 @@ function mockRunOptions() {
   };
 }
 
-export const api: MorwiskoApi = isTauri()
+export const api: MontyBrainApi = isTauri()
   ? createTauriApi()
   : createMockApi({ latencyMs: 40, runs: mockRunOptions(), updateScenario: mockUpdateScenario() ?? undefined, drift: query().get("drift") === "none" ? "none" : undefined, today: query().get("today") === "full" ? "full" : undefined, map: mockMap() });

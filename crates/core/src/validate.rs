@@ -1,4 +1,4 @@
-//! Validation of free-text input before Morwisko writes it into a file.
+//! Validation of free-text input before MontyBrain writes it into a file.
 //!
 //! The goal is that no value can create or alter structure outside its own field:
 //! no new tasks, headings, journal entries, frontmatter keys or delimiters, and no

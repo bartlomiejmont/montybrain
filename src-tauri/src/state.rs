@@ -6,8 +6,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use morwisko_core::chrono::{NaiveDate, NaiveDateTime};
-use morwisko_core::{JournalEntry, Snapshot, TodayItem, Vault};
+use montybrain_core::chrono::{NaiveDate, NaiveDateTime};
+use montybrain_core::{JournalEntry, Snapshot, TodayItem, Vault};
 use serde::Serialize;
 
 use crate::lock;
@@ -37,7 +37,7 @@ pub struct AppView {
     /// Local date used for `today_items`.
     pub today: NaiveDate,
     /// Local "now" (minute precision), for relative times in the UI.
-    #[serde(with = "morwisko_core::minute")]
+    #[serde(with = "montybrain_core::minute")]
     pub now: NaiveDateTime,
     pub snapshot: Arc<Snapshot>,
     pub today_items: Vec<TodayItem>,
@@ -133,7 +133,7 @@ fn read(vault: &Vault) -> (Option<Snapshot>, Option<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morwisko_core::{NewTask, TaskLocation, chrono::NaiveDate};
+    use montybrain_core::{NewTask, TaskLocation, chrono::NaiveDate};
 
     fn date(s: &str) -> NaiveDate {
         s.parse().unwrap()

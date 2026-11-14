@@ -109,7 +109,7 @@ fn fm_scalar(
     }
 }
 
-/// Report every repeated occurrence of one of Morwisko's own keys: the first one is
+/// Report every repeated occurrence of one of MontyBrain's own keys: the first one is
 /// read and written, the others are kept as they are and ignored.
 fn duplicate_keys(fm: Option<&Frontmatter>, keys: &[&str], problems: &mut Problems) {
     let Some(fm) = fm else { return };

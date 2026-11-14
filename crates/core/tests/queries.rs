@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use morwisko_core::*;
+use montybrain_core::*;
 
 fn setup() -> (tempfile::TempDir, Vault) {
     let (dir, v) = vault();
@@ -152,7 +152,7 @@ fn init_and_open() {
     assert!(matches!(Vault::open(&root), Err(Error::VaultNotFound(_))));
     let v = Vault::init(&root).unwrap();
     assert!(root.join("skrzynka.md").is_file());
-    assert!(root.join(".morwisko").is_dir());
+    assert!(root.join(".montybrain").is_dir());
     write(&v, "skrzynka.md", "- [ ] keep ^kkkkk1\n");
     Vault::init(&root).unwrap();
     assert_eq!(

@@ -10,12 +10,12 @@ import {
   VAULT_CHANGED_EVENT,
   DRIFT_CHANGED_EVENT,
   WAITING_CHANGED_EVENT,
-  type MorwiskoApi,
+  type MontyBrainApi,
 } from "./api";
 import type { AppSettings, ProjectUpdateView, RunEvent, RunInfo, VaultChanged } from "./types";
 
 /** Backend access through Tauri commands (src-tauri/src/commands.rs). */
-export function createTauriApi(): MorwiskoApi {
+export function createTauriApi(): MontyBrainApi {
   return {
     mode: "tauri",
     getState: () => invoke("get_state"),

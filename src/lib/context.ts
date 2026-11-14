@@ -63,7 +63,7 @@ export function buildTopicContext({ project, topic, journal, tasks, branches, ne
   out.push(
     "",
     "---",
-    `Zapisuj postęp w Morwisku dla tego tematu (projekt \`${project.slug}\`, temat \`${topic.slug}\`): wpisy przez \`log_update\`, statusy zadań przez \`update_task\`, nowe zadania przez \`create_task\` (serwer MCP \`morwisko\`).`,
+    `Zapisuj postęp w MontyBrain dla tego tematu (projekt \`${project.slug}\`, temat \`${topic.slug}\`): wpisy przez \`log_update\`, statusy zadań przez \`update_task\`, nowe zadania przez \`create_task\` (serwer MCP \`montybrain\`).`,
   );
   return `${out.join("\n")}\n`;
 }

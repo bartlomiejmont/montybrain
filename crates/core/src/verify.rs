@@ -43,7 +43,7 @@ impl Shape {
     }
 }
 
-/// What an operation is allowed to change, beyond Morwisko's own frontmatter keys
+/// What an operation is allowed to change, beyond MontyBrain's own frontmatter keys
 /// and adding a missing `## Zadania` / `## Dziennik` section.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct Expect<'a> {
@@ -92,7 +92,7 @@ pub(crate) fn check(
     let after = Shape::of(new, kind);
     let own = |k: &String| own_keys(kind).contains(&k.as_str()) || k == UPDATED_KEY;
 
-    // Frontmatter: only Morwisko's keys may come or go; other keys stay in order.
+    // Frontmatter: only MontyBrain's keys may come or go; other keys stay in order.
     match (&before.fm_keys, &after.fm_keys) {
         (Some(_), None) => return Err("the frontmatter would disappear".into()),
         (b, Some(a)) => {

@@ -56,7 +56,7 @@ export function Sidebar({ route }: { route: Route }) {
   const counts = countTasks(view.snapshot);
   const runningActions = useRuns().list.filter((r) => r.mode === "background" && r.status === "running").length;
   const { visible, archived } = partitionProjects(view.snapshot.projects);
-  const [showArchived, setShowArchived] = useStoredFlag("morwisko.sidebar.archived", false);
+  const [showArchived, setShowArchived] = useStoredFlag("montybrain.sidebar.archived", false);
   const [adding, setAdding] = useState(false);
   const activeProject = route.view === "project" ? route.params.project : null;
   const updates = useUpdates();

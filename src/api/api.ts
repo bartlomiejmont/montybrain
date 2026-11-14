@@ -35,7 +35,7 @@ import type {
   VaultChanged,
 } from "./types";
 
-export interface MorwiskoApi {
+export interface MontyBrainApi {
   /** "tauri" inside the app, "mock" in a plain browser (`pnpm dev`). */
   readonly mode: "tauri" | "mock";
 

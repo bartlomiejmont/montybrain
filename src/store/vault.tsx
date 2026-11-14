@@ -4,7 +4,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { api, type AppView, type MorwiskoApi } from "../api";
+import { api, type AppView, type MontyBrainApi } from "../api";
 import { toIsoDate } from "../lib/dates";
 import { describeError } from "../lib/errors";
 
@@ -24,10 +24,10 @@ interface VaultContextValue {
   view: AppView | null;
   /** Fatal error of the very first load. */
   fatal: string | null;
-  api: MorwiskoApi;
+  api: MontyBrainApi;
   refresh(): Promise<void>;
   /** Runs a backend call; on error shows a toast and resolves to `undefined`. */
-  run<T>(call: (api: MorwiskoApi) => Promise<T>): Promise<T | undefined>;
+  run<T>(call: (api: MontyBrainApi) => Promise<T>): Promise<T | undefined>;
   toasts: Toast[];
   notify(text: string, action?: ToastAction): void;
   dismiss(id: number): void;
@@ -66,7 +66,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }, [notify]);
 
   const run = useCallback(
-    async <T,>(call: (api: MorwiskoApi) => Promise<T>): Promise<T | undefined> => {
+    async <T,>(call: (api: MontyBrainApi) => Promise<T>): Promise<T | undefined> => {
       try {
         const out = await call(api);
         await refresh();
@@ -100,10 +100,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
   // Browser mock only: a handle to simulate an external change (an agent or an
   // editor writing a file) from the console, e.g.
-  //   __morwisko.api.updateTask("g7h8i9", { notes: "from outside" })
+  //   __montybrain.api.updateTask("g7h8i9", { notes: "from outside" })
   useEffect(() => {
     if (api.mode !== "mock") return;
-    (window as unknown as { __morwisko?: unknown }).__morwisko = { api, refresh };
+    (window as unknown as { __montybrain?: unknown }).__montybrain = { api, refresh };
   }, [refresh]);
 
   // A new local day changes "Dziś" without any file change.

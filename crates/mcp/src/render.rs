@@ -3,8 +3,8 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use morwisko_core::chrono::NaiveDate;
-use morwisko_core::{
+use montybrain_core::chrono::NaiveDate;
+use montybrain_core::{
     JournalEntry, Priority, Project, SearchHit, Snapshot, Task, TaskLocation, TodayReason, Topic,
     TopicStatus, minute,
 };
@@ -258,7 +258,7 @@ fn project_arg(project: Option<&Project>) -> String {
 
 /// The session-start briefing. `project` limits it to one project, with more detail.
 pub fn overview(snap: &Snapshot, today: NaiveDate, project: Option<&Project>) -> String {
-    let mut out = format!("# Morwisko overview · {}\n", today.format("%Y-%m-%d, %A"));
+    let mut out = format!("# MontyBrain overview · {}\n", today.format("%Y-%m-%d, %A"));
 
     // Today block.
     let items: Vec<_> = snap
@@ -316,7 +316,7 @@ pub fn overview(snap: &Snapshot, today: NaiveDate, project: Option<&Project>) ->
             let active: Vec<_> = snap
                 .projects
                 .iter()
-                .filter(|p| p.state == morwisko_core::ProjectState::Active)
+                .filter(|p| p.state == montybrain_core::ProjectState::Active)
                 .collect();
             if active.is_empty() {
                 out.push_str("(no active projects)\n");
@@ -374,7 +374,7 @@ pub fn overview(snap: &Snapshot, today: NaiveDate, project: Option<&Project>) ->
             let others: Vec<_> = snap
                 .projects
                 .iter()
-                .filter(|p| p.state == morwisko_core::ProjectState::Paused)
+                .filter(|p| p.state == montybrain_core::ProjectState::Paused)
                 .map(|p| p.slug.as_str())
                 .collect();
             if !others.is_empty() {

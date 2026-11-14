@@ -1,4 +1,4 @@
-//! Tauri commands: thin wrappers over `morwisko-core`.
+//! Tauri commands: thin wrappers over `montybrain-core`.
 //!
 //! Core does synchronous file I/O, so every command is `async` and runs its work
 //! on a blocking thread; nothing touches the main (UI) thread. Errors cross the
@@ -9,7 +9,7 @@
 //! `vault-changed` is emitted. The watcher reports the same write a moment later;
 //! that reload finds nothing new and stays silent.
 
-use morwisko_core::{
+use montybrain_core::{
     JournalAdded, NewJournalEntry, NewProject, NewTask, NewTopic, Project, ProjectPatch, SearchHit,
     Task, TaskLocation, TaskPatch, Topic, TopicPatch, Vault, local_today,
 };
@@ -43,7 +43,7 @@ async fn mutate<R, T, F>(app: AppHandle<R>, f: F) -> CmdResult<T>
 where
     R: Runtime,
     T: Send + 'static,
-    F: FnOnce(&Vault) -> morwisko_core::Result<T> + Send + 'static,
+    F: FnOnce(&Vault) -> montybrain_core::Result<T> + Send + 'static,
 {
     blocking(move || {
         let state = app.state::<VaultState>();
@@ -361,7 +361,7 @@ pub async fn list_updates<R: Runtime>(
 }
 
 /// Applies the selected changes (0-based indices) of the proposal of a run,
-/// through `morwisko-core`; each change gets its own result.
+/// through `montybrain-core`; each change gets its own result.
 #[tauri::command]
 pub async fn apply_update<R: Runtime>(
     app: AppHandle<R>,
@@ -482,7 +482,7 @@ pub async fn refresh_drift<R: Runtime>(
 }
 
 fn check_branch(
-    snap: &morwisko_core::Snapshot,
+    snap: &montybrain_core::Snapshot,
     project: &str,
     repo: &str,
     branch: &str,

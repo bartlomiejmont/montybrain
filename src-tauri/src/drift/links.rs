@@ -1,6 +1,6 @@
 //! Explicit branch ↔ topic links and ignored branches, in a sidecar file of
-//! the vault (`.morwisko/links.json`; the loader and the watcher skip
-//! `.morwisko/`), so the topic file format stays as it is and the links travel
+//! the vault (`.montybrain/links.json`, or `.morwisko/links.json` in a vault
+//! that predates the rename; the loader and the watcher skip both), so the topic file format stays as it is and the links travel
 //! with the vault. Written by applying proposals that name `branches`, by
 //! "Przypisz do tematu…" and by "Ignoruj".
 
@@ -107,8 +107,10 @@ impl LinkStore {
     }
 }
 
+/// In the vault's meta directory: `.montybrain/`, or the legacy `.morwisko/`
+/// of a vault that already has one (see [`montybrain_core::meta_dir`]).
 pub fn path(vault_root: &Path) -> PathBuf {
-    vault_root.join(morwisko_core::META_DIR).join(FILE)
+    montybrain_core::meta_dir(vault_root).join(FILE)
 }
 
 /// Missing or unreadable → empty (an unreadable file is logged and left alone

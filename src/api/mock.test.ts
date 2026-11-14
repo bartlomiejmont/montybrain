@@ -69,8 +69,8 @@ describe("mock api", () => {
 
   it("handles projects, topics and the journal", async () => {
     const api = createMockApi({ now });
-    const p = await api.createProject({ name: "Morwisko" });
-    expect(p.slug).toBe("morwisko-2"); // fixtures already have "morwisko"
+    const p = await api.createProject({ name: "MontyBrain" });
+    expect(p.slug).toBe("montybrain-2"); // fixtures already have "montybrain"
     const t = await api.createTopic(p.slug, { title: "Zażółć gęślą jaźń" });
     expect(t.slug).toBe("zazolc-gesla-jazn");
     expect(t.status).toBe("planned");

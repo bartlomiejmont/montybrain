@@ -199,7 +199,7 @@ describe("requests (zlecenie)", () => {
   it("have their own status wording, distinct from checks", () => {
     const req = { request: "Rozpisz temat kasy" };
     expect(statusLine(last({ kind: "proposed", count: 3 }, req), NOW).text).toBe("Zlecenie · dziś 14:02 · Codex · 3 propozycje");
-    expect(statusLine(last({ kind: "no_changes" }, req), NOW).text).toBe("Zlecenie · dziś 14:02 · Codex · odpowiedź bez zmian w Morwisku");
+    expect(statusLine(last({ kind: "no_changes" }, req), NOW).text).toBe("Zlecenie · dziś 14:02 · Codex · odpowiedź bez zmian w MontyBrain");
     expect(statusLine(last({ kind: "applied", count: 1 }, req), NOW).text).toBe("Zlecenie · dziś 14:02 · Codex · zastosowano 1 zmianę");
     expect(statusLine(last({ kind: "failed", message: "kod 3", limit: false }, req), NOW)).toEqual({
       text: "Zlecenie dziś 14:02 nie powiodło się · Codex",
@@ -386,7 +386,7 @@ describe("formats and texts", () => {
   });
 
   it("hides the machine-readable block in Akcje", () => {
-    const text = "Raport.\n\n- a\n\n```morwisko-zmiany\n{\"changes\": []}\n```\n";
+    const text = "Raport.\n\n- a\n\n```montybrain-zmiany\n{\"changes\": []}\n```\n";
     expect(stripProposalBlock(text)).toBe("Raport.\n\n- a");
     expect(stripProposalBlock("A\n```ts\nx\n```")).toBe("A\n```ts\nx\n```");
   });
@@ -418,16 +418,16 @@ describe("round 6", () => {
     expect(tool('get_topic {"project":"whenubuy","topic":"platnosci"}')).toBe("Czytam temat „Płatności”");
     expect(tool('get_topic {"project":"whenubuy","topic":"inny"}')).toBe("Czytam temat „inny”");
     expect(tool('list_tasks {"project":"whenubuy","status":"open"}')).toBe("Czytam listę zadań");
-    expect(tool('search {"query":"blik"}')).toBe("Szukam „blik” w Morwisku");
-    expect(tool('search {"query":"blik i karty, a tu jest cięty tekst')).toBe("Szukam „blik i karty, a tu jest cięty tekst” w Morwisku");
-    expect(tool("mcp__morwisko__overview {}")).toBe("Czytam przegląd projektu");
-    expect(tool('log_update {"topic":"x"}')).toBe("Agent próbował zapisać w Morwisku (w tym trybie zablokowane)");
+    expect(tool('search {"query":"blik"}')).toBe("Szukam „blik” w MontyBrain");
+    expect(tool('search {"query":"blik i karty, a tu jest cięty tekst')).toBe("Szukam „blik i karty, a tu jest cięty tekst” w MontyBrain");
+    expect(tool("mcp__montybrain__overview {}")).toBe("Czytam przegląd projektu");
+    expect(tool('log_update {"topic":"x"}')).toBe("Agent próbował zapisać w MontyBrain (w tym trybie zablokowane)");
     expect(progressText({ kind: "note", text: "Zbieram stan repozytoriów (2; tylko odczyt)…" })).toBe("Zbieram stan repozytoriów (2; tylko odczyt)…");
     expect(progressText({ kind: "text", text: "I will now…" })).toBe("Agent analizuje i pisze odpowiedź…");
   });
 
   it("says in one line what the agent of a request can see", () => {
-    expect(requestNote(true)).toBe("Agent widzi Morwisko, repozytoria i historię rozmów; bez poczty i Slacka.");
-    expect(requestNote(false)).toBe("Agent widzi Morwisko i repozytoria; bez historii rozmów, poczty i Slacka.");
+    expect(requestNote(true)).toBe("Agent widzi MontyBrain, repozytoria i historię rozmów; bez poczty i Slacka.");
+    expect(requestNote(false)).toBe("Agent widzi MontyBrain i repozytoria; bez historii rozmów, poczty i Slacka.");
   });
 });

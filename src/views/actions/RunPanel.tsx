@@ -155,7 +155,7 @@ export function RunPanel({ run, recipe }: { run: RunInfo; recipe: Recipe | null 
       {terminal ? (
         <div className="run-note">
           <p className="run-note-title">Otwarto w Terminalu</p>
-          <p className="run-note-text">Sesja toczy się tam dalej. Jej efekty pojawią się w Morwisku same, gdy agent zapisze zadania lub wpisy.</p>
+          <p className="run-note-text">Sesja toczy się tam dalej. Jej efekty pojawią się w MontyBrain same, gdy agent zapisze zadania lub wpisy.</p>
         </div>
       ) : (
         <>
@@ -168,7 +168,7 @@ export function RunPanel({ run, recipe }: { run: RunInfo; recipe: Recipe | null 
           )}
           {run.status === "cancelled" && (
             <p className="run-cancelled">
-              {recipe?.background_writes ? "Uruchomienie przerwane. Agent mógł zdążyć coś zapisać w Morwisku." : "Uruchomienie przerwane. Nic nie zostało zapisane w Morwisku."}
+              {recipe?.background_writes ? "Uruchomienie przerwane. Agent mógł zdążyć coś zapisać w MontyBrain." : "Uruchomienie przerwane. Nic nie zostało zapisane w MontyBrain."}
             </p>
           )}
           {run.status === "succeeded" && (

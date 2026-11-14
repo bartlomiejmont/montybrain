@@ -37,7 +37,7 @@ export function TaskList({
   const view = useView();
   const { createTask } = useActions();
   const { open, done } = splitDone(tasks);
-  const [showDone, setShowDone] = useStoredFlag(`morwisko.done.${listId}`, false);
+  const [showDone, setShowDone] = useStoredFlag(`montybrain.done.${listId}`, false);
   const reveal = useReveal();
   // A revealed task that is done must not stay hidden in the collapsed group.
   useEffect(() => {

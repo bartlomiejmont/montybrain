@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from "react";
 
 import { api } from "../api";
-import type { MorwiskoApi } from "../api/api";
+import type { MontyBrainApi } from "../api/api";
 import type { ProjectUpdateView, ProviderInfo } from "../api/types";
 
 export interface UpdatesSnapshot {
@@ -13,7 +13,7 @@ export interface UpdatesSnapshot {
   byProject: Record<string, ProjectUpdateView>;
 }
 
-export function createUpdateStore(api: Pick<MorwiskoApi, "listUpdates" | "onUpdatesChanged" | "listProviders">) {
+export function createUpdateStore(api: Pick<MontyBrainApi, "listUpdates" | "onUpdatesChanged" | "listProviders">) {
   let snap: UpdatesSnapshot = { loaded: false, byProject: {} };
   let providers: ProviderInfo[] | null = null;
   let providersAt = 0;

@@ -1,4 +1,4 @@
-// Mirrors of the JSON shapes produced by `morwisko-core` (see docs/core-api.md)
+// Mirrors of the JSON shapes produced by `montybrain-core` (see docs/core-api.md)
 // and by the app's own commands (src-tauri/src/state.rs). One place, on purpose.
 
 /** "YYYY-MM-DD" */
@@ -277,7 +277,7 @@ export interface Recipe {
   description: string;
   skill: string;
   modes: RunMode[];
-  /** In the background the agent writes to Morwisko without asking. */
+  /** In the background the agent writes to MontyBrain without asking. */
   background_writes: boolean;
   /** The background run proposes changes that are written after review (needs a project with repositories). */
   proposes: boolean;

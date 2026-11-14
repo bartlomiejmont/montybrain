@@ -258,7 +258,7 @@ function requestLine(last: UpdateResult, when: string, who: string): StatusLine 
       return { text: `${head} · ${plural(o.count, "propozycja", "propozycje", "propozycji")}`, error: false, detail: null };
     case "no_changes":
     case "unchanged":
-      return { text: `${head} · odpowiedź bez zmian w Morwisku`, error: false, detail: null };
+      return { text: `${head} · odpowiedź bez zmian w MontyBrain`, error: false, detail: null };
     case "applied":
       return { text: `${head} · zastosowano ${plural(o.count, "zmianę", "zmiany", "zmian")}`, error: false, detail: null };
     case "no_proposal":
@@ -408,12 +408,12 @@ export function hourChoices(current: number | null): number[] {
   return current && !base.includes(current) ? [...base, current].sort((a, b) => a - b) : base;
 }
 
-/** The answer of a proposing recipe without its machine-readable `morwisko-zmiany` block. */
+/** The answer of a proposing recipe without its machine-readable `montybrain-zmiany` block. */
 export function stripProposalBlock(text: string): string {
   const lines = text.split("\n");
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = /^ {0,3}(`{3,}|~{3,})\s*morwisko-zmiany\s*$/.exec(lines[i]!);
+    const m = /^ {0,3}(`{3,}|~{3,})\s*montybrain-zmiany\s*$/.exec(lines[i]!);
     if (!m) {
       out.push(lines[i]!);
       continue;
@@ -447,7 +447,7 @@ export function panelLabel(cfg: AutoUpdate, history: boolean): string {
 
 /** What the agent of a request can see, one line under the request field. */
 export function requestNote(history: boolean): string {
-  return history ? "Agent widzi Morwisko, repozytoria i historię rozmów; bez poczty i Slacka." : "Agent widzi Morwisko i repozytoria; bez historii rozmów, poczty i Slacka.";
+  return history ? "Agent widzi MontyBrain, repozytoria i historię rozmów; bez poczty i Slacka." : "Agent widzi MontyBrain i repozytoria; bez historii rozmów, poczty i Slacka.";
 }
 
 /**
@@ -490,7 +490,7 @@ function argOf(line: string, key: string): string | null {
 export function progressText(e: { kind: string; text: string }, topicTitle: (slug: string) => string | null = () => null): string {
   if (e.kind === "text") return "Agent analizuje i pisze odpowiedź…";
   if (e.kind !== "tool") return e.text;
-  const name = (e.text.split(/[\s{]/, 1)[0] ?? "").replace(/^mcp__morwisko__/, "").replace(/^morwisko\//, "");
+  const name = (e.text.split(/[\s{]/, 1)[0] ?? "").replace(/^mcp__montybrain__/, "").replace(/^montybrain\//, "");
   const topic = argOf(e.text, "topic");
   const named = topic ? `„${topicTitle(topic) ?? topic}”` : null;
   switch (name) {
@@ -502,7 +502,7 @@ export function progressText(e: { kind: string; text: string }, topicTitle: (slu
       return named ? `Czytam zadania tematu ${named}` : "Czytam listę zadań";
     case "search": {
       const q = argOf(e.text, "query");
-      return q ? `Szukam „${shorten(q, 40)}” w Morwisku` : "Szukam w Morwisku";
+      return q ? `Szukam „${shorten(q, 40)}” w MontyBrain` : "Szukam w MontyBrain";
     }
     case "recent_journal":
       return "Czytam dziennik";
@@ -512,7 +512,7 @@ export function progressText(e: { kind: string; text: string }, topicTitle: (slu
     case "update_task":
     case "create_task":
     case "create_topic":
-      return "Agent próbował zapisać w Morwisku (w tym trybie zablokowane)";
+      return "Agent próbował zapisać w MontyBrain (w tym trybie zablokowane)";
     default:
       return name.startsWith("Bash") || name.startsWith("$") ? "Agent próbował uruchomić polecenie (w tym trybie zablokowane)" : `Używam narzędzia ${name || "agenta"}`;
   }
@@ -520,7 +520,7 @@ export function progressText(e: { kind: string; text: string }, topicTitle: (slu
 
 /** The consent sentence for turning the history source on. */
 export const HISTORY_CONSENT =
-  "Treść twoich poleceń z sesji Claude Code i Codexa w repozytoriach tego projektu trafi do agenta, który robi sprawdzenie, także do drugiego dostawcy. Morwisko wycina fragmenty wyglądające na hasła i klucze, ale nie daje gwarancji.";
+  "Treść twoich poleceń z sesji Claude Code i Codexa w repozytoriach tego projektu trafi do agenta, który robi sprawdzenie, także do drugiego dostawcy. MontyBrain wycina fragmenty wyglądające na hasła i klucze, ale nie daje gwarancji.";
 
 /**
  * The history toggle: turning it on only asks for consent (nothing is saved

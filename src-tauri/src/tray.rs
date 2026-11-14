@@ -6,8 +6,8 @@
 
 use std::sync::Mutex;
 
-use morwisko_core::chrono::NaiveDate;
-use morwisko_core::{TodayItem, TodayReason, local_today};
+use montybrain_core::chrono::NaiveDate;
+use montybrain_core::{TodayItem, TodayReason, local_today};
 use tauri::image::Image;
 use tauri::menu::{IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
@@ -15,7 +15,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use crate::state::VaultState;
 
-const TRAY_ID: &str = "morwisko";
+const TRAY_ID: &str = "montybrain";
 /// How many tasks the menu lists.
 const MENU_TASKS: usize = 6;
 const MAX_LABEL: usize = 46;
@@ -118,7 +118,7 @@ pub fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::new_owned(icon_rgba(size), size, size))
         .icon_as_template(true)
-        .tooltip("Morwisko")
+        .tooltip("MontyBrain")
         .show_menu_on_left_click(true)
         .on_menu_event(on_menu_event)
         .build(app)?;
@@ -157,15 +157,15 @@ fn apply<R: Runtime>(app: &AppHandle<R>, tray: &TrayIcon<R>, m: &TrayModel) -> t
         None
     })?;
     tray.set_tooltip(Some(match m.count {
-        0 => "Morwisko".to_string(),
-        n => format!("Morwisko — dziś: {}", crate::reminders::count_tasks(n)),
+        0 => "MontyBrain".to_string(),
+        n => format!("MontyBrain — dziś: {}", crate::reminders::count_tasks(n)),
     }))?;
 
     let mut owned: Vec<Box<dyn IsMenuItem<R>>> = vec![
         Box::new(MenuItem::with_id(
             app,
             "open",
-            "Otwórz Morwisko",
+            "Otwórz MontyBrain",
             true,
             None::<&str>,
         )?),
@@ -252,7 +252,7 @@ fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morwisko_core::{Due, Priority, Task, TaskLocation, TaskStatus};
+    use montybrain_core::{Due, Priority, Task, TaskLocation, TaskStatus};
 
     fn item(reason: TodayReason, title: &str, due: Option<&str>) -> TodayItem {
         TodayItem {

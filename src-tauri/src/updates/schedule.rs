@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use morwisko_core::chrono::{NaiveDateTime, NaiveTime, TimeDelta};
+use montybrain_core::chrono::{NaiveDateTime, NaiveTime, TimeDelta};
 use serde::{Deserialize, Serialize};
 
 use crate::runs::ProviderId;
@@ -173,7 +173,7 @@ mod tests {
     use super::*;
 
     fn at(s: &str) -> NaiveDateTime {
-        morwisko_core::minute::parse(s).unwrap()
+        montybrain_core::minute::parse(s).unwrap()
     }
 
     fn every(hours: u32) -> AutoUpdate {

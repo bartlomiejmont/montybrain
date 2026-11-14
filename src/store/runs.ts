@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from "react";
 
 import { api } from "../api";
-import type { MorwiskoApi } from "../api/api";
+import type { MontyBrainApi } from "../api/api";
 import type { RunInfo, RunRequest } from "../api/types";
 import { activeBackgroundRun, initialRunsState, runsReducer, sortRuns, type RunsAction, type RunsState } from "../lib/runs";
 
@@ -17,7 +17,7 @@ export interface RunsSnapshot {
   active: RunInfo | null;
 }
 
-export function createRunStore(api: Pick<MorwiskoApi, "onRunEvent" | "onRunUpdated" | "listRuns" | "startRun" | "cancelRun">) {
+export function createRunStore(api: Pick<MontyBrainApi, "onRunEvent" | "onRunUpdated" | "listRuns" | "startRun" | "cancelRun">) {
   let data = initialRunsState;
   let selectedId: string | null = null;
   let snap: RunsSnapshot = build();

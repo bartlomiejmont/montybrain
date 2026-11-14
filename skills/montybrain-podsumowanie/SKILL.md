@@ -1,11 +1,11 @@
 ---
-name: morwisko-podsumowanie
-description: "Podsumowuj pracę z użyciem Morwiska (serwer MCP `morwisko`). Dwa zastosowania: (1) na koniec sesji zapisz w Morwisku, co zostało zrobione w tym wątku: wpis do dziennika tematu, zamknięte zadania, nowe zadania na resztę; (2) przygotuj raport z dnia lub tygodnia na podstawie dziennika i zadań. Używaj przy prośbach „podsumuj pracę”, „zapisz postęp”, „zamknij sesję”, „co dziś zrobiłem”, „raport z tygodnia”, „status projektu”."
+name: montybrain-podsumowanie
+description: "Podsumowuj pracę z użyciem MontyBrain (serwer MCP `montybrain`). Dwa zastosowania: (1) na koniec sesji zapisz w MontyBrain, co zostało zrobione w tym wątku: wpis do dziennika tematu, zamknięte zadania, nowe zadania na resztę; (2) przygotuj raport z dnia lub tygodnia na podstawie dziennika i zadań. Używaj przy prośbach „podsumuj pracę”, „zapisz postęp”, „zamknij sesję”, „co dziś zrobiłem”, „raport z tygodnia”, „status projektu”."
 ---
 
-# Podsumowanie pracy w Morwisku
+# Podsumowanie pracy w MontyBrain
 
-Morwisko trzyma pracę użytkownika w plikach Markdown: Projekt → Temat (status, krótki opis stanu, dziennik) → Zadanie. Korzystasz z niego przez narzędzia serwera MCP `morwisko`: `overview`, `list_tasks`, `search`, `get_topic`, `create_task`, `update_task`, `create_topic`, `log_update`. Jeśli tych narzędzi nie ma w sesji, powiedz to wprost; podsumowanie możesz wtedy podać tylko w rozmowie.
+MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat (status, krótki opis stanu, dziennik) → Zadanie. Korzystasz z niego przez narzędzia serwera MCP `montybrain`: `overview`, `list_tasks`, `search`, `get_topic`, `create_task`, `update_task`, `create_topic`, `log_update`. Jeśli tych narzędzi nie ma w sesji, powiedz to wprost; podsumowanie możesz wtedy podać tylko w rozmowie.
 
 Ustal najpierw, o co chodzi: **zapis postępu z tej sesji** czy **raport** za okres. Gdy nie wynika to z prośby, a w wątku była praca, zrób zapis postępu.
 
@@ -36,6 +36,6 @@ Jeden wpis na sesję i temat. Nie dopisuj kolejnego, jeśli od poprzedniego nic 
    - **W toku**: co trwa, z aktualnym stanem tematu.
    - **Zablokowane / czeka**: na co.
    - **Najbliższe**: zadania z terminem w najbliższych dniach i zaległe.
-4. Raport oddaj w rozmowie. Do Morwiska nic nie zapisuj, chyba że użytkownik o to poprosi.
+4. Raport oddaj w rozmowie. Do MontyBrain nic nie zapisuj, chyba że użytkownik o to poprosi.
 
-Pisz zwięźle i po polsku. Opieraj się wyłącznie na tym, co jest w Morwisku i w repozytoriach; jeśli dziennik jest pusty, napisz, że brak wpisów, zamiast odtwarzać pracę z domysłów.
+Pisz zwięźle i po polsku. Opieraj się wyłącznie na tym, co jest w MontyBrain i w repozytoriach; jeśli dziennik jest pusty, napisz, że brak wpisów, zamiast odtwarzać pracę z domysłów.

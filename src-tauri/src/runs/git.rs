@@ -491,7 +491,7 @@ impl Collector<'_> {
     pub fn collect(&self, repos: &[RepoRef]) -> GitSnapshot {
         let mut snap = GitSnapshot::default();
         if repos.is_empty() {
-            snap.text = "Wybrane projekty nie mają w Morwisku przypisanych repozytoriów.".into();
+            snap.text = "Wybrane projekty nie mają w MontyBrain przypisanych repozytoriów.".into();
             return snap;
         }
         let Some(git) = self.git else {

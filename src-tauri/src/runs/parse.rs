@@ -147,20 +147,19 @@ impl Parser {
                     s.push_str(&format!(", model {m}"));
                 }
                 out.push((EventKind::Note, s));
-                let morwisko = v
+                let montybrain = v
                     .get("mcp_servers")
                     .and_then(Value::as_array)
-                    .and_then(|a| a.iter().find(|s| str_at(s, "name") == Some("morwisko")));
+                    .and_then(|a| a.iter().find(|s| str_at(s, "name") == Some("montybrain")));
                 out.push((
                     EventKind::Note,
-                    match morwisko {
+                    match montybrain {
                         Some(s) => format!(
-                            "Serwer MCP morwisko: {}",
+                            "Serwer MCP montybrain: {}",
                             str_at(s, "status").unwrap_or("?")
                         ),
-                        None => {
-                            "Serwer MCP morwisko nie jest skonfigurowany w Claude Code.".to_string()
-                        }
+                        None => "Serwer MCP montybrain nie jest skonfigurowany w Claude Code."
+                            .to_string(),
                     },
                 ));
             }
@@ -332,7 +331,12 @@ fn claude_tool(name: &str, input: Option<&Value>) -> String {
     {
         return format!("Bash: {}", one_line(cmd, COMMAND_CHARS));
     }
-    let short = name.strip_prefix("mcp__morwisko__").unwrap_or(name);
+    // Our tools under the server name, or the pre-rename `morwisko` one
+    // (still registered in a CLI that was not reinstalled).
+    let short = name
+        .strip_prefix("mcp__montybrain__")
+        .or_else(|| name.strip_prefix("mcp__morwisko__"))
+        .unwrap_or(name);
     tool_line(short, input)
 }
 
@@ -345,7 +349,7 @@ fn codex_tool(kind: &str, item: &Value) -> String {
         "mcp_tool_call" => {
             let tool = str_at(item, "tool").unwrap_or("?");
             let name = match str_at(item, "server") {
-                Some("morwisko") | None => tool.to_string(),
+                Some("montybrain" | "morwisko") | None => tool.to_string(),
                 Some(server) => format!("{server}/{tool}"),
             };
             tool_line(&name, item.get("arguments"))
@@ -399,14 +403,27 @@ mod tests {
     }
 
     #[test]
+    fn tools_of_the_pre_rename_server_name_are_shortened_too() {
+        assert_eq!(claude_tool("mcp__morwisko__overview", None), "overview");
+        assert_eq!(claude_tool("mcp__montybrain__overview", None), "overview");
+        assert_eq!(
+            codex_tool(
+                "mcp_tool_call",
+                &serde_json::json!({"server": "morwisko", "tool": "search"})
+            ),
+            "search"
+        );
+    }
+
+    #[test]
     fn claude_success_stream() {
         let (lines, outcome) = run(
             ProviderId::Claude,
             &[
-                r#"{"type":"system","subtype":"init","model":"claude-x","mcp_servers":[{"name":"gmail","status":"failed"},{"name":"morwisko","status":"connected"}],"tools":["mcp__morwisko__overview"]}"#,
+                r#"{"type":"system","subtype":"init","model":"claude-x","mcp_servers":[{"name":"gmail","status":"failed"},{"name":"montybrain","status":"connected"}],"tools":["mcp__montybrain__overview"]}"#,
                 r#"{"type":"rate_limit_event","rate_limit_info":{}}"#,
-                r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"hm"},{"type":"text","text":"Sprawdzam."},{"type":"tool_use","id":"t1","name":"mcp__morwisko__list_tasks","input":{"project":"beeking"}}]}}"#,
-                r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t0","name":"mcp__morwisko__overview","input":{}}]}}"#,
+                r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"hm"},{"type":"text","text":"Sprawdzam."},{"type":"tool_use","id":"t1","name":"mcp__montybrain__list_tasks","input":{"project":"beeking"}}]}}"#,
+                r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t0","name":"mcp__montybrain__overview","input":{}}]}}"#,
                 r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"git log\n--oneline -15","description":"x"}}]}}"#,
                 r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"3 task(s)"}]}}"#,
                 r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":[{"type":"text","text":"Permission denied"}]}]}}"#,
@@ -419,7 +436,7 @@ mod tests {
             lines,
             vec![
                 (Note, "Sesja Claude Code, model claude-x".to_string()),
-                (Note, "Serwer MCP morwisko: connected".to_string()),
+                (Note, "Serwer MCP montybrain: connected".to_string()),
                 (Text, "Sprawdzam.".to_string()),
                 (Tool, r#"list_tasks {"project":"beeking"}"#.to_string()),
                 (Tool, "overview".to_string()),
@@ -487,10 +504,10 @@ mod tests {
                 r#"{"type":"turn.started"}"#,
                 r#"{"type":"item.completed","item":{"id":"item_0","type":"error","message":"`experimental_use_rmcp_client` is deprecated"}}"#,
                 r#"{"type":"item.completed","item":{"id":"item_1","type":"reasoning","text":"thinking"}}"#,
-                r#"{"type":"item.started","item":{"id":"item_2","type":"mcp_tool_call","server":"morwisko","tool":"overview","arguments":{},"result":null,"error":null,"status":"in_progress"}}"#,
-                r#"{"type":"item.completed","item":{"id":"item_2","type":"mcp_tool_call","server":"morwisko","tool":"overview","arguments":{},"result":{"content":[]},"error":null,"status":"completed"}}"#,
-                r#"{"type":"item.started","item":{"id":"item_3","type":"mcp_tool_call","server":"morwisko","tool":"list_tasks","arguments":{"project":"beeking"},"status":"in_progress"}}"#,
-                r#"{"type":"item.completed","item":{"id":"item_3","type":"mcp_tool_call","server":"morwisko","tool":"list_tasks","arguments":{"project":"beeking"},"error":{"message":"Unknown project"},"status":"failed"}}"#,
+                r#"{"type":"item.started","item":{"id":"item_2","type":"mcp_tool_call","server":"montybrain","tool":"overview","arguments":{},"result":null,"error":null,"status":"in_progress"}}"#,
+                r#"{"type":"item.completed","item":{"id":"item_2","type":"mcp_tool_call","server":"montybrain","tool":"overview","arguments":{},"result":{"content":[]},"error":null,"status":"completed"}}"#,
+                r#"{"type":"item.started","item":{"id":"item_3","type":"mcp_tool_call","server":"montybrain","tool":"list_tasks","arguments":{"project":"beeking"},"status":"in_progress"}}"#,
+                r#"{"type":"item.completed","item":{"id":"item_3","type":"mcp_tool_call","server":"montybrain","tool":"list_tasks","arguments":{"project":"beeking"},"error":{"message":"Unknown project"},"status":"failed"}}"#,
                 r#"{"type":"item.completed","item":{"id":"item_4","type":"mcp_tool_call","server":"gmail","tool":"search","arguments":"{\"q\":\"x\"}","status":"completed"}}"#,
                 r#"{"type":"item.started","item":{"id":"item_5","type":"command_execution","command":"/bin/zsh -lc 'git log --oneline'","aggregated_output":"","status":"in_progress"}}"#,
                 r#"{"type":"item.completed","item":{"id":"item_5","type":"command_execution","command":"/bin/zsh -lc 'git log --oneline'","aggregated_output":"fatal","exit_code":128,"status":"failed"}}"#,
@@ -605,7 +622,7 @@ mod tests {
         assert_eq!(clip("ąęść", 2), "ąę…");
         assert_eq!(clip("ab", 2), "ab");
         let long = format!(
-            r#"{{"type":"assistant","message":{{"content":[{{"type":"tool_use","name":"mcp__morwisko__search","input":{{"query":"{}"}}}}]}}}}"#,
+            r#"{{"type":"assistant","message":{{"content":[{{"type":"tool_use","name":"mcp__montybrain__search","input":{{"query":"{}"}}}}]}}}}"#,
             "x".repeat(500)
         );
         let l = Parser::new(ProviderId::Claude).line(&long);
