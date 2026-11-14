@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-edit-update"
+description = "Enables the edit_update command without any pre-configured scope."
+commands.allow = ["edit_update"]
+
+[[permission]]
+identifier = "deny-edit-update"
+description = "Denies the edit_update command without any pre-configured scope."
+commands.deny = ["edit_update"]

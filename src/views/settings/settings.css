@@ -1,0 +1,199 @@
+/* „Ustawienia" view and its sidebar entry. Tokens come from src/styles.css. */
+
+.settings .group {
+  margin-top: 34px;
+}
+
+.settings .view-head + .group {
+  margin-top: 0;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 52px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.set-row:last-child {
+  border-bottom: 0;
+}
+
+.set-text {
+  min-width: 0;
+}
+
+.set-label {
+  color: var(--text);
+}
+
+.set-hint {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.set-path {
+  display: block;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.set-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.set-value {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-select {
+  width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* switch */
+
+.set-switch {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  border: 1px solid var(--line);
+  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+}
+
+.set-switch:disabled {
+  opacity: 0.45;
+}
+
+.set-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 160ms var(--ease), background 160ms var(--ease);
+}
+
+.set-switch.on {
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.set-switch.on .set-knob {
+  transform: translateX(12px);
+  background: var(--bg);
+}
+
+/* shortcut */
+
+.set-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-field);
+}
+
+.set-shortcut:hover {
+  border-color: var(--text-4);
+}
+
+.set-shortcut.recording {
+  border-color: var(--text-3);
+}
+
+.set-shortcut.broken .set-kbd {
+  color: var(--danger);
+  text-decoration: line-through;
+  text-decoration-color: oklch(0.7 0.13 25 / 0.6);
+}
+
+.set-keys {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.set-kbd {
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: center;
+}
+
+.set-recording {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.set-note {
+  margin: 6px 0 4px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.set-note.danger {
+  color: var(--danger);
+}
+
+.set-link {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.set-link:hover {
+  color: var(--text);
+}
+
+/* sidebar entry (src/components/Sidebar.tsx) */
+
+.nav-settings {
+  padding: 0 10px 2px;
+}
+
+/* automatic project update list */
+
+.set-empty {
+  margin: 10px 0 4px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  max-width: 62ch;
+}
+
+.set-foot {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.set-model {
+  width: 180px;
+  font-variant-numeric: tabular-nums;
+}
+
+.set-saved {
+  min-width: 6ch;
+  font-size: 12px;
+  color: var(--text-3);
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-undo-update"
+description = "Enables the undo_update command without any pre-configured scope."
+commands.allow = ["undo_update"]
+
+[[permission]]
+identifier = "deny-undo-update"
+description = "Denies the undo_update command without any pre-configured scope."
+commands.deny = ["undo_update"]

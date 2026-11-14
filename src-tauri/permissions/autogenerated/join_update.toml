@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-join-update"
+description = "Enables the join_update command without any pre-configured scope."
+commands.allow = ["join_update"]
+
+[[permission]]
+identifier = "deny-join-update"
+description = "Denies the join_update command without any pre-configured scope."
+commands.deny = ["join_update"]

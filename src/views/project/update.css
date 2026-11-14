@@ -1,0 +1,913 @@
+/* „Aktualizacja" strip under the project header. Tokens come from src/styles.css.
+   Readable text and anything clickable use --text-3 or brighter (never --text-4). */
+
+.view-head + .upd {
+  margin-top: -14px;
+}
+
+.upd {
+  container-type: inline-size;
+  margin: 0 0 30px;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+}
+
+.upd-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 28px;
+}
+
+.upd-icon {
+  flex: none;
+  align-self: center;
+  color: var(--text-3);
+}
+
+.upd-icon.spin {
+  color: var(--text-2);
+  animation: upd-spin 1.4s linear infinite;
+}
+
+@keyframes upd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.upd-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.upd-title {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.01em;
+}
+
+.upd-status {
+  flex: 0 1 auto;
+  min-width: 12ch;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.upd-status.error {
+  color: var(--danger);
+}
+
+.upd-clock {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.upd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.upd-auto-btn {
+  color: var(--text-3);
+}
+
+.upd-auto-btn[aria-expanded="true"] {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.upd-provider {
+  gap: 3px;
+  color: var(--text-2);
+}
+
+.upd-link {
+  padding: 1px 3px;
+  margin-left: -3px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.upd-link:hover {
+  color: var(--text);
+  text-decoration-color: var(--text-3);
+}
+
+.upd-run,
+.upd-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin: 4px 0 0 23px;
+}
+
+.upd-run-line {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+.upd-sub-text,
+.upd-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+.upd-hint {
+  margin: 4px 0 0 23px;
+}
+
+.upd-tech {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: oklch(0.205 0.005 265);
+  color: var(--text-2);
+  font: 11.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ---- confirmations ---- */
+
+.upd-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 2px 23px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  animation: reveal 140ms var(--ease);
+}
+
+.upd-confirm-q {
+  flex: 1 1 280px;
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.upd-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---- automatic update ---- */
+
+.upd-auto {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 2px 23px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  animation: reveal 140ms var(--ease);
+}
+
+.upd-auto .upd-confirm {
+  margin-left: 0;
+}
+
+.upd-auto-note,
+.upd-auto-next {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.upd-auto-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.upd-auto-label {
+  padding-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.upd-auto-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.upd-auto-warn {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.upd-select {
+  height: 28px;
+  font-size: 12.5px;
+}
+
+/* ---- review ---- */
+
+.upd-review {
+  margin: 10px 0 2px 23px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  animation: reveal 160ms var(--ease);
+}
+
+.upd-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 6px;
+}
+
+.upd-review-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.upd-review-title:focus-visible {
+  outline-offset: 3px;
+}
+
+.upd-review-meta {
+  font-weight: 400;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.upd-changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.upd-change {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.upd-change:last-child {
+  border-bottom: 0;
+}
+
+.upd-check {
+  grid-row: 1;
+  margin: 2px 0 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--text-2);
+}
+
+.upd-change-main {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.upd-change-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.upd-change-kind {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.upd-change-title {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.upd-change-what {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.upd-change-body {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.upd-change-detail {
+  margin: 2px 0 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.upd-change-summary {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+
+.upd-change-summary-label {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.upd-change-summary p {
+  margin: 1px 0 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.upd-mark {
+  grid-row: 1;
+  width: 14px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-3);
+}
+
+.upd-mark.st-applied {
+  color: var(--text);
+}
+
+.upd-mark.st-failed {
+  color: var(--danger);
+}
+
+.upd-outcome {
+  grid-column: 2;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.upd-change.st-failed .upd-outcome {
+  color: var(--danger);
+}
+
+.upd-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.upd-disclosure:hover {
+  color: var(--text);
+}
+
+.upd-receipt-toggle {
+  color: var(--text-2);
+}
+
+.upd-dropped,
+.upd-report {
+  margin-top: 6px;
+}
+
+.upd-dropped-list {
+  margin: 4px 0 0;
+  padding: 0 0 0 18px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.upd-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.upd > .upd-report {
+  margin: 6px 0 0 23px;
+}
+
+.upd-report-body {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: oklch(0.205 0.005 265);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* ---- narrow strip: actions get their own row; the status text never collapses ---- */
+
+@container (max-width: 620px) {
+  .upd-bar {
+    flex-wrap: wrap;
+  }
+  .upd-text {
+    flex-basis: 100%;
+  }
+  .upd-actions {
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-left: 19px;
+  }
+  .upd-auto-btn {
+    height: auto;
+    min-height: 28px;
+    white-space: normal;
+    text-align: left;
+  }
+  .upd-auto-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .upd-auto-label {
+    padding-top: 0;
+  }
+}
+
+@container (max-width: 420px) {
+  .upd-actions {
+    margin-left: 0;
+  }
+  .upd-run,
+  .upd-sub,
+  .upd-hint,
+  .upd-auto,
+  .upd-review,
+  .upd-confirm,
+  .upd > .upd-report {
+    margin-left: 0;
+  }
+}
+
+/* ---- topics first ---- */
+
+.upd-change.is-topic .upd-change-title {
+  font-weight: 600;
+}
+
+.upd-change.is-topic .upd-change-kind {
+  color: var(--text-2);
+}
+
+.upd-group-head {
+  margin: 10px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.01em;
+}
+
+.upd-groups .upd-group-head:first-child {
+  margin-top: 2px;
+}
+
+.upd-topic-tasks {
+  margin: 6px 0 0;
+  padding: 0 0 0 16px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.upd-topic-tasks li {
+  margin: 1px 0;
+}
+
+.upd-topic-task-status {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ---- sources ---- */
+
+.upd-panel-head {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.upd-panel-head + .upd-auto-note,
+.upd-panel-head + .upd-auto-row {
+  margin-top: -2px;
+}
+
+.upd-auto-static {
+  padding-top: 5px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.upd-history-note {
+  flex-basis: 100%;
+  order: 3;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ---- request („Zlecenie") ---- */
+
+.upd-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px 8px;
+  margin: 6px 0 0 23px;
+}
+
+.upd-ask-input.field {
+  flex: 1;
+  min-height: 28px;
+  padding: 4px 9px;
+  resize: none;
+  font-size: 12.5px;
+  background: transparent;
+}
+
+.upd-ask-input.field:focus {
+  background: var(--bg-field);
+}
+
+.upd-ask-go {
+  flex: none;
+  height: 28px;
+}
+
+.upd-ask-term {
+  flex: none;
+  align-self: center;
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+.upd-ask-term:disabled,
+.upd-link:disabled {
+  color: var(--text-3);
+  text-decoration-color: transparent;
+  cursor: default;
+}
+
+.upd-ask-hint {
+  margin: 3px 0 0 23px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.upd-request {
+  flex-basis: 100%;
+  order: 2;
+  margin: 2px 0 4px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.upd > .upd-request {
+  margin: 6px 0 0 23px;
+}
+
+.upd-request-label {
+  margin-right: 4px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.upd-request-text {
+  quotes: "„" "”";
+}
+
+@container (max-width: 420px) {
+  .upd-ask,
+  .upd-ask-hint,
+  .upd > .upd-request {
+    margin-left: 0;
+  }
+  .upd-ask {
+    flex-wrap: wrap;
+  }
+  .upd-ask-input.field {
+    flex-basis: 100%;
+  }
+}
+
+/* ---- round 6: corrections, compact decided rows, answer on top ---- */
+
+.upd-edited {
+  color: var(--text-3);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.upd-edit-btn {
+  margin-top: 2px;
+  color: var(--text-3);
+  text-decoration-color: transparent;
+}
+
+.upd-change:hover .upd-edit-btn,
+.upd-edit-btn:focus-visible {
+  color: var(--text-2);
+  text-decoration-color: var(--line);
+}
+
+.upd-edit {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--bg-raised);
+}
+
+.upd-edit-field {
+  display: grid;
+  gap: 3px;
+}
+
+.upd-edit-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.upd-edit textarea.field {
+  resize: vertical;
+}
+
+.upd-edit-tasks {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.upd-edit-task {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 130px;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.upd-edit-task.off .field {
+  opacity: 0.55;
+}
+
+.upd-edit-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.upd-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.upd-change.is-compact {
+  align-items: baseline;
+  padding: 4px 0;
+}
+
+.upd-compact-line {
+  grid-column: 2;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+.upd-compact-more {
+  margin-left: 4px;
+}
+
+.upd-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 14px;
+  margin-top: 4px;
+}
+
+.upd-compare p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.upd-answer {
+  margin: 4px 0 10px;
+}
+
+.upd-answer-body {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: oklch(0.205 0.005 265);
+}
+
+.upd-answer-body.clamped {
+  max-height: 11.5em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.upd-idle-answer {
+  margin: 6px 0 0 23px;
+}
+
+/* The actions stay reachable while a long review is on screen. */
+.upd-review-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: 8px 0;
+  background: var(--bg);
+  box-shadow: 0 -1px 0 var(--line-soft);
+}
+
+.upd-ask-wrap.in-review {
+  flex-basis: 100%;
+}
+
+.upd-ask-wrap.in-review .upd-ask,
+.upd-ask-wrap.in-review .upd-ask-hint {
+  margin-left: 0;
+}
+
+.upd-ask-open {
+  margin-left: auto;
+  color: var(--text-3);
+}
+
+.upd-ask-keys {
+  color: var(--text-3);
+}
+
+@container (max-width: 420px) {
+  .upd-idle-answer {
+    margin-left: 0;
+  }
+}
+
+.upd-edit-task input {
+  accent-color: var(--text-2);
+}
+
+/* The stuck action row never hides what is being accepted: it un-sticks in a
+   short window and while a correction form is open; elsewhere focus and
+   scrolling leave room for it. */
+@media (max-height: 800px) {
+  .upd-review-actions {
+    position: static;
+    box-shadow: none;
+  }
+}
+
+.upd-review:has(.upd-edit) .upd-review-actions {
+  position: static;
+  box-shadow: none;
+}
+
+.main-scroll:has(.upd-review) {
+  scroll-padding-bottom: 72px;
+}
+
+/* ---- drift ---- */
+
+.upd-drift {
+  margin: 4px 0 0 19px;
+}
+
+.upd-drift-toggle {
+  color: var(--text-2);
+  text-align: left;
+}
+
+.upd-drift-body {
+  margin: 4px 0 2px 4px;
+  padding-top: 4px;
+}
+
+.upd-drift-list {
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.upd-drift-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+
+.upd-drift-item:last-child {
+  border-bottom: 0;
+}
+
+.upd-drift-name {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.upd-drift-repo {
+  color: var(--text-3);
+}
+
+.upd-drift-meta {
+  color: var(--text-3);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.upd-drift-actions {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.upd-drift-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+
+.upd-row-actions {
+  display: inline-flex;
+  gap: 12px;
+}
+
+.upd-similar {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+@container (max-width: 420px) {
+  .upd-drift {
+    margin-left: 0;
+  }
+}

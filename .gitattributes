@@ -1,0 +1,2 @@
+# Test fixtures must stay byte-exact (CRLF, missing trailing newline, ...).
+crates/core/tests/fixtures/** -text

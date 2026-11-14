@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ignore-branch"
+description = "Enables the ignore_branch command without any pre-configured scope."
+commands.allow = ["ignore_branch"]
+
+[[permission]]
+identifier = "deny-ignore-branch"
+description = "Denies the ignore_branch command without any pre-configured scope."
+commands.deny = ["ignore_branch"]

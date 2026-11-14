@@ -1,0 +1,27 @@
+[package]
+name = "morwisko-core"
+description = "Markdown vault model, parser and lossless writer for Morwisko"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# File watcher (pulls in `notify`). Off by default so the MCP server stays lean.
+watch = ["dep:notify-debouncer-mini"]
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+fastrand.workspace = true
+notify-debouncer-mini = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

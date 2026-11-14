@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Morwisko — lokalne centrum dowodzenia na macOS</title>
+    <meta
+      name="description"
+      content="Lokalne okno na macOS: projekty, tematy, zadania i dziennik w plikach Markdown w ~/Morwisko. Ten sam folder czyta serwer MCP dla Claude Code i Codexa."
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#tresc">Przejdź do treści</a>
+
+    <div class="page">
+      <div class="layout">
+        <main class="content" id="tresc">
+          <header class="hero">
+            <p class="eyebrow">macOS · Tauri 2 + React · ok. 13 MB</p>
+            <h1>Morwisko</h1>
+            <p class="lead">
+              Lokalne okno na macOS do projektów, tematów, zadań i dziennika. Wszystko leży w plikach Markdown, domyślnie w <code>~/Morwisko</code>. Ten sam folder czyta serwer MCP, więc agent w Claude Code albo Codexie widzi te zadania i może je aktualizować.
+            </p>
+            <ul class="facts">
+              <li>Bez konta i chmury. Po zamknięciu aplikacji zostają pliki <code>.md</code></li>
+              <li>Okno na macOS oraz binarka <code>morwisko-mcp</code></li>
+              <li>Zapis agenta widać w otwartym oknie od razu. Agent widzi dysk przy następnym wywołaniu</li>
+            </ul>
+
+            <figure class="hero-shot">
+              <button type="button" class="shot-frame" aria-label="Powiększ zrzut widoku Tablica">
+                <img
+                  src="img/tablica.png"
+                  width="2200"
+                  height="1600"
+                  alt="Okno Morwisko na widoku Tablica: kolumny Do zrobienia, W toku, Zablokowane i zwinięta Zrobione, w nich karty zadań z projektem i tematem. Po lewej pasek boczny z widokami Dziś, Skrzynka, Tablica i listą projektów."
+                />
+              </button>
+              <figcaption>
+                Widok <span class="ui">Tablica</span>: zadania ze wszystkich aktywnych projektów według statusu.
+              </figcaption>
+            </figure>
+
+            <nav class="toc-inline" aria-label="Spis treści">
+              <p class="toc-inline-label">Spis treści</p>
+              <div class="toc-inline-links">
+                <a href="#po-co">Dla kogo i po co</a>
+                <a href="#dzien">Dzień z Morwiskiem</a>
+                <a href="#sciagawka">Ściągawka</a>
+                <a href="#instalacja">Instalacja i MCP</a>
+                <a href="#ograniczenia">Ograniczenia</a>
+              </div>
+            </nav>
+          </header>
+
+          <section id="po-co">
+            <h2>Dla kogo i po co</h2>
+            <p>
+              Morwisko jest dla jednej osoby, która prowadzi naraz kilka rzeczy: własny program, zlecenie, sprawy poza kodem. Zadania, terminy i krótki dziennik są w jednym folderze, obok repozytoriów. Na początku sesji agent woła <code>overview</code> i dostaje stan na dziś. Po robocie dopisuje wpis albo zamyka zadanie, bez przeklejania kontekstu do czatu.
+            </p>
+            <p>
+              Nie ma konta, synchronizacji ani osobnej bazy. Pliki da się czytać i poprawiać w edytorze oraz trzymać w Gicie. Aplikacja powstała do własnego użytku: nie ma tu kont, cennika ani wspólnej pracy kilku osób.
+            </p>
+          </section>
+
+          <section id="dzien">
+            <h2>Dzień z Morwiskiem</h2>
+            <p>
+              Poniżej jest jeden przebieg na danych demo: projekty WhenUBuy, Morwisko i Remont kuchni. Każdy krok to jedna czynność i widok, który po niej zostaje.
+            </p>
+
+            <article class="step" id="krok-dzis">
+              <h3><span class="step-num">01</span>Otwierasz aplikację: widok Dziś</h3>
+              <p>
+                Po uruchomieniu jesteś na <span class="ui">Dziś</span>. Cztery bloki: <span class="ui">Po terminie</span>, <span class="ui">Na dziś</span>, <span class="ui">W toku</span>, <span class="ui">Zablokowane</span>. Pod nimi <span class="ui">Ostatnie aktualizacje</span> z dzienników tematów.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut widoku Dziś">
+                  <img
+                    src="img/dzis.png"
+                    width="2200"
+                    height="2560"
+                    alt="Okno Morwisko na widoku Dziś. Pasek boczny: Dziś 8, Skrzynka 4, Tablica, projekty Morwisko 4, Remont kuchni 1, WhenUBuy 9, Archiwum 1. W treści: Po terminie 2, Na dziś 2, W toku 2, Zablokowane 2 oraz pełna lista Ostatnie aktualizacje."
+                  />
+                </button>
+                <figcaption>
+                  Widok <span class="ui">Dziś</span>, piątek 13 listopada. Cztery bloki i cała lista <span class="ui">Ostatnie aktualizacje</span>.
+                </figcaption>
+              </figure>
+              <p>
+                Dopóki proces działa, w pasku menu macOS jest ikona. Liczba przy niej liczy zadania po terminie, na dziś i w toku, bez zablokowanych. Kliknięcie otwiera menu: <span class="ui">Otwórz Morwisko</span>, <span class="ui">Szybkie zadanie…</span>, najwyżej sześć zadań (albo <span class="ui">Nic pilnego na dziś</span>), <span class="ui">Ustawienia…</span>, <span class="ui">Zakończ</span>.
+              </p>
+              <p>
+                O godzinie z ustawień (domyślnie 09:00) idzie jedno powiadomienie z zadaniami na dziś bez godziny i z zaległymi. W ustawieniach ta pozycja nazywa się <span class="ui">Podsumowanie dnia</span>. Tytuł samego powiadomienia jest inny: „Na dziś: …”, „Po terminie: …” albo oba naraz. Zadanie z godziną dostaje osobne powiadomienie o tej godzinie, z tytułem zadania.
+              </p>
+            </article>
+
+            <article class="step" id="krok-szybkie">
+              <h3><span class="step-num">02</span>Zapisujesz zadanie skrótem, bez przełączania okna</h3>
+              <p>
+                <kbd>⌃⌥Spacja</kbd> (domyślnie <code>Ctrl+Alt+Space</code>) otwiera małe okno <span class="ui">Szybkie zadanie</span> nad bieżącą aplikacją. W jednym polu wpisujesz tytuł i tokeny, na przykład <code>!wysoki</code> i <code>@jutro</code>. Pod polem widać je jako chipy „jutro” i „wysoki”.
+              </p>
+              <p>
+                <kbd>Tab</kbd> albo przycisk przy nazwie miejsca otwiera listę. <kbd>Enter</kbd> w polu tytułu zapisuje, <kbd>Esc</kbd> zamyka okno. W liście <kbd>↑</kbd> i <kbd>↓</kbd> przesuwają wybór, <kbd>Enter</kbd> go zatwierdza, <kbd>Esc</kbd> albo <kbd>Tab</kbd> zamyka listę bez zapisu. Lista ma ograniczoną wysokość i przewija się dalej. Pod nim są kolejne tematy WhenUBuy.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame shot-frame--floating" aria-label="Powiększ zrzut okna Szybkie zadanie">
+                  <img
+                    src="img/szybkie-zadanie.png"
+                    width="1160"
+                    height="754"
+                    alt="Okno Szybkie zadanie szerokości 580 px. Pole: Napisać notatkę ze spotkania !wysoki @jutro. Chipy jutro i wysoki. Lista miejsc otwarta, Skrzynka oznaczona jako obecnie, dalej Morwisko, Remont kuchni i początek WhenUBuy."
+                  />
+                </button>
+                <figcaption>
+                  <span class="ui">Szybkie zadanie</span> z tokenami w tytule. Miejsce zapisu to nadal <span class="ui">Skrzynka</span>. Lista jest otwarta i nieprzefiltrowana.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-skrzynka">
+              <h3><span class="step-num">03</span>Porządkujesz Skrzynkę</h3>
+              <p>
+                Zadanie bez projektu trafia do <span class="ui">Skrzynka</span>, plik <code>skrzynka.md</code>. Na górze jest pole <span class="ui">Dodaj do skrzynki…</span>, pod nim otwarte wpisy, na dole zwinięte <span class="ui">Zrobione</span>.
+              </p>
+              <p>
+                Gdy wiadomo, gdzie zadanie należy, przenosisz je przyciskiem <span class="ui">Przenieś do…</span> albo klawiszem <kbd>m</kbd> na zaznaczonym wierszu. Widać cztery otwarte zadania i licznik zrobionych.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut widoku Skrzynka">
+                  <img
+                    src="img/skrzynka.png"
+                    width="2200"
+                    height="1600"
+                    alt="Widok Skrzynka. Pole Dodaj do skrzynki, cztery zadania: Odpisać Kasi z wysokim priorytetem i terminem wczoraj, oferta hostingu, przegląd auta na wtorek, artykuł o CRDT z linkiem. Na dole zwinięte Zrobione 1."
+                  />
+                </button>
+                <figcaption>
+                  <span class="ui">Skrzynka</span>: cztery zadania bez projektu. Zrobione jest zwinięte.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-temat">
+              <h3><span class="step-num">04</span>Otwierasz temat i jego dziennik</h3>
+              <p>
+                W projekcie WhenUBuy rozwijasz temat <span class="ui">A/B testy cen</span>. W jednym miejscu jest podsumowanie, status <span class="ui">W toku</span>, repozytorium, lista zadań i <span class="ui">Dziennik</span>. Wpisy idą od najnowszego. Formularz na dole ma pole „Co się wydarzyło?”, listę <span class="ui">Status bez zmian</span> i przycisk <span class="ui">Dodaj wpis</span>. Zapis to <kbd>⌘↩</kbd> albo ten przycisk. Autor wpisu z okna to <code>ja</code>.
+              </p>
+              <p>
+                Nazwa projektu, opis i lista repozytoriów są nad listą tematów. Kolor ustawia się w <span class="ui">Edytuj projekt</span>. Na zrzucie okno jest przewinięte do tematu, więc nagłówka projektu już nie widać.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut rozwiniętego tematu A/B testy cen">
+                  <img
+                    src="img/projekt.png"
+                    width="2200"
+                    height="2240"
+                    alt="Projekt WhenUBuy, rozwinięty temat A/B testy cen ze statusem W toku, podsumowaniem, dwoma otwartymi zadaniami, zwiniętym Zrobione 2 oraz dziennikiem z formularzem i dwoma wpisami. Niżej zwinięte pozostałe tematy i zadania projektu."
+                  />
+                </button>
+                <figcaption>
+                  Temat <strong>A/B testy cen</strong> rozwinięty do dziennika. Oba istniejące wpisy są w całości.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-zadanie">
+              <h3><span class="step-num">05</span>Rozwijasz kartę zadania</h3>
+              <p>
+                <kbd>Enter</kbd> na wierszu (albo kliknięcie) rozwija kartę w miejscu. Da się zmienić tytuł, status, priorytet, termin z datą i godziną, linki oraz notatki. <span class="ui">Miejsce</span> przenosi zadanie do innego projektu albo tematu. Na dole jest identyfikator z pliku, <span class="ui">Pokaż plik</span> i <span class="ui">Usuń zadanie</span>.
+              </p>
+              <p>
+                <kbd>Delete</kbd> albo <kbd>Backspace</kbd> na wierszu nie kasuje od razu. Rozwija kartę i pyta „Usunąć to zadanie?”.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut rozwiniętej karty zadania">
+                  <img
+                    src="img/zadanie.png"
+                    width="2200"
+                    height="2240"
+                    alt="Rozwinięta karta zadania Przygotować dashboard konwersji dla wariantu B. Status W toku, priorytet Wysoki, termin 13/11/2026 14:00, link gitlab.com, dwie linijki notatek, miejsce WhenUBuy · A/B testy cen, stopka ^g7h8i9, Pokaż plik i Usuń zadanie."
+                  />
+                </button>
+                <figcaption>
+                  Karta w temacie A/B testy cen. Termin ma godzinę, jest link, notatki i stopka z <code>^g7h8i9</code>.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-tablica">
+              <h3><span class="step-num">06</span>Przeglądasz zadania na tablicy</h3>
+              <p>
+                <span class="ui">Tablica</span> w trybie <span class="ui">Zadania</span> układa otwarte zadania w kolumnach <span class="ui">Do zrobienia</span>, <span class="ui">W toku</span> i <span class="ui">Zablokowane</span>. <span class="ui">Zrobione</span> startuje zwinięte. Kartę przeciągasz do innej kolumny albo, mając na niej fokus, przesuwasz klawiszami <kbd>1</kbd>–<kbd>4</kbd> oraz <kbd>⌥←</kbd> i <kbd>⌥→</kbd>.
+              </p>
+              <p>
+                Przy szerokości okna około 1100 px widać trzy kolumny. Zwinięte <span class="ui">Zrobione</span> jest strzałką przy prawej krawędzi. Dół pierwszej kolumny schodzi poniżej kadru, tak jak w oknie.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut tablicy zadań">
+                  <img
+                    src="img/tablica.png"
+                    width="2200"
+                    height="1600"
+                    alt="Tablica w trybie Zadania, zakres Wszystkie aktywne projekty. Kolumny Do zrobienia 9, W toku 3 i Zablokowane 1. Zrobione zwinięte przy prawej krawędzi."
+                  />
+                </button>
+                <figcaption>
+                  <span class="ui">Tablica</span>, tryb <span class="ui">Zadania</span>, zakres <span class="ui">Wszystkie aktywne projekty</span>. <span class="ui">Zrobione</span> jest zwinięte.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-tematy">
+              <h3><span class="step-num">07</span>Przełączasz tablicę na tematy</h3>
+              <p>
+                Ten sam widok w trybie <span class="ui">Tematy</span> ma pięć kolumn: <span class="ui">Planowany</span>, <span class="ui">W toku</span>, <span class="ui">Zablokowany</span>, <span class="ui">Czeka</span>, <span class="ui">Zrobiony</span>. Na klawiaturze status tematu ustawiają <kbd>1</kbd>–<kbd>5</kbd>.
+              </p>
+              <p>
+                Pięć kolumn nie mieści się w oknie o szerokości 1100 px. Tablica przewija się wtedy w bok. Zrzut poniżej ma około 1720 px, więc widać wszystkie kolumny, a <span class="ui">Zrobiony</span> jest rozwinięty. Dłuższe podsumowania na kartach są obcięte wielokropkiem. Tak rysuje je sam widok.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut tablicy tematów">
+                  <img
+                    src="img/tablica-tematy.png"
+                    width="3440"
+                    height="1720"
+                    alt="Tablica w trybie Tematy na szerokim oknie. Kolumny Planowany, W toku, Zablokowany, Czeka i rozwinięty Zrobiony z tematem Onboarding nowych użytkowników."
+                  />
+                </button>
+                <figcaption>
+                  Tryb <span class="ui">Tematy</span> w szerszym oknie. W węższym kolumny z prawej są poza krawędzią.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-paleta">
+              <h3><span class="step-num">08</span>Szukasz przez ⌘K</h3>
+              <p>
+                <kbd>⌘K</kbd> otwiera wyszukiwanie. Trafia w tytuły i notatki zadań, tytuły i podsumowania tematów, tekst i autora dziennika oraz nazwy miejsc w pasku bocznym. Wielkość liter i polskie znaki nie mają znaczenia. <kbd>Enter</kbd> otwiera zaznaczony wynik, <kbd>Esc</kbd> zamyka okno.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut wyszukiwania Cmd+K">
+                  <img
+                    src="img/paleta.png"
+                    width="2200"
+                    height="1600"
+                    alt="Okno wyszukiwania nad widokiem Dziś. W polu jest krs. Wynik w Zadaniach: Wysłać dokumenty rejestrowe do Przelewy24, z podświetlonym KRS w notatce. Wynik w Dzienniku: wpis o odpisie z KRS."
+                  />
+                </button>
+                <figcaption>
+                  Zapytanie <code>krs</code> znajduje notatkę zadania i wpis dziennika o odpisie z KRS.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-agent">
+              <h3><span class="step-num">09</span>Agent czyta overview i dopisuje dziennik</h3>
+              <p>
+                Na starcie sesji agent woła <code>overview</code>. Poniżej jest wynik tego narzędzia dla danych demo, z binarki <code>morwisko-mcp</code>, 13 listopada 2026. Tekst jest po angielsku: statusy i priorytety to <code>in_progress</code>, <code>!high</code>, a dzień tygodnia to „Friday”. W pliku zostają polskie tokeny, <code>w-toku</code> i <code>!wysoki</code>. Godzina przy najnowszym wpisie to moment wywołania.
+              </p>
+              <div class="code-block">
+                <div class="code-head">
+                  <span>overview, dane demo, 13 listopada 2026</span>
+                  <button type="button" class="copy-btn" data-copy-target="cmd-overview">Kopiuj</button>
+                </div>
+                <pre><code id="cmd-overview"># Morwisko overview · 2026-11-13, Friday
+
+## Today
+Overdue:
+- [ ] Obsłużyć webhook zwrotów (refund) @2026-11-11 ^h4j5k6 · whenubuy / platnosci-stripe-przelewy24
+- [ ] Odpisać Kasi w sprawie faktury za październik !high @2026-11-12 ^a1b2c3 · inbox
+Due today:
+- [ ] Odpowiedzieć na uwagi z App Store Review @2026-11-13 ^t5y6u7 · whenubuy / powiadomienia-push
+- [/] Przygotować dashboard konwersji dla wariantu B !high @2026-11-13T14:00 ^g7h8i9 · whenubuy / ab-testy-cen
+In progress:
+- [/] Widok projektu z rozwijanymi tematami ^c3v4b5 · morwisko / aplikacja-desktopowa
+- [/] Narzędzie add_journal_entry z opcjonalną zmianą statusu ^y2u3i4 · morwisko / serwer-mcp
+Blocked:
+- [!] Zadzwonić do kamieniarza ^f8g9h0 · remont-kuchni / wybor-blatu
+- [!] Wysłać dokumenty rejestrowe do Przelewy24 ^s1d2f3 · whenubuy / platnosci-stripe-przelewy24
+
+## Inbox
+4 open task(s) (list_tasks with inbox_only).
+
+## Projects
+### Morwisko (`morwisko`) · repos: morwisko
+- Aplikacja desktopowa (`aplikacja-desktopowa`) · in_progress · 2 open — Szkielet Tauri, widoki Dziś i projektu, pełna edycja.
+- Serwer MCP (`serwer-mcp`) · in_progress · 2 open — Narzędzia do odczytu i zapisu zadań dla agentów.
+### WhenUBuy (`whenubuy`) · repos: whenubuy-backend, whenubuy-mobile
+- project-level tasks: 2 open
+- A/B testy cen (`ab-testy-cen`) · in_progress · 2 open — Wariant B (ceny z końcówką ,99) idzie na 20% ruchu. Czekamy na tydzień danych, potem decyzja o rolloucie.
+- Płatności: Stripe → Przelewy24 (`platnosci-stripe-przelewy24`) · blocked · 3 open — Integracja gotowa na sandboksie. Blokuje nas weryfikacja konta firmowego w Przelewy24.
+- Powiadomienia push w aplikacji mobilnej (`powiadomienia-push`) · waiting · 1 open — Czekamy na review w App Store.
+- Refaktoryzacja modułu koszyka i synchronizacji stanu między urządzeniami użytkownika (`refaktoryzacja-koszyka`) · planned · 1 open
+- (1 done topic(s) hidden)
+
+Paused projects: remont-kuchni
+
+## Recent journal
+- 2026-11-13T21:11 · claude-code · morwisko / aplikacja-desktopowa · Widok Dziś i lista tematów działają na danych z mocka.
+- 2026-11-13T09:41 · agent · whenubuy / ab-testy-cen · Wariant B: +3,1% konwersji po 4 dniach, przedział ufności jeszcze szeroki.
+- 2026-11-13T08:12 · agent · morwisko / serwer-mcp · Dodane narzędzia list_tasks i update_task. Testy zielone.
+- 2026-11-12T21:15 · ja · morwisko / aplikacja-desktopowa · Ustalony wygląd: ciemny, minimalny, kolor projektu jako jedyny akcent.
+- 2026-11-12T16:20 · ja · whenubuy / platnosci-stripe-przelewy24 · Przelewy24 poprosiło o aktualny odpis z KRS — zamówione, będzie w poniedziałek.
+- 2026-11-11T15:30 · ja · whenubuy / ab-testy-cen · Ruch podzielony 80/20, flagi włączone na produkcji.
+- 2026-11-10T11:05 · ja · whenubuy / powiadomienia-push · Build 2.5.0 wysłany do review.
+- 2026-11-09T12:00 · agent · whenubuy / platnosci-stripe-przelewy24 · Sandbox: płatności kartą i BLIK przechodzą, zwroty jeszcze nie.
+- 2026-11-01T19:00 · ja · remont-kuchni / wybor-blatu · Wybrane dwie próbki, czekam na wycenę.</code></pre>
+              </div>
+              <p>
+                Po etapie pracy agent woła <code>log_update</code>. Wpis ląduje na górze <code>## Dziennik</code>, autor domyślnie <code>agent</code>. Aplikacja obserwuje folder i odświeża otwarte okno. Serwer nic do agenta nie wypycha.
+              </p>
+              <p>
+                Zrzut pokazuje ten sam temat po dopisaniu zdania „Dashboard konwersji jest w notatce zadania. Próg istotności zostaje na jutro.” Tej linii nie ma w bloku <code>overview</code> powyżej. To osobny zapis, późniejszy niż tamto wywołanie.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut dziennika po wpisie agenta">
+                  <img
+                    src="img/dziennik-agent.png"
+                    width="2200"
+                    height="2400"
+                    alt="Temat A/B testy cen po nowym wpisie dziennika. Na górze listy: agent, Dashboard konwersji jest w notatce zadania. Próg istotności zostaje na jutro. Pod spodem starsze wpisy z 09:41 i 11 listopada."
+                  />
+                </button>
+                <figcaption>
+                  Ten sam temat po <code>log_update</code>. Nowy wpis jest pierwszy, starsze zostały.
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="step" id="krok-ustawienia">
+              <h3><span class="step-num">10</span>Ustawienia na tym komputerze</h3>
+              <p>
+                W <span class="ui">Ustawienia</span> jest skrót <span class="ui">Szybkie zadanie</span>, przełącznik <span class="ui">Powiadomienia o terminach</span>, godzina <span class="ui">Podsumowanie dnia</span>, autostart <span class="ui">Uruchamiaj przy logowaniu</span> oraz <span class="ui">Folder danych</span>. Autostart jest domyślnie wyłączony. W danych demo folder to <code>/Users/ja/Morwisko</code>. Na twoim Macu domyślnie jest <code>~/Morwisko</code>, chyba że ustawisz <code>MORWISKO_DIR</code>.
+              </p>
+              <figure>
+                <button type="button" class="shot-frame" aria-label="Powiększ zrzut ustawień">
+                  <img
+                    src="img/ustawienia.png"
+                    width="2200"
+                    height="1600"
+                    alt="Ustawienia. Skrót Szybkie zadanie to Control Option Spacja. Powiadomienia o terminach włączone. Podsumowanie dnia o 09:00. Uruchamiaj przy logowaniu wyłączone. Folder danych /Users/ja/Morwisko. Wersja 0.1.0."
+                  />
+                </button>
+                <figcaption>
+                  <span class="ui">Ustawienia</span> na danych demo. Autostart jest wyłączony, podsumowanie dnia o 09:00.
+                </figcaption>
+              </figure>
+            </article>
+          </section>
+
+          <section id="sciagawka">
+            <h2>Ściągawka</h2>
+
+            <h3 id="statusy">Statusy zadań, tematów i projektów</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Obiekt</th>
+                    <th scope="col">Etykieta w aplikacji</th>
+                    <th scope="col">Zapis w pliku Markdown</th>
+                    <th scope="col">Skrót / API MCP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Zadanie</td>
+                    <td><span class="ui">Do zrobienia</span></td>
+                    <td><code>- [ ]</code></td>
+                    <td><kbd>1</kbd> · <code>todo</code></td>
+                  </tr>
+                  <tr>
+                    <td>Zadanie</td>
+                    <td><span class="ui">W toku</span></td>
+                    <td><code>- [/]</code></td>
+                    <td><kbd>2</kbd> · <code>doing</code></td>
+                  </tr>
+                  <tr>
+                    <td>Zadanie</td>
+                    <td><span class="ui">Zrobione</span></td>
+                    <td><code>- [x]</code> oraz <code>✓YYYY-MM-DD</code></td>
+                    <td><kbd>3</kbd> · <code>done</code></td>
+                  </tr>
+                  <tr>
+                    <td>Zadanie</td>
+                    <td><span class="ui">Zablokowane</span></td>
+                    <td><code>- [!]</code></td>
+                    <td><kbd>4</kbd> · <code>blocked</code></td>
+                  </tr>
+                  <tr>
+                    <td>Temat</td>
+                    <td><span class="ui">Planowany</span></td>
+                    <td><code>status: planowany</code></td>
+                    <td><kbd>1</kbd> na tablicy · <code>planned</code></td>
+                  </tr>
+                  <tr>
+                    <td>Temat</td>
+                    <td><span class="ui">W toku</span></td>
+                    <td><code>status: w-toku</code></td>
+                    <td><kbd>2</kbd> na tablicy · <code>in_progress</code></td>
+                  </tr>
+                  <tr>
+                    <td>Temat</td>
+                    <td><span class="ui">Zablokowany</span></td>
+                    <td><code>status: zablokowany</code></td>
+                    <td><kbd>3</kbd> na tablicy · <code>blocked</code></td>
+                  </tr>
+                  <tr>
+                    <td>Temat</td>
+                    <td><span class="ui">Czeka</span></td>
+                    <td><code>status: czeka</code></td>
+                    <td><kbd>4</kbd> na tablicy · <code>waiting</code></td>
+                  </tr>
+                  <tr>
+                    <td>Temat</td>
+                    <td><span class="ui">Zrobiony</span></td>
+                    <td><code>status: zrobiony</code></td>
+                    <td><kbd>5</kbd> na tablicy · <code>done</code></td>
+                  </tr>
+                  <tr>
+                    <td>Projekt</td>
+                    <td><span class="ui">Aktywny</span> · <span class="ui">Wstrzymany</span> · <span class="ui">Archiwum</span></td>
+                    <td><code>stan: aktywny | wstrzymany | archiwum</code></td>
+                    <td>Edytor projektu</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              W argumentach MCP status można podać po angielsku albo polskim słowem z pliku. Dla zadania: <code>w-toku</code>, <code>zrobione</code>, <code>zablokowane</code>. Dla tematu: <code>planowany</code>, <code>w-toku</code>, <code>zablokowany</code>, <code>czeka</code>, <code>zrobiony</code>. Wynik <code>overview</code> i tak wypisuje angielskie tokeny.
+            </p>
+
+            <h3 id="tokeny">Tokeny szybkiego dodawania</h3>
+            <p>
+              W <span class="ui">Szybkie zadanie</span>, w <span class="ui">Skrzynce</span> i na liście zadań tokeny na końcu tytułu stają się polami. Przy zapisie plik układa linię jako <code>tytuł !priorytet @termin ✓ukończono ^id</code>.
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Token</th>
+                    <th scope="col">Znaczenie</th>
+                    <th scope="col">Zapis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="wrap-code"><code>!wysoki</code>, <code>!w</code>, <code>!pilne</code></td>
+                    <td>Priorytet <span class="ui">Wysoki</span></td>
+                    <td><code>!wysoki</code></td>
+                  </tr>
+                  <tr>
+                    <td class="wrap-code"><code>!niski</code>, <code>!n</code></td>
+                    <td>Priorytet <span class="ui">Niski</span></td>
+                    <td><code>!niski</code>. Brak tokenu to <span class="ui">Normalny</span></td>
+                  </tr>
+                  <tr>
+                    <td class="wrap-code"><code>@dziś</code>, <code>@dzis</code>, <code>@jutro</code>, <code>@pojutrze</code></td>
+                    <td>Termin względem dzisiaj</td>
+                    <td>W pliku data <code>@YYYY-MM-DD</code></td>
+                  </tr>
+                  <tr>
+                    <td class="wrap-code"><code>@2026-11-20</code></td>
+                    <td>Termin bez godziny</td>
+                    <td>W dniu terminu jest w <span class="ui">Na dziś</span>. Poranne powiadomienie obejmuje takie zadania na dziś oraz zaległe</td>
+                  </tr>
+                  <tr>
+                    <td class="wrap-code"><code>@2026-11-20T14:00</code></td>
+                    <td>Termin z godziną</td>
+                    <td>Powiadomienie o tej godzinie. Tytuł to tytuł zadania. Kilka naraz składa się w tytuł w rodzaju „5 zadań – termin minął”</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="narzedzia-mcp">Narzędzia serwera MCP</h3>
+            <p>
+              Osiem narzędzi. Zapis idzie tą samą ścieżką co okno i bierze blokadę <code>.morwisko/lock</code>. Nie ma narzędzi do usuwania. <code>stdout</code> to protokół, logi idą na <code>stderr</code> (<code>RUST_LOG=debug</code>).
+            </p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Narzędzie</th>
+                    <th scope="col">Parametry</th>
+                    <th scope="col">Działanie</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>overview</code></td>
+                    <td class="wrap-code"><code>project?</code></td>
+                    <td>Stan na start sesji. Bez <code>project</code> obejmuje wszystkie projekty. Z nim jeden projekt, szerzej.</td>
+                  </tr>
+                  <tr>
+                    <td><code>get_topic</code></td>
+                    <td class="wrap-code"><code>project, topic, include_done?, tasks_limit?, tasks_offset?, journal_limit?, journal_offset?</code></td>
+                    <td>Temat: status, repo, podsumowanie, zadania (domyślnie 50) i dziennik od najnowszego (domyślnie 30). Górna granica strony to 500.</td>
+                  </tr>
+                  <tr>
+                    <td><code>list_tasks</code></td>
+                    <td class="wrap-code"><code>project?, topic?, inbox_only?, status?[], due_from?, due_to?, include_done?, limit?, offset?</code></td>
+                    <td>Lista zadań. Puste <code>status</code> znaczy dowolny status otwarty. Domyślnie 50, najwyżej 500.</td>
+                  </tr>
+                  <tr>
+                    <td><code>search</code></td>
+                    <td class="wrap-code"><code>query, limit?, offset?</code></td>
+                    <td>Szukanie w zadaniach, tematach i dzienniku. <code>limit</code> i <code>offset</code> liczą się osobno dla każdego rodzaju. Domyślnie 20, najwyżej 500.</td>
+                  </tr>
+                  <tr>
+                    <td><code>create_task</code></td>
+                    <td class="wrap-code"><code>title, project?, topic?, status?, priority?, due?, links?[], notes?</code></td>
+                    <td>Nowe zadanie. Bez projektu trafia do <span class="ui">Skrzynki</span>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>update_task</code></td>
+                    <td class="wrap-code"><code>id, title?, status?, priority?, due?, clear_due?, add_links?[], remove_links?[], notes?, move_to?{inbox?, project?, topic?}</code></td>
+                    <td>Zmiana pól i przeniesienie w jednej transakcji.</td>
+                  </tr>
+                  <tr>
+                    <td><code>create_topic</code></td>
+                    <td class="wrap-code"><code>project, title, status?, repo?, summary?</code></td>
+                    <td>Nowy plik <code>tematy/&lt;slug&gt;.md</code> w istniejącym projekcie.</td>
+                  </tr>
+                  <tr>
+                    <td><code>log_update</code></td>
+                    <td class="wrap-code"><code>project, topic, text, status?, summary?, author?</code></td>
+                    <td>Wpis na górze dziennika. Autor domyślnie <code>agent</code>. Opcjonalnie zmienia status albo podsumowanie tematu.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 id="pliki">Układ plików</h3>
+            <p>
+              Katalog to <code>~/Morwisko</code> albo <code>MORWISKO_DIR</code>. Czytanie zostawia nieznane sekcje, komentarze YAML, własne nagłówki <code>###</code> i dotychczasowe końce linii. Błąd w jednym pliku nie zatrzymuje reszty katalogu. Trafia na pasek <span class="ui">Ostrzeżenia</span>.
+            </p>
+            <div class="code-block">
+              <div class="code-head">
+                <span>Katalog danych</span>
+              </div>
+              <pre><code>~/Morwisko/
+  skrzynka.md
+  whenubuy/
+    projekt.md
+    tematy/
+      ab-testy-cen.md
+  .morwisko/
+    lock</code></pre>
+            </div>
+
+            <div class="code-block">
+              <div class="code-head">
+                <span>whenubuy/projekt.md z danych demo</span>
+                <button type="button" class="copy-btn" data-copy-target="cmd-projekt">Kopiuj</button>
+              </div>
+              <pre><code id="cmd-projekt">---
+nazwa: WhenUBuy
+kolor: "#a3e635"
+stan: aktywny
+repozytoria:
+  - nazwa: whenubuy-backend
+    sciezka: /Users/ja/Projects/WhenUBuy/whenubuy-backend
+  - nazwa: whenubuy-mobile
+    sciezka: /Users/ja/Projects/WhenUBuy/whenubuy-mobile
+---
+Porównywarka cen z historią i alertami. Backend w Kotlinie, aplikacja w React Native.
+
+## Zadania
+- [ ] Odnowić certyfikat domeny whenubuy.pl @2026-11-15 ^r4t5y6
+- [ ] Uporządkować tablicę w Linear !niski ^u7i8o9</code></pre>
+            </div>
+
+            <div class="code-block">
+              <div class="code-head">
+                <span>whenubuy/tematy/ab-testy-cen.md z danych demo</span>
+                <button type="button" class="copy-btn" data-copy-target="cmd-temat">Kopiuj</button>
+              </div>
+              <pre><code id="cmd-temat">---
+status: w-toku
+repo: whenubuy-backend
+utworzono: 2026-10-14
+zaktualizowano: 2026-11-13T09:41
+---
+# A/B testy cen
+
+Wariant B (ceny z końcówką ,99) idzie na 20% ruchu. Czekamy na tydzień danych, potem decyzja o rolloucie.
+
+## Zadania
+- [/] Przygotować dashboard konwersji dla wariantu B !wysoki @2026-11-13T14:00 ^g7h8i9
+  - https://gitlab.com/whenubuy/backend/-/merge_requests/42
+  Metryki: CR, AOV, odsetek porzuconych koszyków.
+  Porównać z tym samym tygodniem w zeszłym roku.
+- [ ] Ustalić próg istotności statystycznej z Tomkiem @2026-11-14 ^j1k2l3
+- [x] Dodać flagę wariantu do eventów analitycznych ✓2026-11-12 ^m4n5b6
+- [x] Skonfigurować podział ruchu 80/20 w feature flagach ✓2026-11-10 ^v7c8x9
+
+## Dziennik
+- 2026-11-13 09:41 · agent · Wariant B: +3,1% konwersji po 4 dniach, przedział ufności jeszcze szeroki.
+- 2026-11-11 15:30 · ja · Ruch podzielony 80/20, flagi włączone na produkcji.</code></pre>
+            </div>
+
+            <h3 id="skroty">Skróty</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Gdzie</th>
+                    <th scope="col">Skrót</th>
+                    <th scope="col">Co robi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Cały macOS</td>
+                    <td><kbd>⌃⌥Spacja</kbd></td>
+                    <td>Otwiera albo zamyka <span class="ui">Szybkie zadanie</span>. Skrót da się zmienić w ustawieniach</td>
+                  </tr>
+                  <tr>
+                    <td>Okno główne</td>
+                    <td><kbd>⌘K</kbd></td>
+                    <td>Otwiera albo zamyka wyszukiwanie</td>
+                  </tr>
+                  <tr>
+                    <td>Pole szybkiego zadania</td>
+                    <td><kbd>Enter</kbd> · <kbd>Tab</kbd> · <kbd>Esc</kbd></td>
+                    <td>Zapisuje · otwiera listę miejsc · zamyka okno</td>
+                  </tr>
+                  <tr>
+                    <td>Lista miejsc</td>
+                    <td><kbd>↑</kbd> <kbd>↓</kbd> · <kbd>Enter</kbd> · <kbd>Esc</kbd> / <kbd>Tab</kbd></td>
+                    <td>Przesuwa wybór · zatwierdza · zamyka listę</td>
+                  </tr>
+                  <tr>
+                    <td>Wiersz zadania</td>
+                    <td><kbd>Enter</kbd> · <kbd>Spacja</kbd> / <kbd>x</kbd></td>
+                    <td>Rozwija albo zwija kartę · przełącza <span class="ui">Zrobione</span></td>
+                  </tr>
+                  <tr>
+                    <td>Wiersz zadania</td>
+                    <td><kbd>1</kbd>–<kbd>4</kbd> · <kbd>e</kbd> / <kbd>F2</kbd> · <kbd>s</kbd> · <kbd>m</kbd></td>
+                    <td>Status · tytuł · menu statusu · przenoszenie</td>
+                  </tr>
+                  <tr>
+                    <td>Wiersz zadania</td>
+                    <td><kbd>Delete</kbd> / <kbd>Backspace</kbd> · <kbd>↑</kbd> <kbd>↓</kbd> lub <kbd>k</kbd> <kbd>j</kbd> · <kbd>Esc</kbd></td>
+                    <td>Pyta „Usunąć to zadanie?” · sąsiedni wiersz · zwija kartę</td>
+                  </tr>
+                  <tr>
+                    <td>Karta na tablicy</td>
+                    <td><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> lub <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td>
+                    <td>Przechodzi między kartami</td>
+                  </tr>
+                  <tr>
+                    <td>Karta na tablicy</td>
+                    <td><kbd>1</kbd>–<kbd>4</kbd> albo <kbd>1</kbd>–<kbd>5</kbd> · <kbd>⌥←</kbd> <kbd>⌥→</kbd> · <kbd>m</kbd> · <kbd>Enter</kbd> / <kbd>Spacja</kbd></td>
+                    <td>Status (zadania do 4, tematy do 5) · sąsiednia kolumna · menu statusu · otwiera kartę</td>
+                  </tr>
+                  <tr>
+                    <td>Dziennik i notatki</td>
+                    <td><kbd>⌘↩</kbd></td>
+                    <td>Dodaje wpis albo zapisuje notatki. Działa też <kbd>Ctrl</kbd>+<kbd>Enter</kbd></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="instalacja">
+            <h2>Instalacja i MCP</h2>
+            <p>
+              Jedno repozytorium: React, Tauri 2 i crate <code>morwisko-mcp</code>. Do zbudowania potrzeba Rusta, Node.js z <code>pnpm</code> i narzędzi Xcode. Polecenia odpalasz w katalogu repozytorium. W ścieżkach poniżej podmień <code>/ABS/PATH/TO/morwisko</code> na swój katalog.
+            </p>
+
+            <h3>1. Aplikacja i serwer</h3>
+            <div class="code-block">
+              <div class="code-head">
+                <span>Budowanie</span>
+                <button type="button" class="copy-btn" data-copy-target="cmd-build">Kopiuj</button>
+              </div>
+              <pre><code id="cmd-build">pnpm install
+pnpm tauri build
+cargo build --release -p morwisko-mcp
+cargo test -p morwisko-mcp</code></pre>
+            </div>
+            <p>
+              Aplikacja (ok. 13 MB) ląduje w <code>target/release/bundle/macos/Morwisko.app</code>, serwer w <code>target/release/morwisko-mcp</code>. W czasie pracy nad kodem okno uruchamia <code>pnpm tauri dev</code>.
+            </p>
+
+            <h3>2. Claude Code</h3>
+            <p>
+              <code>--scope user</code> zapisuje serwer dla użytkownika. Bez <code>-e</code> serwer czyta <code>~/Morwisko</code>.
+            </p>
+            <div class="code-block">
+              <div class="code-head">
+                <span>claude mcp add</span>
+                <button type="button" class="copy-btn" data-copy-target="cmd-claude">Kopiuj</button>
+              </div>
+              <pre><code id="cmd-claude">claude mcp add --scope user morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp
+claude mcp add --scope user -e MORWISKO_DIR=/sciezka/do/folderu morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp</code></pre>
+            </div>
+
+            <h3>3. Codex</h3>
+            <p>
+              Inny folder danych podajesz przez <code>--env</code>. Wpis w <code>~/.codex/config.toml</code> poniżej ma tylko pole <code>command</code>, sprawdzone w binariu Codex. Osobnej tabeli <code>env</code> w tym pliku tu nie podaję.
+            </p>
+            <div class="code-block">
+              <div class="code-head">
+                <span>codex mcp add</span>
+                <button type="button" class="copy-btn" data-copy-target="cmd-codex">Kopiuj</button>
+              </div>
+              <pre><code id="cmd-codex">codex mcp add morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp
+codex mcp add --env MORWISKO_DIR=/sciezka/do/folderu morwisko -- /ABS/PATH/TO/morwisko/target/release/morwisko-mcp</code></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-head">
+                <span>~/.codex/config.toml</span>
+                <button type="button" class="copy-btn" data-copy-target="cmd-toml">Kopiuj</button>
+              </div>
+              <pre><code id="cmd-toml">[mcp_servers.morwisko]
+command = "/ABS/PATH/TO/morwisko/target/release/morwisko-mcp"</code></pre>
+            </div>
+          </section>
+
+          <section id="ograniczenia">
+            <h2>Ograniczenia</h2>
+            <ul>
+              <li>Skrót globalny, ikona w pasku menu i powiadomienia są napisane pod macOS.</li>
+              <li>Jedno stanowisko i jeden folder. Nie ma synchronizacji między komputerami ani scalania dwóch zapisów tego samego pliku.</li>
+              <li>Okno i serwer MCP biorą blokadę <code>.morwisko/lock</code> na czas swojego zapisu. Edytor tekstu tej blokady nie bierze. Zapis z edytora w tej samej chwili może zostać nadpisany.</li>
+              <li>Przypomnienia wymagają zgody macOS na powiadomienia. Odmowy aplikacja nie wykrywa. Powiadomienia wtedy po prostu nie przychodzą.</li>
+              <li>Zamknięcie okna je chowa, proces zostaje, więc skrót i przypomnienia dalej działają. Proces kończy <span class="ui">Zakończ</span> w menu ikony albo <kbd>⌘Q</kbd>.</li>
+              <li>Nie ma narzędzi MCP do usuwania zadań i tematów. Usuwasz je w oknie albo w pliku.</li>
+            </ul>
+          </section>
+
+          <footer>
+            Morwisko. Pliki Markdown w <code>~/Morwisko</code>. Ta strona nie ładuje niczego z sieci.
+          </footer>
+        </main>
+
+        <aside class="toc" aria-label="Spis treści">
+          <p class="toc-title">Na tej stronie</p>
+          <ul>
+            <li><a href="#po-co">Dla kogo i po co</a></li>
+            <li>
+              <a href="#dzien">Dzień z Morwiskiem</a>
+              <ul class="toc-sub">
+                <li><a href="#krok-dzis">01 · Dziś</a></li>
+                <li><a href="#krok-szybkie">02 · Szybkie zadanie</a></li>
+                <li><a href="#krok-skrzynka">03 · Skrzynka</a></li>
+                <li><a href="#krok-temat">04 · Temat i dziennik</a></li>
+                <li><a href="#krok-zadanie">05 · Karta zadania</a></li>
+                <li><a href="#krok-tablica">06 · Tablica zadań</a></li>
+                <li><a href="#krok-tematy">07 · Tablica tematów</a></li>
+                <li><a href="#krok-paleta">08 · ⌘K</a></li>
+                <li><a href="#krok-agent">09 · Agent</a></li>
+                <li><a href="#krok-ustawienia">10 · Ustawienia</a></li>
+              </ul>
+            </li>
+            <li>
+              <a href="#sciagawka">Ściągawka</a>
+              <ul class="toc-sub">
+                <li><a href="#statusy">Statusy</a></li>
+                <li><a href="#tokeny">Tokeny</a></li>
+                <li><a href="#narzedzia-mcp">Narzędzia MCP</a></li>
+                <li><a href="#pliki">Pliki</a></li>
+                <li><a href="#skroty">Skróty</a></li>
+              </ul>
+            </li>
+            <li><a href="#instalacja">Instalacja i MCP</a></li>
+            <li><a href="#ograniczenia">Ograniczenia</a></li>
+          </ul>
+        </aside>
+      </div>
+    </div>
+
+    <dialog id="lightbox" class="lightbox" aria-labelledby="lightbox-caption">
+      <div class="lightbox-bar">
+        <span id="lightbox-caption">Podgląd zrzutu ekranu</span>
+        <button type="button" id="lightbox-close" class="lightbox-close">Zamknij</button>
+      </div>
+      <div class="lightbox-body">
+        <img id="lightbox-img" alt="" />
+      </div>
+    </dialog>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>

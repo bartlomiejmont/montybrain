@@ -1,0 +1,251 @@
+/* Quick-capture window. Reuses the tokens of src/styles.css; the native window
+   is transparent, this box is the visible panel (macOS draws the shadow). */
+
+html,
+body.quick-body {
+  background: transparent;
+  height: auto;
+  overflow: hidden;
+}
+
+#quick-root {
+  height: auto;
+}
+
+.qc {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.qc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 18px;
+}
+
+.qc-ring {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-3);
+}
+
+.qc-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 17px;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.qc-input::placeholder {
+  color: var(--text-4);
+}
+
+.qc-input:focus-visible {
+  outline: none;
+}
+
+.qc-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px 0 12px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.qc-dest {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 52%;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.qc-dest:hover,
+.qc-dest[aria-expanded="true"] {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.qc-dest-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qc-chev {
+  flex: none;
+  color: var(--text-3);
+}
+
+.qc-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.qc-chips {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.qc-chip {
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-error {
+  flex: 1;
+  min-width: 0;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qc-hints {
+  flex: none;
+  color: var(--text-4);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.qc-hints kbd {
+  font: inherit;
+  color: var(--text-3);
+  margin-left: 8px;
+}
+
+.qc-hints kbd:first-child {
+  margin-left: 0;
+}
+
+.qc-picker {
+  border-top: 1px solid var(--line-soft);
+}
+
+.qc-filter {
+  display: block;
+  width: 100%;
+  height: 36px;
+  padding: 0 18px;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  outline: none;
+}
+
+.qc-filter::placeholder {
+  color: var(--text-4);
+}
+
+.qc-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px 6px;
+  max-height: 248px;
+  overflow-y: auto;
+}
+
+.qc-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.qc-opt.sub {
+  padding-left: 28px;
+  color: var(--text-3);
+}
+
+.qc-opt.active {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.qc-opt-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qc-opt-current {
+  font-size: 11px;
+  color: var(--text-4);
+}
+
+.qc-empty {
+  padding: 8px 12px;
+  color: var(--text-4);
+}
+
+.qc-done {
+  color: var(--text);
+  animation: qc-in 180ms var(--ease);
+}
+
+.qc-check {
+  display: inline-flex;
+  color: var(--text);
+}
+
+.qc-done-text {
+  font-size: 15px;
+}
+
+.qc-done-where {
+  color: var(--text-3);
+}
+
+@keyframes qc-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qc-done {
+    animation: none;
+  }
+}
