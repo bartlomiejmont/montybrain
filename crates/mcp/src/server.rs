@@ -32,7 +32,13 @@ tasks without a project go to the inbox. \
 (5) Attach merge-request / thread / issue URLs to tasks with `add_links`. \
 (6) Do not restructure the user's projects or topics unasked: no new projects, no mass moves or \
 renames. Tool results are Markdown; `^id` is a task id and `project / topic` its location. \
-Project and topic arguments accept the slug or the display name.";
+Project and topic arguments accept the slug or the display name. \
+(7) Connections between topics and tasks (the app's map): in a topic summary or task notes write \
+`[[slug]]` for a topic of the same project, `[[project-slug/topic-slug]]` for any project, `^id` for a \
+task. A line `Czeka na: [[project-slug/topic-slug]]` (or `Czeka na: ^id`) on its own says this one waits \
+for that one; any other reference means related; `Powiązane: [[…]]` on its own line is the usual form. \
+Use slugs (they do not change when a title does); keep the rest of the summary as it is when you add \
+one. The journal is not read for connections.";
 
 /// Appended to [`INSTRUCTIONS`] when the server runs read-only.
 const READ_ONLY_INSTRUCTIONS: &str = "\n\nREAD-ONLY RUN: this session was started with \
@@ -202,7 +208,8 @@ pub struct CreateTaskArgs {
     due: Option<String>,
     /// URLs to attach (merge request, issue, thread, doc).
     links: Option<Vec<String>>,
-    /// Free-form notes; may span several lines.
+    /// Free-form notes; may span several lines. May reference topics (`[[project/slug]]`) and
+    /// tasks (`^id`); a line `Czeka na: ^id` means this task waits for that one.
     notes: Option<String>,
 }
 
@@ -250,7 +257,8 @@ pub struct CreateTopicArgs {
     status: Option<String>,
     /// Name of one of the project's repositories (see overview with `project`).
     repo: Option<String>,
-    /// Short current-state summary.
+    /// Short current-state summary. May end with connection lines, e.g. `Powiązane: [[project/slug]]`
+    /// or `Czeka na: [[project/slug]]` (see the server instructions).
     summary: Option<String>,
 }
 
@@ -264,7 +272,8 @@ pub struct LogUpdateArgs {
     text: String,
     /// Also set the topic status: planned, in_progress, blocked, waiting, done.
     status: Option<String>,
-    /// Also replace the topic's summary (the current-state text under the title).
+    /// Also replace the topic's summary (the current-state text under the title). Keep its
+    /// connection lines (`Czeka na: [[…]]`, `Powiązane: [[…]]`) unless they are no longer true.
     summary: Option<String>,
     /// Entry author. Default "agent".
     author: Option<String>,

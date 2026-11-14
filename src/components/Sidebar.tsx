@@ -1,4 +1,4 @@
-import { ChevronRight, Columns3, Inbox, Play, Settings2, Sun } from "lucide-react";
+import { ChevronRight, Columns3, Inbox, Network, Play, Settings2, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { countTasks, partitionProjects } from "../lib/group";
@@ -96,6 +96,7 @@ export function Sidebar({ route }: { route: Route }) {
           count={counts.inbox.open}
         />
         <NavItem href={boardHref()} active={route.view === "board"} icon={<Columns3 size={14} />} label="Tablica" />
+        <NavItem href={links.map()} active={route.view === "map"} icon={<Network size={14} />} label="Mapa" />
         <NavItem href="#/akcje" active={route.view === "actions"} icon={<Play size={14} />} label="Akcje" count={runningActions} />
 
         <div className="nav-section">Projekty</div>

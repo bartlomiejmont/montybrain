@@ -13,11 +13,13 @@ export interface ContextInput {
   tasks: Task[];
   /** Branches matched or linked to the topic (from the drift detector). */
   branches: DriftBranch[];
+  /** One-hop neighbours on the map (kind label, title, project name, first sentence). */
+  neighbours?: { kind: string; title: string; project: string; sentence: string }[];
 }
 
 const one = (s: string) => s.replace(/\s+/g, " ").trim();
 
-export function buildTopicContext({ project, topic, journal, tasks, branches }: ContextInput): string {
+export function buildTopicContext({ project, topic, journal, tasks, branches, neighbours = [] }: ContextInput): string {
   const out: string[] = [];
   out.push(`# ${project.name} / ${topic.title}`, "");
   out.push(`- Projekt: ${project.name} (\`${project.slug}\`)`);
@@ -51,6 +53,11 @@ export function buildTopicContext({ project, topic, journal, tasks, branches }: 
       const seen = b.seen ? `, widziana ${b.seen.replace("T", " ")}` : "";
       out.push(`- ${b.repo}: ${b.branch} (ostatni commit ${b.last_commit}${wt}${seen})`);
     }
+  }
+
+  if (neighbours.length) {
+    out.push("", "## Połączone tematy", "");
+    for (const n of neighbours) out.push(`- ${n.kind}: ${n.project} / ${n.title}${n.sentence ? ` — ${n.sentence}` : ""}`);
   }
 
   out.push(

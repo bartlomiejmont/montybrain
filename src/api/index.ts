@@ -29,6 +29,11 @@ export function mockUpdateScenario(): UpdateScenario | null {
   return UPDATE_SCENARIOS.includes(v as UpdateScenario) ? (v as UpdateScenario) : null;
 }
 
+function mockMap(): "demo" | "large" | undefined {
+  const v = query().get("map");
+  return v === "demo" || v === "large" ? v : undefined;
+}
+
 function mockRunOptions() {
   const q = query();
   const step = Number(q.get("step"));
@@ -42,4 +47,4 @@ function mockRunOptions() {
 
 export const api: MorwiskoApi = isTauri()
   ? createTauriApi()
-  : createMockApi({ latencyMs: 40, runs: mockRunOptions(), updateScenario: mockUpdateScenario() ?? undefined, drift: query().get("drift") === "none" ? "none" : undefined, today: query().get("today") === "full" ? "full" : undefined });
+  : createMockApi({ latencyMs: 40, runs: mockRunOptions(), updateScenario: mockUpdateScenario() ?? undefined, drift: query().get("drift") === "none" ? "none" : undefined, today: query().get("today") === "full" ? "full" : undefined, map: mockMap() });

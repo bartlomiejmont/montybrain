@@ -5,6 +5,7 @@
 import type { MorwiskoApi } from "./api";
 import { buildFixtures } from "./fixtures";
 import { createMockRuns, type MockRunOptions } from "./mock-runs";
+import { addMapDemo, buildLargeFixture } from "./mock-map";
 import { createMockSignals } from "./mock-signals";
 import { createMockUpdates, type UpdateScenario } from "./mock-updates";
 import { DEFAULT_SHORTCUT, canonicalShortcut } from "./shortcut";
@@ -42,6 +43,8 @@ export interface MockOptions {
   updateScenario?: UpdateScenario;
   /** `full`: extra fixture topics so every Dziś section shows (a waiting one, a stale one, a loose task in progress). */
   today?: "full";
+  /** „Mapa" data: `demo` (references, a fourth project) or `large` (5 projects, 40 topics, 300 tasks). */
+  map?: "demo" | "large";
   /** `none`: the drift detector has not collected anything yet. */
   drift?: "none" | "default";
 }
@@ -130,7 +133,8 @@ const clone = <T>(v: T): T => structuredClone(v);
 export function createMockApi(opts: MockOptions = {}): MorwiskoApi & { snapshotForTests(): Snapshot } {
   const now = opts.now ?? (() => new Date());
   const latency = opts.latencyMs ?? 0;
-  const db: Snapshot = clone(opts.snapshot ?? buildFixtures(toIsoDate(now()), toIsoMinute(now())));
+  const db: Snapshot = clone(opts.snapshot ?? (opts.map === "large" ? buildLargeFixture(toIsoDate(now())) : buildFixtures(toIsoDate(now()), toIsoMinute(now()))));
+  if (opts.map === "demo") addMapDemo(db, toIsoDate(now()));
   let version = 1;
   const listeners = new Set<(e: VaultChanged) => void>();
   const settingsListeners = new Set<(s: AppSettings) => void>();

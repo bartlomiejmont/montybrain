@@ -3,6 +3,9 @@ import { useState } from "react";
 
 import type { Project, Topic, TopicStatus } from "../api";
 import { buildTopicContext, copyText } from "../lib/context";
+import { buildGraph, neighbours, topicKey as refTopicKey } from "../lib/refs";
+import { firstSentence } from "../lib/today";
+import { links, navigate } from "../router/router";
 import { formatAge } from "../lib/dates";
 import { countTasks, journalOf, tasksAt, topicKey } from "../lib/group";
 import { TOPIC_STATUSES, TOPIC_STATUS_LABEL } from "../lib/labels";
@@ -89,12 +92,23 @@ export function useCopyContext() {
     const project = view.snapshot.projects.find((p) => p.slug === projectSlug);
     if (!project) return;
     const branches = drift.list.find((d) => d.project === projectSlug)?.branches.filter((b) => b.topic === topic.slug) ?? [];
+    // One-hop neighbours on the map (topics only), with the first sentence of each.
+    const graph = buildGraph(view.snapshot);
+    const neighbourList = neighbours(graph, refTopicKey(projectSlug, topic.slug)).flatMap((n) => {
+      const other = view.snapshot.topics.find((t) => refTopicKey(t.project, t.slug) === n.other);
+      if (!other) return [];
+      const kind = n.edge.kind === "waits" ? (n.outgoing ? "Czeka na" : "Czeka na ten temat") : "Powiązane";
+      const name = view.snapshot.projects.find((p) => p.slug === other.project)?.name ?? other.project;
+      const prose = other.summary.split("\n").filter((l) => !/^(Czeka na|Powiązane):/.test(l.trim())).join(" ");
+      return [{ kind, title: other.title, project: name, sentence: firstSentence(prose) }];
+    });
     const text = buildTopicContext({
       project,
       topic,
       journal: journalOf(view.snapshot, projectSlug, topic.slug),
       tasks: tasksAt(view.snapshot, { kind: "topic", project: projectSlug, topic: topic.slug }),
       branches,
+      neighbours: neighbourList,
     });
     notify((await copyText(text)) ? "Skopiowano kontekst tematu." : "Nie udało się skopiować do schowka.");
   };
@@ -309,7 +323,10 @@ export function TopicItem({
             label={`Temat ${topic.title}`}
             minWidth={190}
             onClose={() => setMenu(null)}
-            items={[{ key: "copy", label: "Kopiuj kontekst", onSelect: () => void copyContext(project.slug, topic) }]}
+            items={[
+              { key: "copy", label: "Kopiuj kontekst", onSelect: () => void copyContext(project.slug, topic) },
+              { key: "map", label: "Pokaż na mapie", onSelect: () => navigate(links.map(`${project.slug}/${topic.slug}`)) },
+            ]}
           />
         )}
       </div>

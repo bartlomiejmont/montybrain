@@ -10,7 +10,7 @@ import { fragment, highlight, searchTerms, type Segment } from "../lib/highlight
 import { formatStamp } from "../lib/dates";
 import { taskHref, topicHref } from "../lib/nav";
 import { GROUP_LABEL, buildItems, nextActive, resolveItem, type PaletteGroup, type PaletteItem } from "../lib/palette";
-import { navigate } from "../router/router";
+import { links, navigate } from "../router/router";
 import { revealTask, revealTopic } from "../store/ui";
 import { useVault } from "../store/vault";
 import { StatusGlyph } from "./StatusToggle";
@@ -49,7 +49,13 @@ export function Palette() {
       }
     };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    // A link inside the palette ("Pokaż na mapie") navigated: close it.
+    const onHash = () => setOpen(false);
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("hashchange", onHash);
+    };
   }, []);
 
   if (!open || !view) return null;
@@ -171,7 +177,11 @@ function PaletteDialog({
     } else if (e.key === "Enter") {
       e.preventDefault();
       const item = items[active];
-      if (item) choose(item);
+      // ⌘↵ / Ctrl+↵ on a topic: show it on the map.
+      if (item?.group === "topic" && (e.metaKey || e.ctrlKey)) {
+        onClose();
+        navigate(links.map(`${item.topic.project}/${item.topic.slug}`));
+      } else if (item) choose(item);
     } else if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
@@ -233,6 +243,7 @@ function PaletteDialog({
         <div className="pal-foot" aria-hidden>
           <span>↑↓ wybierz</span>
           <span>↵ otwórz</span>
+          {items[active]?.group === "topic" && <span>⌘↵ pokaż na mapie</span>}
           <span>esc zamknij</span>
         </div>
       </div>
@@ -316,6 +327,14 @@ function TopicItem({ topic, snapshot, terms }: { topic: Topic; snapshot: Snapsho
           <ProjectDot color={p?.color} size={6} />
           <span className="ctx-text">{p?.name ?? topic.project}</span>
         </span>
+        <a
+          className="pal-map"
+          href={links.map(`${topic.project}/${topic.slug}`)}
+          title="Pokaż na mapie (⌘↵)"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Pokaż na mapie
+        </a>
       </div>
       {summary && (
         <div className="pal-snippet">

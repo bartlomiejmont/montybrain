@@ -2430,3 +2430,17 @@ body.dragging-card * {
 .today-reason + .today-reason::before {
   margin-right: 6px;
 }
+
+.pal-map {
+  flex: none;
+  margin-left: 8px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.pal-map:hover {
+  color: var(--text);
+}

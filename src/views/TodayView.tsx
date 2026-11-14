@@ -114,6 +114,7 @@ function TopicRowView({ row, today }: { row: TopicRow; today: string }) {
             items={[
               { key: "open", label: "Otwórz w projekcie", onSelect: () => navigate(links.project(row.project, t.slug)) },
               { key: "copy", label: "Kopiuj kontekst", onSelect: () => void copy(row.project, t) },
+              { key: "map", label: "Pokaż na mapie", onSelect: () => navigate(links.map(`${row.project}/${t.slug}`)) },
             ]}
           />
         )}

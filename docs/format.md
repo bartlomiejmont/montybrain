@@ -528,6 +528,29 @@ hand save that lands between Morwisko's read and its rename can be overwritten. 
 script or agent that edits files directly should take the same lock (for example
 `flock <vault>/.morwisko/lock <command>`) or go through the MCP server.
 
+## 11a. References between topics and tasks (a convention on free text)
+
+The app's map ("Mapa") reads connections from free text. Core treats them as
+ordinary text: nothing below changes the structure of a file, and a summary or
+note with references round-trips byte for byte.
+
+* `[[slug]]`: a topic of the same project; `[[projekt/slug]]`: a topic of any
+  project (the same slug may exist in two projects); `^id`: a task.
+* Read only from a topic's summary (the text under the title) and from task
+  notes. Fenced code blocks and inline code are skipped. The journal is never
+  read: an entry is history.
+* A line that starts with `Czeka na:` makes its references directed: "this
+  topic / task waits for that one". Any other reference is "related"
+  (undirected).
+* The app writes a connection as one standalone line at the end of the summary,
+  `Powiązane: [[projekt/slug]]` or `Czeka na: [[projekt/slug]]`, and removes
+  exactly that line again; a reference inside prose is only changed by editing
+  the text.
+* A reference to something that does not exist is shown as a warning, never as
+  a node. Use slugs: a title change keeps the slug, `^id` survives moving a
+  task; only renaming a file breaks a reference. A task without an id cannot be
+  referenced.
+
 ## 12. Notes for agents editing files by hand
 
 * Keep a task on one line: `- [ ] Title !prio @due ^id`. Leave out `^id` if you don't
