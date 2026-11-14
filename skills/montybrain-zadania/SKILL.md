@@ -5,7 +5,7 @@ description: "Dodawaj i aktualizuj zadania w MontyBrain (lokalne centrum dowodze
 
 # Zadania w MontyBrain
 
-MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat → Zadanie, plus Skrzynka na rzeczy bez projektu. Piszesz do niego wyłącznie przez narzędzia serwera MCP `montybrain`: `overview`, `list_tasks`, `search`, `get_topic`, `create_task`, `update_task`, `create_topic`, `log_update`. Nie edytuj plików w `~/MontyBrain` ręcznie, jeśli serwer jest dostępny. Jeśli narzędzi `montybrain` nie ma w tej sesji, powiedz to wprost i zakończ; nie zapisuj zadań gdzie indziej.
+MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat → Zadanie, plus Skrzynka na rzeczy bez projektu. Piszesz do niego wyłącznie przez narzędzia serwera MCP `montybrain`: `overview`, `list_tasks`, `search`, `get_topic`, `connections`, `create_task`, `update_task`, `create_topic`, `log_update`, `command`. Nie edytuj plików w `~/MontyBrain` ręcznie, jeśli serwer jest dostępny. Jeśli narzędzi `montybrain` nie ma w tej sesji, powiedz to wprost i zakończ; nie zapisuj zadań gdzie indziej.
 
 ## Dwa tryby
 
@@ -35,6 +35,23 @@ MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat → 
 - **Termin** (`due`, `YYYY-MM-DD` lub `YYYY-MM-DDTHH:MM`): tylko gdy padł w źródle. Nie wymyślaj terminów.
 - **Priorytet** (`priority`: `high` / `low`): tylko gdy wynika ze źródła („pilne”, „blokuje wdrożenie”).
 - **Status**: domyślnie do zrobienia. `doing` dla rzeczy, nad którą właśnie trwa praca, `blocked` gdy czeka na kogoś lub coś (napisz w notatkach, na co).
+
+## Komendy (narzędzie `command`)
+
+Użytkownik zna język komend z aplikacji; możesz go użyć zamiast pól narzędzi, zwłaszcza gdy sam podał komendę. `command` bez `apply` pokazuje plan (pliki i dokładne linie Markdown) z tokenem `plan` i niczego nie zapisuje; zapis to drugie wywołanie z tym samym `text`, `apply: true` i tym tokenem (gdy w międzyczasie coś się zmieniło, nic się nie zapisze i dostaniesz nowy podgląd). Przykłady:
+
+- `Zadzwonić do sądu @jutro !wysoki` — zadanie w Skrzynce z terminem i priorytetem;
+- `Podpiąć karty > whenubuy/checkout` — zadanie w temacie (` > ` ze spacjami wskazuje miejsce);
+- `^a1b2c3 [x] > whenubuy/checkout` — status i przeniesienie istniejącego zadania;
+- `^a1b2c3 /czeka ^c3d4e5`, `[[whenubuy/checkout]] /powiaz [[firma/krs]]` — jedna linia powiązania;
+- `^a1b2c3 /czeka odpis z sądu`, `umowa z dostawcą /powiaz płatności` — zadanie albo temat wskazany słowami zamiast `^id` / `[[…]]` (jedno trafienie: przyjęte; kilka: błąd z listą `^id`; nowe zadanie z powiązaniem zacznij od `[ ]`);
+- `/temat Płatności mobilne > whenubuy` — nowy temat.
+
+Gdy nazwa jest niejednoznaczna, narzędzie zwraca błąd „Nothing was changed:” z listą slugów albo `^id`: wybierz dokładny, nie zgaduj. Prośby zaczynające się od `?` są dla agenta w aplikacji, nie dla ciebie.
+
+## Powiązania
+
+Gdy zadanie czeka na inne zadanie albo temat, podaj to w `waits_for` (`^id` albo `[[projekt/temat]]`); powiązane rzeczy w `related`. Każde dopisuje jedną linię („Czeka na: …” / „Powiązane: …”) i nie zmienia reszty notatek. `connections` pokazuje powiązania w obie strony.
 
 ## Zmiany w istniejących zadaniach
 

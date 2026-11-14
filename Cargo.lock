@@ -2291,7 +2291,7 @@ dependencies = [
 
 [[package]]
 name = "montybrain-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "fastrand",
@@ -2304,7 +2304,7 @@ dependencies = [
 
 [[package]]
 name = "montybrain-desktop"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mac-notification-sys",
  "montybrain-core",
@@ -2324,7 +2324,7 @@ dependencies = [
 
 [[package]]
 name = "montybrain-mcp"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "montybrain-core",
  "rmcp",

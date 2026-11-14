@@ -6,22 +6,25 @@ import { href } from "../router/registry";
 import { partitionProjects } from "./group";
 import { fold } from "./text";
 
-export type PaletteGroup = "nav" | "task" | "topic" | "journal";
+export type PaletteGroup = "nav" | "task" | "topic" | "journal" | "new";
 
 export const GROUP_LABEL: Record<PaletteGroup, string> = {
   nav: "Przejdź do",
   task: "Zadania",
   topic: "Tematy",
   journal: "Dziennik",
+  new: "Nowe",
 };
 
 export type PaletteItem =
   | { group: "nav"; key: string; label: string; to: string; color: string | null }
   | { group: "task"; key: string; task: Task }
   | { group: "topic"; key: string; topic: Topic }
-  | { group: "journal"; key: string; entry: JournalEntry };
+  | { group: "journal"; key: string; entry: JournalEntry }
+  /** The query as a new task or command (read by the backend, written after confirmation). */
+  | { group: "new"; key: "new"; text: string };
 
-export const GROUP_LIMIT: Record<PaletteGroup, number> = { nav: 5, task: 8, topic: 6, journal: 6 };
+export const GROUP_LIMIT: Record<PaletteGroup, number> = { nav: 5, task: 8, topic: 6, journal: 6, new: 1 };
 
 export function navTargets(snap: Snapshot): PaletteItem[] {
   const items: PaletteItem[] = [
@@ -69,6 +72,8 @@ function findEntry(snap: Snapshot, e: JournalEntry): JournalEntry | undefined {
  */
 export function resolveItem(snap: Snapshot, item: PaletteItem): PaletteItem | null {
   switch (item.group) {
+    case "new":
+      return item;
     case "nav": {
       const slug = item.key.startsWith("nav:p:") ? item.key.slice("nav:p:".length) : null;
       return !slug || snap.projects.some((p) => p.slug === slug) ? item : null;
@@ -113,7 +118,8 @@ export function buildItems(snap: Snapshot, query: string, hits: SearchHit[]): Pa
       if (item) journal.push(item);
     }
   }
-  return [...tasks, ...topics, ...journal, ...nav];
+  // Last: the query itself as a new task or command.
+  return [...tasks, ...topics, ...journal, ...nav, { group: "new", key: "new", text: query.trim() }];
 }
 
 /**

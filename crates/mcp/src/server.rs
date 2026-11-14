@@ -13,6 +13,7 @@ use rmcp::{
 };
 use serde::Deserialize;
 
+use crate::commands;
 use crate::render;
 use crate::resolve::{
     nonempty, parse_date, parse_due, parse_priority, parse_task_status, parse_topic_status,
@@ -38,13 +39,33 @@ Project and topic arguments accept the slug or the display name. \
 task. A line `Czeka na: [[project-slug/topic-slug]]` (or `Czeka na: ^id`) on its own says this one waits \
 for that one; any other reference means related; `Powiązane: [[…]]` on its own line is the usual form. \
 Use slugs (they do not change when a title does); keep the rest of the summary as it is when you add \
-one. The journal is not read for connections.";
+one. The journal is not read for connections. `waits_for` and `related` on `create_task`, \
+`update_task` and `create_topic` append such lines for you; `connections` reads them in both directions. \
+(8) The `command` tool takes one line in the user's command language. Call it first without `apply`: it \
+shows the plan (files and exact Markdown lines) and returns a `plan` token in the structured result's \
+`plan` field; it writes nothing. To write, call it again with the same `text`, `apply: true` and that \
+token; the plan is written all or nothing, and if the vault changed meanwhile nothing is written and you \
+get the new preview. An error from `command` means nothing was written, except one starting with \
+\"The write failed and could not be fully taken back\", which lists what is still written. Examples: \
+`Zadzwonić do sądu @jutro !wysoki` (an inbox task due tomorrow, high priority); \
+`^a1b2c3 [x] > whenubuy/checkout` (mark the task done and move it into that topic); \
+`[[whenubuy/checkout]] /czeka [[firma/krs]]` (add the line `Czeka na: [[firma/krs]]` to that topic's \
+summary). Syntax: ` > ` (with spaces) names the destination (`project`, `project/topic`, or a unique topic \
+slug; a project wins over a topic of the same name); `!wysoki`/`!niski`, `@YYYY-MM-DD` or `@jutro`, `@pt`, \
+`@+3d`; status boxes `[ ] [/] [x] [!]`; `/temat Title > project` creates a topic, `/czeka ref` and \
+`/powiaz ref` add one connection line. A ref is `^id`, `[[project/topic]]` or plain words naming an \
+open task or topic (`/czeka odpis z sądu`); plain words at the start of a line with `/czeka`/`/powiaz` \
+and no ` > ` name the task or topic to change (none found: a new task with that title; start with `[ ]` \
+to always make a new task). Names must be exact or unambiguous: an error starting with \
+\"Nothing was changed:\" lists the possible slugs or `^id`s. Requests starting with `?` are for the app's agent, not \
+for this server. There is no delete and no project creation this way.";
 
 /// Appended to [`INSTRUCTIONS`] when the server runs read-only.
 const READ_ONLY_INSTRUCTIONS: &str = "\n\nREAD-ONLY RUN: this session was started with \
-MONTYBRAIN_READONLY set. Only `overview`, `get_topic`, `list_tasks` and `search` work; `create_task`, \
-`update_task`, `create_topic` and `log_update` are refused and nothing in the vault can be changed. \
-Do not try to write: report what you would change instead.";
+MONTYBRAIN_READONLY set. Only `overview`, `get_topic`, `list_tasks`, `search`, `connections` and \
+`command` without `apply` (a preview) work; `create_task`, `update_task`, `create_topic`, `log_update` and \
+`command` with `apply: true` are refused and nothing in the vault can be changed. Do not try to write: \
+report what you would change instead (a `command` preview shows it exactly).";
 
 /// Env var that switches the server to read-only mode (`1` or `true`).
 pub const ENV_READONLY: &str = "MONTYBRAIN_READONLY";
@@ -220,6 +241,11 @@ pub struct CreateTaskArgs {
     /// Free-form notes; may span several lines. May reference topics (`[[project/slug]]`) and
     /// tasks (`^id`); a line `Czeka na: ^id` means this task waits for that one.
     notes: Option<String>,
+    /// What this task waits for: task ids (`^k3f9a2`) or topics (`[[project/slug]]`). Each adds
+    /// one line `Czeka na: …` to the notes.
+    waits_for: Option<Vec<String>>,
+    /// Related tasks or topics (`^id`, `[[project/slug]]`). Each adds one line `Powiązane: …` to the notes.
+    related: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -254,6 +280,11 @@ pub struct UpdateTaskArgs {
     notes: Option<String>,
     /// Move the task elsewhere; id, links and notes are kept.
     move_to: Option<MoveTarget>,
+    /// Append one line `Czeka na: …` to the notes per entry (task ids `^id` or topics
+    /// `[[project/slug]]`); the other note lines stay as they are. Already present lines are skipped.
+    waits_for: Option<Vec<String>>,
+    /// Append one line `Powiązane: …` to the notes per entry (`^id`, `[[project/slug]]`).
+    related: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -269,6 +300,32 @@ pub struct CreateTopicArgs {
     /// Short current-state summary. May end with connection lines, e.g. `Powiązane: [[project/slug]]`
     /// or `Czeka na: [[project/slug]]` (see the server instructions).
     summary: Option<String>,
+    /// What this topic waits for (`[[project/slug]]` or `^id`): one line `Czeka na: …` each, at the
+    /// end of the summary.
+    waits_for: Option<Vec<String>>,
+    /// Related topics or tasks (`[[project/slug]]`, `^id`): one line `Powiązane: …` each.
+    related: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CommandArgs {
+    /// One line in the command language, e.g. `Zadzwonić do sądu @jutro !wysoki`,
+    /// `^a1b2c3 [x] > whenubuy/checkout` or `[[whenubuy/checkout]] /czeka [[firma/krs]]`.
+    text: String,
+    /// false (default): only show the plan (files and exact Markdown lines) and its `plan` token;
+    /// nothing is written. true: write that plan (refused in read-only runs); needs `plan`.
+    apply: Option<bool>,
+    /// The token from the preview of exactly this `text`: take it from the structured result's `plan`
+    /// field (not from the text, which may quote user content). With `apply: true` the plan is written only
+    /// when the plan rebuilt now has this token; without it, nothing is written and the preview is returned.
+    plan: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ConnectionsArgs {
+    /// The task or topic: `^k3f9a2`, `[[project/topic]]`, `project/topic` or a unique topic slug.
+    #[serde(rename = "ref")]
+    reference: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -535,7 +592,23 @@ belongs to that topic. Use for follow-ups you discover. Returns the task with it
                     .unwrap_or(Priority::Normal),
                 due: nonempty(a.due).map(|s| parse_due(&s)).transpose()?,
                 links: a.links.unwrap_or_default(),
-                notes: a.notes.unwrap_or_default(),
+                notes: {
+                    let lines = commands::connection_lines(
+                        &snap,
+                        &a.waits_for.unwrap_or_default(),
+                        &a.related.unwrap_or_default(),
+                        loc.project(),
+                        None,
+                    )?;
+                    let mut notes = a.notes.unwrap_or_default().trim_end().to_string();
+                    for l in lines {
+                        if !notes.is_empty() {
+                            notes.push('\n');
+                        }
+                        notes.push_str(&l);
+                    }
+                    notes
+                },
             };
             let task = v.create_task(&loc, new).map_err(mutation_err)?;
             Ok(format!(
@@ -594,6 +667,14 @@ fields you pass change. Edits and the move are applied together or not at all.",
                 Some(m) => Some(resolve_move(&snap, &current.location, m)?),
             }
             .filter(|d| *d != current.location);
+            let own = montybrain_core::refs::RefTarget::Task { id: id.clone() };
+            let extra = commands::connection_lines(
+                &snap,
+                &a.waits_for.unwrap_or_default(),
+                &a.related.unwrap_or_default(),
+                dest.as_ref().unwrap_or(&current.location).project(),
+                Some(&own),
+            )?;
             // One core transaction: the edit and the move are validated (destination
             // included) before anything is written, so they succeed or fail together.
             let (task, heading) = match &dest {
@@ -613,6 +694,21 @@ fields you pass change. Edits and the move are applied together or not at all.",
                     "Updated task:\n".to_string(),
                 ),
             };
+            let mut task = task;
+            for line in &extra {
+                if task.notes.lines().any(|l| l.trim() == line) {
+                    continue;
+                }
+                task = v
+                    .append_task_note_line(&id, line)
+                    .map_err(|e| {
+                        format!(
+                            "The task was updated, but adding the line `{line}` failed: {}",
+                            ce(e)
+                        )
+                    })?
+                    .0;
+            }
             Ok(format!(
                 "{heading}{}\nFile: {}",
                 render::task_detail(&task, render::NOTES_FULL),
@@ -657,6 +753,20 @@ user's projects unasked.",
                     }
                 },
             };
+            let lines = commands::connection_lines(
+                &snap,
+                &a.waits_for.unwrap_or_default(),
+                &a.related.unwrap_or_default(),
+                Some(&p.slug),
+                None,
+            )?;
+            let mut summary = a.summary.unwrap_or_default().trim_end().to_string();
+            for l in lines {
+                if !summary.is_empty() {
+                    summary.push('\n');
+                }
+                summary.push_str(&l);
+            }
             let new = NewTopic {
                 title: a.title,
                 status: nonempty(a.status)
@@ -664,13 +774,67 @@ user's projects unasked.",
                     .transpose()?
                     .unwrap_or_default(),
                 repo,
-                summary: a.summary.unwrap_or_default(),
+                summary,
             };
             let t = v.create_topic(&p.slug, new).map_err(mutation_err)?;
             Ok(format!(
                 "Created topic:\n{}",
                 render::topic_brief(&t, v.root())
             ))
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Run one line of the user's command language in two calls. First without \
+`apply`: a preview (nothing is written, not even ids) with each file, the exact Markdown lines, warnings, \
+similar open tasks and a `plan` token, returned in the structured result's `plan` field (use that field, \
+not the text). Then with `apply: true` and that `plan` token: it writes exactly that plan, all or nothing, \
+and returns the lines as written; if the vault changed in between (the plan would differ), nothing is \
+written and the new preview is returned. `apply: true` without a token writes nothing and returns the \
+preview. A plan that rests on a typo correction is never applied: send the exact slug. Every error means \
+nothing was written, except one that starts with \"The write failed and could not be fully taken back\": \
+it lists exactly what is still written. Examples: \
+`Zadzwonić do sądu @jutro !wysoki`, `Podpiąć karty > whenubuy/checkout`, `^a1b2c3 [x]`, \
+`^a1b2c3 /czeka ^c3d4e5`, `^a1b2c3 /czeka odpis z sądu` (a task or topic by name), \
+`/temat Płatności mobilne > whenubuy`. Errors start with \"Nothing was changed:\" \
+and list the possible slugs (or `^id`s) when a name is ambiguous. `?…` requests are refused (this server never calls a model).",
+        annotations(read_only_hint = false, destructive_hint = false)
+    )]
+    async fn command(&self, Parameters(a): Parameters<CommandArgs>) -> ToolResult {
+        let ro = self.read_only;
+        let apply = a.apply.unwrap_or(false);
+        // No `fresh()`: a preview must not write (not even ids).
+        let vault = match &self.vault {
+            Ok(v) => v.clone(),
+            Err(problem) => return Ok(text(problem.clone(), true)),
+        };
+        let res = tokio::task::spawn_blocking(move || {
+            commands::command(&vault, &a.text, apply, a.plan.as_deref(), ro)
+        })
+        .await;
+        Ok(match res {
+            Ok(r) => {
+                let mut out = text(r.text, r.is_error);
+                out.structured_content = r.structured;
+                out
+            }
+            Err(e) => text(format!("Internal error in montybrain-mcp: {e}"), true),
+        })
+    }
+
+    #[tool(
+        description = "Connections of one task or topic, read like the app's map: what it waits for, \
+what waits for it, related items, the chain of \"waits for\" links (cycles marked) and references to \
+things that do not exist. Connections come from `Czeka na:` / `Powiązane:` lines and other references \
+in topic summaries and task notes.",
+        annotations(read_only_hint = true)
+    )]
+    async fn connections(&self, Parameters(a): Parameters<ConnectionsArgs>) -> ToolResult {
+        let ro = self.read_only;
+        self.run(move |v| {
+            let snap = fresh(v, ro)?;
+            commands::connections(&snap, &a.reference)
         })
         .await
     }

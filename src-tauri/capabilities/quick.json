@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "quick",
-  "description": "Quick-capture window: core events only plus the app commands it had before the app ACL was declared; deliberately NOT the agent-run and project-update commands. Saving, closing and resizing go through the app's own commands.",
+  "description": "Quick-capture window: core events only plus the app commands it had before the app ACL was declared; deliberately NOT the agent-run and project-update commands. Saving (the command field: command_preview, command_apply, command_undo, capture_task), closing and resizing go through the app's own commands.",
   "windows": [
     "quick"
   ],
@@ -30,6 +30,10 @@
     "allow-pause-shortcut",
     "allow-set-autostart",
     "allow-quick-close",
-    "allow-quick-resize"
+    "allow-quick-resize",
+    "allow-command-preview",
+    "allow-command-apply",
+    "allow-command-undo",
+    "allow-capture-task"
   ]
 }

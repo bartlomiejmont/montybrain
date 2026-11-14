@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 
 import {
   QUICK_SHOW_EVENT,
+  AGENT_SESSION_EVENT,
   RUN_EVENT_EVENT,
   RUN_UPDATED_EVENT,
   SETTINGS_CHANGED_EVENT,
@@ -12,7 +13,7 @@ import {
   WAITING_CHANGED_EVENT,
   type MontyBrainApi,
 } from "./api";
-import type { AppSettings, ProjectUpdateView, RunEvent, RunInfo, VaultChanged } from "./types";
+import type { AppSettings, ProjectUpdateView, RunEvent, RunInfo, SessionView, VaultChanged } from "./types";
 
 /** Backend access through Tauri commands (src-tauri/src/commands.rs). */
 export function createTauriApi(): MontyBrainApi {
@@ -32,6 +33,23 @@ export function createTauriApi(): MontyBrainApi {
     addJournalEntry: (project, topic, entry) => invoke("add_journal_entry", { project, topic, entry }),
 
     createTask: (location, input) => invoke("create_task", { location, input }),
+    commandPreview: (input) => invoke("command_preview", { input }),
+    commandApply: (input, plan) => invoke("command_apply", { input, plan }),
+    commandUndo: (token, source) => invoke("command_undo", { token, source }),
+    captureTask: (location, text) => invoke("capture_task", { location, text }),
+    inboxSuggestions: () => invoke("inbox_suggestions"),
+    inboxAgent: (request) => invoke("inbox_agent", { request }),
+    inboxAgentAnswer: (runId) => invoke("inbox_agent_answer", { runId }),
+    inboxAgentCheck: (runId) => invoke("inbox_agent_check", { runId }),
+    inboxAgentPaste: (runId, text) => invoke("inbox_agent_paste", { runId, text }),
+    agentSessionStart: (request) => invoke("agent_session_start", { request }),
+    agentSessionGet: () => invoke("agent_session_get"),
+    agentSessionSend: (text) => invoke("agent_session_send", { text }),
+    agentSessionAnswer: (entry, answer, answers) => invoke("agent_session_answer", { entry, answer, answers: answers ?? null }),
+    agentSessionInterrupt: () => invoke("agent_session_interrupt"),
+    agentSessionStop: () => invoke("agent_session_stop"),
+    agentSessionClose: () => invoke("agent_session_close"),
+    onAgentSession: (cb) => listen<SessionView>(AGENT_SESSION_EVENT, (e) => cb(e.payload)),
     updateTask: (id, patch) => invoke("update_task", { id, patch }),
     moveTask: (id, to) => invoke("move_task", { id, to }),
     deleteTask: (id) => invoke("delete_task", { id }),

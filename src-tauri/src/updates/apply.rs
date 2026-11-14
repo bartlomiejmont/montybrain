@@ -104,6 +104,23 @@ pub enum UndoItem {
     /// "Odrzuć wszystkie / pozostałe": nothing was written; undoing makes the
     /// change undecided again (its user corrections kept).
     Rejected { index: usize },
+    /// Skrzynka: an entry moved; undone (moved back) while it is still there.
+    MovedTask {
+        index: usize,
+        task: String,
+        title: String,
+        from: TaskLocation,
+        to: TaskLocation,
+    },
+    /// Skrzynka: a topic made of entries; undone while the file is unchanged.
+    TopicFromTasks {
+        index: usize,
+        project: String,
+        topic: String,
+        title: String,
+        contents: String,
+        origins: Vec<(String, TaskLocation)>,
+    },
 }
 
 impl UndoItem {
@@ -112,7 +129,10 @@ impl UndoItem {
             UndoItem::TaskStatus { stamp, .. }
             | UndoItem::NewTask { stamp, .. }
             | UndoItem::TopicLog { stamp, .. } => *stamp = value,
-            UndoItem::NewTopic { .. } | UndoItem::Rejected { .. } => {}
+            UndoItem::NewTopic { .. }
+            | UndoItem::Rejected { .. }
+            | UndoItem::MovedTask { .. }
+            | UndoItem::TopicFromTasks { .. } => {}
         }
     }
 
@@ -121,7 +141,10 @@ impl UndoItem {
             UndoItem::TaskStatus { stamp, .. }
             | UndoItem::NewTask { stamp, .. }
             | UndoItem::TopicLog { stamp, .. } => stamp.clone(),
-            UndoItem::NewTopic { .. } | UndoItem::Rejected { .. } => None,
+            UndoItem::NewTopic { .. }
+            | UndoItem::Rejected { .. }
+            | UndoItem::MovedTask { .. }
+            | UndoItem::TopicFromTasks { .. } => None,
         }
     }
 
@@ -136,6 +159,8 @@ impl UndoItem {
             | UndoItem::NewTask { index, .. }
             | UndoItem::TopicLog { index, .. }
             | UndoItem::NewTopic { index, .. }
+            | UndoItem::MovedTask { index, .. }
+            | UndoItem::TopicFromTasks { index, .. }
             | UndoItem::Rejected { index } => *index,
         }
     }
@@ -206,7 +231,7 @@ fn file_stamp(vault: &Vault, project: &str, change: &Change) -> Option<String> {
         Change::TopicLog { .. } | Change::NewTask { .. } => {
             vault.stamp_of(&change.location(project)).ok().flatten()
         }
-        Change::NewTopic { .. } => None,
+        Change::NewTopic { .. } | Change::MoveTask { .. } | Change::TopicFromTasks { .. } => None,
     }
 }
 
@@ -315,6 +340,84 @@ fn run_change(
                     },
                 )
             }),
+        Change::MoveTask {
+            task,
+            title,
+            from,
+            to,
+            ..
+        } => vault
+            .update_and_move_task_if(task, |t| t.location == *from, TaskPatch::default(), to)
+            .and_then(|r| {
+                r.ok_or_else(|| {
+                    montybrain_core::Error::InvalidInput("wpis przeniesiono w międzyczasie".into())
+                })
+            })
+            .map(|t| {
+                (
+                    format!("Przeniesiono „{}”.", t.title),
+                    UndoItem::MovedTask {
+                        index,
+                        task: task.clone(),
+                        title: title.clone(),
+                        from: from.clone(),
+                        to: to.clone(),
+                    },
+                )
+            }),
+        Change::TopicFromTasks {
+            project: p,
+            title,
+            slug,
+            summary,
+            tasks,
+            ..
+        } => {
+            let ids: Vec<String> = tasks.iter().map(|e| e.id.clone()).collect();
+            // Each entry must still be where the proposal saw it, checked in
+            // the same lock that moves them.
+            let guard = |t: &Task| {
+                tasks
+                    .iter()
+                    .any(|e| Some(&e.id) == t.id.as_ref() && e.from == t.location)
+            };
+            vault
+                .create_topic_from_tasks_if(
+                    p,
+                    NewTopic {
+                        title: title.clone(),
+                        summary: summary.clone(),
+                        ..Default::default()
+                    },
+                    &ids,
+                    Some(slug.as_str()),
+                    guard,
+                )
+                .and_then(|r| {
+                    r.ok_or_else(|| {
+                        montybrain_core::Error::InvalidInput(
+                            "wpis zmienił się w międzyczasie".into(),
+                        )
+                    })
+                })
+                .map(|made| {
+                    (
+                        format!(
+                            "Dodano temat „{}” z {} wpisami.",
+                            made.topic.title,
+                            made.tasks.len()
+                        ),
+                        UndoItem::TopicFromTasks {
+                            index,
+                            project: p.clone(),
+                            topic: made.topic.slug.clone(),
+                            title: made.topic.title.clone(),
+                            contents: made.contents,
+                            origins: made.origins,
+                        },
+                    )
+                })
+        }
         Change::NewTask { title, .. } => {
             let location = change.location(project);
             vault
@@ -491,6 +594,30 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
             Err(e) => failed(e),
         },
         UndoItem::Rejected { .. } => (UndoStatus::Changed, String::new()),
+        UndoItem::MovedTask { task, from, to, .. } => match vault.update_and_move_task_if(
+            task,
+            |t| t.location == *to,
+            TaskPatch::default(),
+            from,
+        ) {
+            Ok(Some(_)) => (UndoStatus::Undone, "Wpis wrócił na miejsce.".into()),
+            Ok(None) | Err(montybrain_core::Error::TaskNotFound(_)) => changed("Wpis"),
+            Err(e) => failed(e),
+        },
+        UndoItem::TopicFromTasks {
+            project: p,
+            topic,
+            contents,
+            origins,
+            ..
+        } => match vault.dissolve_topic_if(p, topic, contents, origins) {
+            Ok(Some(_)) => (
+                UndoStatus::Undone,
+                "Usunięto temat; wpisy wróciły do Skrzynki.".into(),
+            ),
+            Ok(None) | Err(montybrain_core::Error::TopicNotFound { .. }) => changed("Temat"),
+            Err(e) => failed(e),
+        },
         UndoItem::TopicLog {
             topic,
             entry,
@@ -873,6 +1000,79 @@ mod tests {
             at: at("2026-11-14T14:05"),
             items,
         }
+    }
+
+    #[test]
+    fn inbox_moves_and_topics_from_entries_apply_and_undo() {
+        let f = fixture();
+        let mk = |title: &str| {
+            f.vault
+                .create_task(
+                    &TaskLocation::Inbox,
+                    NewTask {
+                        title: title.into(),
+                        notes: "Notatka.".into(),
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+                .id
+                .unwrap()
+        };
+        let a = mk("Płytki");
+        let b = mk("Fuga");
+        let c = mk("Kartka");
+        let inbox = f.vault.root().join("skrzynka.md");
+        let json = format!(
+            r#"{{"changes":[
+  {{"kind":"move_task","task":"{c}","to":"beeking/platnosci","reason":"Płatności."}},
+  {{"kind":"topic_from_tasks","project":"dom","title":"Łazienka","tasks":["{a}","{b}"],"reason":"Remont."}}
+]}}"#
+        );
+        let answer = format!("Raport.\n```{}\n{json}\n```", proposal::FENCE_INFO);
+        let snap = f.vault.load().unwrap();
+        let parsed = proposal::parse(&answer, &snap, proposal::INBOX);
+        assert_eq!(parsed.changes.len(), 2, "{parsed:?}");
+        let mut p = StoredProposal::from_proposal(
+            parsed,
+            "r9",
+            ProviderId::Claude,
+            TriggerKind::Manual,
+            at("2026-11-14T14:00"),
+        );
+        let before = std::fs::read_to_string(&inbox).unwrap();
+        let (items, written) = apply(
+            &f.vault,
+            proposal::INBOX,
+            &mut p,
+            &[0, 1],
+            at("2026-11-14T14:05"),
+        );
+        assert!(
+            items.iter().all(|i| i.status == ApplyStatus::Applied),
+            "{items:?}"
+        );
+        let s = f.vault.load().unwrap();
+        assert_eq!(s.task(&c).unwrap().location.topic(), Some("platnosci"));
+        assert_eq!(s.task(&a).unwrap().location.topic(), Some("lazienka"));
+        assert_eq!(s.task(&a).unwrap().notes, "Notatka.");
+        let r = undo(&f.vault, proposal::INBOX, &record(written), Some(&mut p));
+        assert!(r.iter().all(|x| x.status == UndoStatus::Undone), "{r:#?}");
+        let s = f.vault.load().unwrap();
+        for id in [&a, &b, &c] {
+            assert_eq!(s.task(id).unwrap().location, TaskLocation::Inbox);
+        }
+        assert!(s.topic("dom", "lazienka").is_none());
+        // Same entries, possibly in a different order.
+        let mut x: Vec<_> = std::fs::read_to_string(&inbox)
+            .unwrap()
+            .lines()
+            .map(str::to_string)
+            .collect();
+        let mut y: Vec<_> = before.lines().map(str::to_string).collect();
+        x.sort();
+        y.sort();
+        assert_eq!(x, y);
     }
 
     #[test]

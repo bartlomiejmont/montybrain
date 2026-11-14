@@ -1,0 +1,233 @@
+/* Skrzynka: the command field, the selection bar, rows with one suggestion. */
+
+.ibx-field {
+  margin: 4px 0 14px;
+}
+
+.ibx-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: -4px 0 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-side);
+}
+
+.ibx-bar-count {
+  margin-right: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.ibx-bar kbd,
+.ibx-keys kbd {
+  margin-left: 4px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--text-3);
+  font: 10.5px/16px ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.ibx-agent {
+  margin: -4px 0 12px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.ibx-review {
+  margin: 0 0 16px;
+}
+
+.ibx-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.ibx-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  border-radius: var(--radius);
+  outline: none;
+}
+
+.ibx-row.active,
+.ibx-row:focus-visible {
+  background: var(--bg-hover);
+}
+
+.ibx-row.selected {
+  background: var(--bg-active);
+}
+
+.ibx-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 9px 0 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ibx-row:hover .ibx-check,
+.ibx-row.active .ibx-check,
+.ibx-row.selected .ibx-check,
+.ibx-check:focus-visible,
+.ibx-list:has(.ibx-row.selected) .ibx-check {
+  opacity: 1;
+}
+
+.ibx-row.selected .ibx-check {
+  border-color: var(--text-3);
+  background: var(--bg-raised);
+}
+
+.ibx-task {
+  flex: 1;
+  min-width: 0;
+}
+
+.ibx-sugg {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  height: 22px;
+  margin: 6px 6px 0 0;
+  padding: 0 7px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ibx-sugg:hover,
+.ibx-sugg:focus-visible,
+.ibx-row.active .ibx-sugg {
+  border-color: var(--line);
+  color: var(--text);
+  outline: none;
+}
+
+.ibx-sugg.muted {
+  visibility: hidden;
+  width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ibx-sugg.weak {
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.ibx-arrow {
+  color: var(--text-4);
+}
+
+.ibx-sugg-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ibx-keys {
+  margin: 18px 0 0;
+  color: var(--text-4);
+  font-size: 11.5px;
+}
+
+.view-sub code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--bg-field);
+  color: var(--text-2);
+  font: 11.5px ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.ibx-last {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: -6px 0 12px;
+  padding: 0 2px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.ibx-last-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ibx-last kbd {
+  margin-left: 4px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--text-3);
+  font: 10.5px/16px ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.ibx-last .cf-link {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* A Terminal session ("Moje narzędzia") whose answer is awaited. */
+.ibx-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+
+.ibx-terminal-text {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.ibx-paste {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ibx-paste-text {
+  min-height: 110px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg-field);
+  color: var(--text);
+  font: 12px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  resize: vertical;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ibx-paste-actions {
+  display: flex;
+  gap: 8px;
+}

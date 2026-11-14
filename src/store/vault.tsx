@@ -127,6 +127,11 @@ export function useVault(): VaultContextValue {
   return ctx;
 }
 
+/** The vault context when there is one (the quick-capture window has none). */
+export function useOptionalVault(): VaultContextValue | null {
+  return useContext(VaultContext);
+}
+
 /** The loaded view; only call below the loading gate in <App>. */
 export function useView(): AppView {
   const { view } = useVault();

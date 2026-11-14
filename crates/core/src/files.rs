@@ -128,7 +128,7 @@ fn duplicate_keys(fm: Option<&Frontmatter>, keys: &[&str], problems: &mut Proble
 
 /// Region holding the free text after the H1 (or after the frontmatter if there is
 /// no H1) up to the first `##` section.
-fn text_region(o: &Outline) -> std::ops::Range<usize> {
+pub(crate) fn text_region(o: &Outline) -> std::ops::Range<usize> {
     let start = o.h1.map_or(o.body_start, |h| h + 1);
     start..o.first_section_start().max(start)
 }

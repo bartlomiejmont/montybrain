@@ -23,6 +23,11 @@
   --danger: oklch(0.7 0.13 25);
   --focus: oklch(0.82 0.01 265);
   --accent: var(--text-2);
+  /* Matched letters in search and suggestion lists. */
+  --mark: oklch(0.84 0.13 85);
+  --bg-hover-strong: oklch(0.29 0.012 265);
+  --kind-topic: oklch(0.8 0.08 230);
+  --kind-task: oklch(0.8 0.08 150);
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --radius: 6px;
@@ -1946,13 +1951,16 @@ body.dragging-card * {
 }
 
 .pal-item {
-  padding: 6px 10px;
+  padding: 6px 10px 6px 8px;
+  border-left: 2px solid transparent;
   border-radius: 6px;
   color: var(--text-2);
 }
 
+/* The active result: filled and marked on the left, unmistakable. */
 .pal-item.active {
-  background: var(--bg-active);
+  border-left-color: var(--mark);
+  background: var(--bg-hover-strong);
   color: var(--text);
 }
 
@@ -2018,11 +2026,9 @@ body.dragging-card * {
 }
 
 .hl {
-  color: var(--text);
-  background: oklch(0.45 0.05 265 / 0.55);
-  border-radius: 2px;
-  padding: 0 1px;
-  margin: 0 -1px;
+  color: var(--mark);
+  background: transparent;
+  font-weight: 700;
 }
 
 .pal-none {

@@ -16,6 +16,7 @@ use montybrain_core::{
 use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
 use tauri_plugin_opener::OpenerExt;
 
+use crate::command_line;
 use crate::native::{self, SettingsView};
 use crate::paths::{checked_url, resolve_in_vault};
 use crate::runs::{ProviderInfo, Recipe, RunInfo, RunRequest, Runs, StartExtra};
@@ -166,6 +167,463 @@ pub async fn move_task<R: Runtime>(
 #[tauri::command]
 pub async fn delete_task<R: Runtime>(app: AppHandle<R>, id: String) -> CmdResult<Task> {
     mutate(app, move |v| v.delete_task(&id)).await
+}
+
+// --- the command field (src-tauri/src/command_line.rs) ------------------------
+
+/// The live reading of the field: plan, problems, choices, duplicate hint and
+/// the completions for the caret. Writes nothing.
+#[tauri::command]
+pub async fn command_preview<R: Runtime>(
+    app: AppHandle<R>,
+    input: command_line::FieldInput,
+) -> CmdResult<command_line::FieldPreview> {
+    blocking(move || {
+        let state = app.state::<VaultState>();
+        Ok(command_line::preview(
+            &state.snapshot(),
+            state.vault(),
+            &input,
+            local_today(),
+        ))
+    })
+    .await
+}
+
+/// Writes a previewed plan, only while the data it was based on is unchanged.
+#[tauri::command]
+pub async fn command_apply<R: Runtime>(
+    app: AppHandle<R>,
+    input: command_line::FieldInput,
+    plan: montybrain_core::command::Plan,
+) -> CmdResult<command_line::ApplyResult> {
+    blocking(move || {
+        let state = app.state::<VaultState>();
+        let undo = app.state::<command_line::CommandUndo>();
+        let r = command_line::apply(state.vault(), &undo, &input, &plan, local_today());
+        if matches!(r, command_line::ApplyResult::Written { .. })
+            && let Some(version) = state.reload()
+        {
+            emit_changed(&app, version, ChangeSource::Mutation, Vec::new());
+        }
+        Ok(r)
+    })
+    .await
+}
+
+/// Takes back a command write (`token`; else the newest one from `source`,
+/// e.g. `inbox` for `u` in Skrzynka).
+#[tauri::command]
+pub async fn command_undo<R: Runtime>(
+    app: AppHandle<R>,
+    token: Option<u64>,
+    source: Option<String>,
+) -> CmdResult<command_line::UndoReport> {
+    blocking(move || {
+        let state = app.state::<VaultState>();
+        let undo = app.state::<command_line::CommandUndo>();
+        let r = command_line::undo(state.vault(), &undo, token, source.as_deref())?;
+        if let Some(version) = state.reload() {
+            emit_changed(&app, version, ChangeSource::Mutation, Vec::new());
+        }
+        Ok(r)
+    })
+    .await
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Captured {
+    pub task: Task,
+    pub undo: Option<u64>,
+}
+
+/// A plain new task from a "dodaj zadanie" field (title, optional `!`/`@`).
+#[tauri::command]
+pub async fn capture_task<R: Runtime>(
+    app: AppHandle<R>,
+    location: TaskLocation,
+    text: String,
+) -> CmdResult<Captured> {
+    blocking(move || {
+        let state = app.state::<VaultState>();
+        let undo = app.state::<command_line::CommandUndo>();
+        let (task, token) =
+            command_line::capture(state.vault(), &undo, location, &text, local_today())?;
+        if let Some(version) = state.reload() {
+            emit_changed(&app, version, ChangeSource::Mutation, Vec::new());
+        }
+        Ok(Captured { task, undo: token })
+    })
+    .await
+}
+
+/// One local destination suggestion per open inbox entry (no model involved).
+#[tauri::command]
+pub async fn inbox_suggestions<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+) -> CmdResult<Vec<montybrain_core::command::InboxSuggestion>> {
+    main_window_only(&window)?;
+    blocking(move || {
+        let snap = app.state::<VaultState>().snapshot();
+        Ok(command_line::suggestions(&snap, local_today()))
+    })
+    .await
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct InboxAgentRequest {
+    /// The text after `?` (for `?rozpisz` / `?dopasuj` the verb's instruction).
+    #[serde(default)]
+    pub text: String,
+    /// Chosen entries; empty = every open inbox entry (batch only).
+    #[serde(default)]
+    pub selection: Vec<String>,
+    /// `command`: one entry, the answer is a command for the field;
+    /// `proposals`: ticked proposals in the review.
+    pub mode: String,
+    pub provider: String,
+    /// `montybrain` (default): in the background, MontyBrain read-only and
+    /// nothing else; `mine`: an interactive session in Terminal with the
+    /// user's own tools, MontyBrain read-only, the answer through a file
+    /// (always proposals).
+    #[serde(default)]
+    pub tools: Option<String>,
+}
+
+/// Runs the Skrzynka agent once, on request, with only the chosen entries and
+/// their top local candidates as data. It writes nothing.
+#[tauri::command]
+pub async fn inbox_agent<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    request: InboxAgentRequest,
+) -> CmdResult<RunInfo> {
+    main_window_only(&window)?;
+    blocking(move || {
+        let state = app.state::<VaultState>();
+        let snapshot = state.snapshot();
+        let mine = request.tools.as_deref() == Some("mine");
+        let single = request.mode == "command" && !mine;
+        if single && request.selection.len() != 1 {
+            return Err("Komendę od agenta można dostać dla jednego wpisu naraz.".into());
+        }
+        let data = command_line::agent_data(&snapshot, &request.selection, local_today())?;
+        let recipe = if single {
+            crate::runs::recipes::INBOX_COMMAND_RECIPE
+        } else {
+            crate::runs::recipes::INBOX_RECIPE
+        };
+        let run = RunRequest {
+            recipe: recipe.into(),
+            provider: request.provider.clone(),
+            mode: if mine { "terminal" } else { "background" }.into(),
+            params: [
+                ("text".to_string(), request.text.clone()),
+                ("dane".to_string(), data),
+            ]
+            .into_iter()
+            .collect(),
+        };
+        let provider = crate::runs::ProviderId::parse(&request.provider)?;
+        let extra = StartExtra {
+            base: Some(snapshot.clone()),
+            agent: crate::updates::agent_choice(&app, provider),
+            ..Default::default()
+        };
+        app.state::<Runs>()
+            .0
+            .start_with(&run, &snapshot.projects, state.vault().root(), extra)
+    })
+    .await
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InboxAgentAnswer {
+    /// The command to put into the field (to be previewed and confirmed).
+    pub command: Option<String>,
+    /// The agent's reason, or why there is no command.
+    pub note: String,
+}
+
+/// The command of a finished single-entry Skrzynka run.
+#[tauri::command]
+pub async fn inbox_agent_answer<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    run_id: String,
+) -> CmdResult<InboxAgentAnswer> {
+    main_window_only(&window)?;
+    blocking(move || {
+        let info = app
+            .state::<Runs>()
+            .0
+            .get(&run_id)
+            .ok_or("Nie ma takiego uruchomienia.")?;
+        if info.recipe != crate::runs::recipes::INBOX_COMMAND_RECIPE {
+            return Err("To nie jest odpowiedź dla wpisu ze Skrzynki.".into());
+        }
+        match info.status {
+            crate::runs::RunStatus::Succeeded => {}
+            crate::runs::RunStatus::Running => return Err("Agent jeszcze pracuje.".into()),
+            _ => {
+                return Err(info
+                    .error
+                    .unwrap_or_else(|| "Agent nie odpowiedział.".into()));
+            }
+        }
+        let answer = info.result.unwrap_or_default();
+        let (note, command) = crate::runs::proposal::command_block(
+            &answer,
+            crate::runs::recipes::INBOX_COMMAND_FENCE,
+        );
+        // Only a single line, and never another agent request.
+        let command = command.filter(|c| !c.starts_with('?') && !c.contains('\n'));
+        let note = if note.is_empty() && command.is_none() {
+            "Agent nie zaproponował komendy.".into()
+        } else {
+            note
+        };
+        Ok(InboxAgentAnswer { command, note })
+    })
+    .await
+}
+
+/// `inbox_agent_check` / `inbox_agent_paste` result.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InboxAgentCheck {
+    /// `waiting`: no answer file yet; `received`: the proposal is in the review.
+    pub status: String,
+    /// How many changes the answer proposes (`received`).
+    pub count: usize,
+}
+
+/// The Terminal Skrzynka run `run_id`, if it is one.
+fn terminal_inbox_run<R: Runtime>(app: &AppHandle<R>, run_id: &str) -> Result<RunInfo, String> {
+    let info = app
+        .state::<Runs>()
+        .0
+        .get(run_id)
+        .ok_or("Nie ma takiej sesji agenta.")?;
+    if info.recipe != crate::runs::recipes::INBOX_RECIPE
+        || info.mode != crate::runs::RunMode::Terminal
+    {
+        return Err("To nie jest sesja agenta Skrzynki w Terminalu.".into());
+    }
+    Ok(info)
+}
+
+/// Whether the Terminal Skrzynka session `run_id` wrote its answer file;
+/// if so it becomes the Skrzynka's proposal (to tick) and the file is removed.
+#[tauri::command]
+pub async fn inbox_agent_check<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    run_id: String,
+) -> CmdResult<InboxAgentCheck> {
+    main_window_only(&window)?;
+    blocking(move || {
+        let info = terminal_inbox_run(&app, &run_id)?;
+        let path = app.state::<Runs>().0.answer_path(&run_id);
+        let Ok(meta) = std::fs::symlink_metadata(&path) else {
+            return Ok(InboxAgentCheck {
+                status: "waiting".into(),
+                count: 0,
+            });
+        };
+        if !meta.is_file() || meta.len() > 512 * 1024 {
+            let _ = std::fs::remove_file(&path);
+            return Err(
+                "Plik odpowiedzi agenta jest nieprawidłowy (za duży albo nie jest plikiem).".into(),
+            );
+        }
+        let text = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Nie udało się odczytać odpowiedzi agenta: {e}"))?;
+        // The agent may still be writing it: an answer without its block waits.
+        if !text.contains(crate::runs::proposal::FENCE_INFO) {
+            return Ok(InboxAgentCheck {
+                status: "waiting".into(),
+                count: 0,
+            });
+        }
+        let r = crate::updates::inbox_answer(&app, &run_id, info.provider, &text);
+        let _ = std::fs::remove_file(&path);
+        let count = r?;
+        Ok(InboxAgentCheck {
+            status: "received".into(),
+            count,
+        })
+    })
+    .await
+}
+
+/// The answer of a Terminal Skrzynka session pasted by the user (when the
+/// agent could not write the file): it becomes the Skrzynka's proposal.
+#[tauri::command]
+pub async fn inbox_agent_paste<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    run_id: String,
+    text: String,
+) -> CmdResult<InboxAgentCheck> {
+    main_window_only(&window)?;
+    blocking(move || {
+        if text.len() > 512 * 1024 {
+            return Err("Wklejona odpowiedź jest za długa.".into());
+        }
+        let info = terminal_inbox_run(&app, &run_id)?;
+        let count = crate::updates::inbox_answer(&app, &run_id, info.provider, &text)?;
+        let _ = std::fs::remove_file(app.state::<Runs>().0.answer_path(&run_id));
+        Ok(InboxAgentCheck {
+            status: "received".into(),
+            count,
+        })
+    })
+    .await
+}
+
+/// `agent_session_start`: what the in-app session is about.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SessionRequest {
+    /// `inbox` (Skrzynka) or `project` ("Zlecenie" of `project`).
+    pub scope: String,
+    #[serde(default)]
+    pub project: Option<String>,
+    pub provider: String,
+    pub text: String,
+    /// Skrzynka: the chosen entries (empty: every open entry).
+    #[serde(default)]
+    pub selection: Vec<String>,
+}
+
+fn sessions<R: Runtime>(app: &AppHandle<R>) -> std::sync::Arc<crate::runs::session::Sessions> {
+    app.state::<crate::runs::AgentSessions>().0.clone()
+}
+
+/// Starts the in-app agent session ("Moje narzędzia" inside the app).
+#[tauri::command]
+pub async fn agent_session_start<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    request: SessionRequest,
+) -> CmdResult<crate::runs::session::SessionView> {
+    main_window_only(&window)?;
+    blocking(move || {
+        use crate::runs::recipes::{MAX_TEXT_CHARS, session_prompt_inbox, session_prompt_request};
+        use crate::runs::session::Scope;
+        let text = request.text.trim().to_string();
+        if text.chars().count() > MAX_TEXT_CHARS {
+            return Err("Prośba jest za długa.".into());
+        }
+        let provider = crate::runs::ProviderId::parse(&request.provider)?;
+        let state = app.state::<VaultState>();
+        let snapshot = state.snapshot();
+        let (scope, prompt) = match request.scope.as_str() {
+            "inbox" => {
+                let data = command_line::agent_data(&snapshot, &request.selection, local_today())?;
+                (Scope::Inbox, session_prompt_inbox(&text, &data))
+            }
+            "project" => {
+                let slug = request.project.clone().unwrap_or_default();
+                if snapshot.project(&slug).is_none() {
+                    return Err("Nie ma takiego projektu.".into());
+                }
+                if text.is_empty() {
+                    return Err("Wpisz zlecenie.".into());
+                }
+                (
+                    Scope::Project {
+                        project: slug.clone(),
+                    },
+                    session_prompt_request(&slug, &text),
+                )
+            }
+            other => return Err(format!("Nieznany zakres sesji: {other}")),
+        };
+        let shown = if text.is_empty() {
+            "Porządek w Skrzynce".to_string()
+        } else {
+            text.clone()
+        };
+        let launch = app.state::<Runs>().0.session_launch(
+            provider,
+            scope,
+            &shown,
+            prompt,
+            &snapshot.projects,
+            state.vault().root(),
+            &crate::updates::agent_choice(&app, provider),
+        )?;
+        sessions(&app).start(launch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn agent_session_get<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+) -> CmdResult<Option<crate::runs::session::SessionView>> {
+    main_window_only(&window)?;
+    Ok(sessions(&app).view())
+}
+
+#[tauri::command]
+pub async fn agent_session_send<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    text: String,
+) -> CmdResult<()> {
+    main_window_only(&window)?;
+    blocking(move || sessions(&app).send(&text)).await
+}
+
+/// The answer to a card: `allow`, `allow_session` or `deny`; `answers` for
+/// a question card (`{question id: chosen label}`).
+#[tauri::command]
+pub async fn agent_session_answer<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+    entry: u64,
+    answer: crate::runs::session::Answer,
+    answers: Option<serde_json::Value>,
+) -> CmdResult<()> {
+    main_window_only(&window)?;
+    blocking(move || {
+        let list = answers
+            .as_ref()
+            .map(crate::runs::session::parse_answers)
+            .unwrap_or_default();
+        sessions(&app).answer(entry, answer, list)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn agent_session_interrupt<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+) -> CmdResult<()> {
+    main_window_only(&window)?;
+    blocking(move || sessions(&app).interrupt()).await
+}
+
+#[tauri::command]
+pub async fn agent_session_stop<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+) -> CmdResult<()> {
+    main_window_only(&window)?;
+    blocking(move || sessions(&app).stop()).await
+}
+
+#[tauri::command]
+pub async fn agent_session_close<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+) -> CmdResult<()> {
+    main_window_only(&window)?;
+    blocking(move || sessions(&app).close()).await
 }
 
 // --- OS integration ---------------------------------------------------------

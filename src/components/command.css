@@ -1,0 +1,646 @@
+/* The command field (Skrzynka, quick capture, ⌘K): input, live reading,
+   choices, plan, echo. Same calm palette as the rest of the app. */
+
+.cf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cf-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row);
+  padding: 0 8px 0 7px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-field);
+}
+
+.cf-row:focus-within {
+  border-color: var(--text-4);
+}
+
+.cf.confirming .cf-row {
+  border-color: var(--text-3);
+}
+
+.cf-lead {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-4);
+  font-size: 15px;
+  line-height: 1;
+  flex: none;
+}
+
+.cf-row:focus-within .cf-lead {
+  color: var(--text-2);
+}
+
+.cf-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.cf-input::placeholder {
+  color: var(--text-4);
+}
+
+.cf-complete {
+  max-height: 260px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  transition: opacity 120ms var(--ease);
+}
+
+/* The list of older text, while the new one is on its way: dimmed, inert. */
+.cf-complete.stale,
+.cf-warnings.stale,
+.cf-similar.stale {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.cf-opt {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px 5px 6px;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* The highlighted row: filled and marked on the left, unmistakable. */
+.cf-opt.active {
+  border-left-color: var(--mark);
+  background: var(--bg-hover-strong);
+}
+
+.cf-opt.active .cf-opt-label {
+  font-weight: 560;
+}
+
+.cf-mark {
+  padding: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--mark);
+  font-weight: 700;
+}
+
+.cf-kind {
+  flex: none;
+  align-self: center;
+  min-width: 52px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  color: var(--text-2);
+  font-size: 10.5px;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.cf-kind.kind-topic {
+  color: var(--kind-topic);
+}
+
+.cf-kind.kind-task {
+  color: var(--kind-task);
+}
+
+.cf-kind.kind-typo {
+  color: var(--danger);
+}
+
+.cf-opt-label {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.cf-opt-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cf-under {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* One line, always present, never changes height while typing. */
+.cf-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  height: 18px;
+  margin: 0;
+  padding: 0 2px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 18px;
+  transition: opacity 120ms var(--ease);
+}
+
+.cf-reading-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cf-reading.idle .cf-reading-text,
+.cf-reading.state-typing .cf-reading-text {
+  color: var(--text-3);
+}
+
+.cf-reading.stale {
+  opacity: 0.6;
+}
+
+/* After Enter: what went wrong, in full (only then the line may wrap). */
+.cf-reading.state-message {
+  height: auto;
+  min-height: 18px;
+}
+
+.cf-reading.state-message .cf-reading-text {
+  color: var(--danger);
+  white-space: normal;
+}
+
+/* Under the reading: the list, warnings, the duplicate hint. In Skrzynka it
+   floats over the entries, so they never move while typing. */
+.cf-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cf-panel.floating {
+  position: absolute;
+  z-index: 30;
+  top: 24px;
+  left: 0;
+  right: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.cf-panel.floating .cf-complete {
+  /* Fits a 480 px tall window. */
+  max-height: min(300px, calc(100vh - 260px));
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.cf-reading.state-invalid .cf-reading-text {
+  color: var(--danger);
+}
+
+.cf-reading.state-agent .cf-reading-text {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.cf-hint {
+  flex: none;
+  color: var(--text-4);
+  font-size: 11.5px;
+}
+
+.cf-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.cf-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cf-choice:hover,
+.cf-choice:focus-visible {
+  background: var(--bg-active);
+  outline: none;
+}
+
+.cf-choice-slug {
+  color: var(--text-3);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+.cf-tag {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  color: var(--text-2);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+.cf-problems,
+.cf-warnings {
+  margin: 0;
+  padding: 0 2px 0 18px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cf-problems {
+  color: var(--danger);
+}
+
+.cf-similar {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cf-ref {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.cf-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--text-4);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.cf-link:hover {
+  text-decoration-color: var(--text-2);
+}
+
+.cf-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-side);
+}
+
+.cf-step {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cf-step-summary {
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.cf-file,
+.cf-file-inline {
+  margin: 0;
+  color: var(--text-3);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+.cf-lines {
+  margin: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.cf-lines.muted {
+  color: var(--text-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-4);
+}
+
+.cf-more {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cf-msg {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.cf-note {
+  padding: 6px 10px;
+  border-left: 2px solid var(--text-4);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.cf-echo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  animation: cf-echo-in 180ms var(--ease);
+}
+
+.cf-echo-head {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+@keyframes cf-echo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-echo {
+    animation: none;
+  }
+}
+
+/* Quick-capture window: no frame of its own, the window is the frame. */
+.cf-quick .cf-row {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.cf-quick .cf-input {
+  height: 40px;
+  font-size: 15px;
+}
+
+.cf-quick .cf-plan {
+  padding: 8px 10px;
+}
+
+/* ⌘K: the field takes the palette input's place. */
+.cf-palette .cf-row {
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  padding: 0 14px;
+  min-height: 46px;
+}
+
+.cf-palette .cf-input {
+  height: 44px;
+  font-size: 14px;
+}
+
+.cf-palette > :not(.cf-row) {
+  margin: 0 14px;
+}
+
+.cf-palette > :last-child {
+  margin-bottom: 12px;
+}
+
+.cf-echo-undo {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+.cf-opt-hint {
+  padding: 4px 8px 2px;
+  color: var(--text-4);
+  font-size: 11px;
+}
+
+.cf-partial {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+}
+
+.cf-partial-head {
+  margin: 0;
+  color: var(--text);
+}
+
+.cf-partial-list {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  color: var(--text-2);
+}
+
+.cf-partial-list.left {
+  color: var(--text-3);
+}
+
+.cf-partial-foot {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cf-undo-state {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.cf-partial .cf-link,
+.cf-undo-state .cf-link {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+/* Komenda | Agent: at the end of the field's row, in both modes. */
+.mode-switch {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  background: var(--bg);
+}
+
+.mode-opt,
+.ag-seg-opt {
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 3px;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mode-opt:hover,
+.ag-seg-opt:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.mode-opt.on,
+.ag-seg-opt.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.ag-seg-opt:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ag-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 0 2px;
+}
+
+.ag-opts-label {
+  color: var(--text-4);
+  font-size: 11.5px;
+}
+
+.ag-seg {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+}
+
+.ag-send {
+  height: 26px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ag-term {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.ag-term + .ag-send {
+  margin-left: 0;
+}
+
+.ag-send:hover:not(:disabled) {
+  background: var(--bg-active);
+}
+
+.ag-send:disabled {
+  color: var(--text-4);
+  cursor: default;
+}
+
+.ag-reach {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ag-cannot {
+  color: var(--text-2);
+}
+
+.ag-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  font-size: 12.5px;
+}
+
+.ag-consent p {
+  margin: 0;
+  color: var(--text);
+}
+
+.ag-consent-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ag-consent-actions .ag-send {
+  margin-left: 0;
+}

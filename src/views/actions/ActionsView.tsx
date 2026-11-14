@@ -5,6 +5,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { api, mockQuery, type ProviderId, type ProviderInfo, type Recipe, type RecipeParam, type RunMode } from "../../api";
 import { Button } from "../../components/ui";
+import { STATUS_LABEL as SESSION_STATUS, providerName } from "../../lib/session";
+import { sessionStore, useSession } from "../../store/session";
+import "../../components/session.css";
 import {
   MODE_LABEL,
   STATUS_LABEL,
@@ -254,6 +257,24 @@ function RecipeForm({ recipe, providers, runningBackground }: { recipe: Recipe; 
   );
 }
 
+/** The in-app agent session ("moje narzędzia"), while there is one: opens its panel. */
+function SessionRow() {
+  const { view } = useSession();
+  if (!view) return null;
+  return (
+    <div className="act-session" role="group" aria-label="Sesja agenta">
+      <span className={`ags-dot st-${view.status}`} aria-hidden />
+      <span className="act-session-text">
+        <span className="act-session-label">Sesja agenta · {providerName(view.provider)}</span> {view.request}
+      </span>
+      <span className="act-session-status">{SESSION_STATUS[view.status]}</span>
+      <button type="button" className="btn btn-quiet" onClick={() => sessionStore.open()}>
+        Otwórz
+      </button>
+    </div>
+  );
+}
+
 export function ActionsView() {
   const runs = useRuns();
   const [cat, setCat] = useState(catalog);
@@ -288,6 +309,8 @@ export function ActionsView() {
         <h1 className="view-title">Akcje</h1>
         <p className="view-sub">Gotowe przepisy dla agenta. Uruchom w tle albo w terminalu, na wybranej subskrypcji.</p>
       </header>
+
+      <SessionRow />
 
       {loadError && !cat && (
         <div className="empty compact">

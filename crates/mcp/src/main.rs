@@ -2,6 +2,7 @@
 //!
 //! stdout is the protocol channel; all logging goes to stderr.
 
+mod commands;
 mod render;
 mod resolve;
 mod server;

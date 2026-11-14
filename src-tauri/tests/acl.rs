@@ -27,6 +27,17 @@ fn app() -> App<MockRuntime> {
             commands::set_auto_update,
             commands::set_update_sources,
             commands::quick_resize,
+            commands::inbox_suggestions,
+            commands::inbox_agent,
+            commands::inbox_agent_answer,
+            commands::inbox_agent_check,
+            commands::inbox_agent_paste,
+            commands::agent_session_start,
+            commands::agent_session_get,
+            commands::agent_session_send,
+            commands::agent_session_answer,
+            commands::agent_session_stop,
+            commands::command_preview,
         ])
         .build(tauri::generate_context!(test = true))
         .expect("mock app")
@@ -109,6 +120,28 @@ fn run_commands_are_main_window_only() {
             "set_auto_update",
             serde_json::json!({"project": "p", "config": {"schedule": {"kind": "every", "hours": 1}}}),
         ),
+        ("inbox_suggestions", serde_json::json!({})),
+        (
+            "inbox_agent",
+            serde_json::json!({"request": {"text": "", "selection": [], "mode": "proposals", "provider": "claude"}}),
+        ),
+        ("inbox_agent_answer", serde_json::json!({"runId": "r1"})),
+        ("inbox_agent_check", serde_json::json!({"runId": "r1"})),
+        (
+            "inbox_agent_paste",
+            serde_json::json!({"runId": "r1", "text": "x"}),
+        ),
+        (
+            "agent_session_start",
+            serde_json::json!({"request": {"scope": "inbox", "provider": "claude", "text": "x"}}),
+        ),
+        ("agent_session_get", serde_json::json!({})),
+        ("agent_session_send", serde_json::json!({"text": "x"})),
+        (
+            "agent_session_answer",
+            serde_json::json!({"entry": 1, "answer": "allow"}),
+        ),
+        ("agent_session_stop", serde_json::json!({})),
     ] {
         let e = invoke(&app, "quick", cmd, body).expect_err("quick must be refused");
         let msg = e.to_string();
@@ -129,4 +162,14 @@ fn run_commands_are_main_window_only() {
         serde_json::json!({"height": 100.0}),
     )
     .expect("quick keeps quick_resize");
+    // The command field works in the quick window (the ACL lets it through;
+    // without a vault in this mock app the command itself then fails).
+    if let Err(e) = invoke(
+        &app,
+        "quick",
+        "command_preview",
+        serde_json::json!({"input": {"text": "x"}}),
+    ) {
+        assert!(!e.to_string().contains("not allowed"), "{e}");
+    }
 }

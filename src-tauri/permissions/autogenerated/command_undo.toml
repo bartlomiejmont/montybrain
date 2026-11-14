@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-command-undo"
+description = "Enables the command_undo command without any pre-configured scope."
+commands.allow = ["command_undo"]
+
+[[permission]]
+identifier = "deny-command-undo"
+description = "Denies the command_undo command without any pre-configured scope."
+commands.deny = ["command_undo"]

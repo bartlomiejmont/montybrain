@@ -1,6 +1,19 @@
 // The one typed surface every view uses to talk to the backend.
 
 import type {
+  Captured,
+  CommandApplyResult,
+  CommandPlan,
+  CommandUndoReport,
+  FieldInput,
+  FieldPreview,
+  InboxAgentAnswer,
+  InboxAgentCheck,
+  SessionAnswer,
+  SessionStartRequest,
+  SessionView,
+  InboxAgentRequest,
+  InboxSuggestion,
   ApplyReport,
   AppSettings,
   AutoUpdate,
@@ -57,6 +70,43 @@ export interface MontyBrainApi {
   updateTask(id: string, patch: TaskPatch): Promise<Task>;
   moveTask(id: string, to: TaskLocation): Promise<Task>;
   deleteTask(id: string): Promise<Task>;
+
+  // --- the command field (Skrzynka, quick capture, ⌘K) ---
+  /** The live reading: plan, problems, choices, duplicate hint, completions. Writes nothing. */
+  commandPreview(input: FieldInput): Promise<FieldPreview>;
+  /** Writes a previewed plan, only while the data it was based on is unchanged. */
+  commandApply(input: FieldInput, plan: CommandPlan): Promise<CommandApplyResult>;
+  /** Takes back a command write (`token`, else the newest one from `source`, e.g. `inbox`). */
+  commandUndo(token: number | null, source: string | null): Promise<CommandUndoReport>;
+  /** A plain new task from a "dodaj zadanie" field (title with optional `!`/`@`). */
+  captureTask(location: TaskLocation, text: string): Promise<Captured>;
+  /** One local destination suggestion per open inbox entry. */
+  inboxSuggestions(): Promise<InboxSuggestion[]>;
+  /** Runs the Skrzynka agent once with the chosen entries (writes nothing). */
+  inboxAgent(request: InboxAgentRequest): Promise<RunInfo>;
+  /** The command of a finished single-entry Skrzynka run. */
+  inboxAgentAnswer(runId: string): Promise<InboxAgentAnswer>;
+  /** Whether the Terminal Skrzynka session wrote its answer; if so it becomes the proposal to tick. */
+  inboxAgentCheck(runId: string): Promise<InboxAgentCheck>;
+  /** The answer of a Terminal Skrzynka session, pasted by the user. */
+  inboxAgentPaste(runId: string, text: string): Promise<InboxAgentCheck>;
+
+  /** Starts the in-app agent session ("Moje narzędzia"): one at a time. */
+  agentSessionStart(request: SessionStartRequest): Promise<SessionView>;
+  /** The live (or last ended) session. */
+  agentSessionGet(): Promise<SessionView | null>;
+  /** A follow-up message to the agent. */
+  agentSessionSend(text: string): Promise<void>;
+  /** The answer to a permission card (or a question card with `answers`). */
+  agentSessionAnswer(entry: number, answer: SessionAnswer, answers?: Record<string, string>): Promise<void>;
+  /** Stops the current turn; the session stays. */
+  agentSessionInterrupt(): Promise<void>;
+  /** Ends the session (the process is killed). */
+  agentSessionStop(): Promise<void>;
+  /** Forgets an ended session. */
+  agentSessionClose(): Promise<void>;
+  /** The session changed (the whole view). */
+  onAgentSession(cb: (v: SessionView) => void): Promise<() => void>;
 
   openUrl(url: string): Promise<void>;
   /** Reveal a vault file (path relative to the vault root) in Finder. */
@@ -141,6 +191,8 @@ export const SETTINGS_CHANGED_EVENT = "settings-changed";
 export const QUICK_SHOW_EVENT = "quick-show";
 /** src-tauri `run-event`. */
 export const RUN_EVENT_EVENT = "run-event";
+/** src-tauri runs::session::SESSION_UPDATED */
+export const AGENT_SESSION_EVENT = "agent-session";
 /** src-tauri `run-updated`. */
 export const RUN_UPDATED_EVENT = "run-updated";
 /** src-tauri/src/updates `UPDATES_CHANGED`. */

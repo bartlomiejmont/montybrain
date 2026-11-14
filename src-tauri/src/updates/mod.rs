@@ -478,12 +478,19 @@ pub fn undo_changes<R: Runtime>(
 
 /// Called by the run sink when a background run ended.
 pub fn run_finished<R: Runtime>(app: &AppHandle<R>, info: &RunInfo, ctx: &RunContext) {
-    if !(info.recipe == RECIPE || info.recipe == REQUEST_RECIPE) || info.mode != RunMode::Background
+    let inbox = info.recipe == crate::runs::recipes::INBOX_RECIPE;
+    if !(info.recipe == RECIPE || info.recipe == REQUEST_RECIPE || inbox)
+        || info.mode != RunMode::Background
     {
         return;
     }
-    let Some(project) = ctx.project.clone() else {
-        return;
+    let project = if inbox {
+        proposal::INBOX.to_string()
+    } else {
+        let Some(project) = ctx.project.clone() else {
+            return;
+        };
+        project
     };
     let Some(updates) = app.try_state::<Updates>() else {
         return;
@@ -571,6 +578,73 @@ pub fn run_finished<R: Runtime>(app: &AppHandle<R>, info: &RunInfo, ctx: &RunCon
     if let Some((title, body)) = note {
         notify(app, &title, &body);
     }
+}
+
+/// The answer of a Terminal Skrzynka session ("Moje narzędzia"): the file it
+/// wrote or the text the user pasted, parsed like a background answer and kept
+/// as the Skrzynka's proposal (to tick, as usual). Nothing is written to the
+/// vault here. Returns how many changes it proposes; an answer without a
+/// usable block is an error and leaves the current proposal alone.
+pub fn inbox_answer<R: Runtime>(
+    app: &AppHandle<R>,
+    run_id: &str,
+    provider: crate::runs::ProviderId,
+    answer: &str,
+) -> Result<usize, String> {
+    agent_answer(
+        app,
+        proposal::INBOX,
+        run_id,
+        provider,
+        answer,
+        "Skrzynka: sesja w Terminalu",
+    )
+}
+
+/// An agent's answer from outside the background runner (a Terminal session,
+/// an in-app session, pasted text) as the proposal of `project` (the inbox
+/// key or a project slug), labelled with `request`.
+pub fn agent_answer<R: Runtime>(
+    app: &AppHandle<R>,
+    project: &str,
+    run_id: &str,
+    provider: crate::runs::ProviderId,
+    answer: &str,
+    request: &str,
+) -> Result<usize, String> {
+    let updates = app
+        .try_state::<Updates>()
+        .ok_or("Propozycje są jeszcze niedostępne.")?;
+    let now = local_now();
+    let current = app.state::<VaultState>().snapshot();
+    if project != proposal::INBOX && current.project(project).is_none() {
+        return Err("Nie ma już takiego projektu.".into());
+    }
+    let parsed = proposal::parse(answer, &current, project);
+    if let Some(problem) = &parsed.problem {
+        return Err(format!(
+            "W odpowiedzi agenta nie ma propozycji do wczytania: {problem}"
+        ));
+    }
+    let n = parsed.changes.len();
+    let finished = Finished {
+        run_id,
+        provider,
+        trigger: TriggerKind::Manual,
+        started_at: now,
+        now,
+        fingerprint: None,
+        history_note: None,
+        request: Some(request.to_string()),
+    };
+    {
+        let mut st = crate::lock(&updates.store);
+        let p = st.project(project);
+        store::record_finished(p, &finished, RunEnd::Parsed(parsed));
+        updates.save(&st);
+    }
+    emit_changed(app);
+    Ok(n)
 }
 
 /// `apply_update` result.

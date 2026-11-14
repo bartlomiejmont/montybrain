@@ -1,3 +1,4 @@
+import { SessionIndicator } from "./AgentSession";
 import { ChevronRight, Columns3, Inbox, Network, Play, Settings2, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -146,6 +147,7 @@ export function Sidebar({ route }: { route: Route }) {
       </div>
       <div className="nav-settings"><NavItem href="#/ustawienia" active={route.view === "settings"} icon={<Settings2 size={14} />} label="Ustawienia" /></div>
       <div className="sidebar-foot">
+        <SessionIndicator />
         <WarningsIndicator />
       </div>
     </nav>

@@ -27,6 +27,9 @@ Sprawdzić fakturę > whenubuy                zadanie na poziomie projektu
 ^a1b2c3 /czeka ^c3d4e5                      dopisuje linię „Czeka na: …”
 [[whenubuy/checkout]] /czeka [[firma/krs]]  to samo dla tematu (linia w opisie stanu)
 ^a1b2c3 /powiaz [[whenubuy/platnosci]]      dopisuje linię „Powiązane: …”
+^a1b2c3 /czeka odpis z sądu                 to samo, zadanie albo temat wskazany nazwą
+umowa z dostawcą /powiaz płatności          podmiot i odwołanie nazwą (bez ` > `)
+[ ] Umowa z dostawcą /powiaz ^a1b2c3        `[ ]` na początku: zawsze nowe zadanie
 ?rozpisz ^a1b2c3                            prośba do agenta
 ?dopasuj                                    agent proponuje miejsca dla zaznaczonych albo całej Skrzynki
 ```
@@ -37,7 +40,9 @@ Reguły:
 - ` > ` i komendy z ukośnikiem są tylko wejściem; do plików nie trafiają.
 - Daty względne (`@dzis`, `@jutro`, `@pojutrze`, `@pn`…`@nd`, `@+3d`, `@+2t`) są zapisywane jako zwykła data. `@` przed czymś, co nie jest datą, zostaje w tytule.
 - Po ` > `: dokładny slug wygrywa; potem dopasowanie bez wielkości liter i polskich znaków do slugów i nazw. Słowo pasujące i do projektu, i do tematu oznacza projekt. Dwa trafienia albo brak trafienia: nic nie jest zapisywane, lista wyboru. Literówka o jeden znak od dokładnie jednej nazwy jest proponowana z etykietą „literówka”.
-- Komendy: `/temat`, `/czeka`, `/powiaz`. Prośby do agenta zaczynają się od `?`.
+- Komendy: `/temat`, `/czeka`, `/powiaz`. Prośby do agenta zaczynają się od `?` (w Skrzynce to też skrót przełącznika Komenda | Agent).
+- Po `/czeka` i `/powiaz` zadanie albo temat można wskazać zwykłymi słowami zamiast `^id` / `[[…]]`; tak samo słowa na początku linii z `/czeka` albo `/powiaz` (bez ` > `) wskazują, co zmienić. Szukanie w otwartych zadaniach (tytuł) i otwartych tematach aktywnych projektów (tytuł, slug), bez wielkości liter i polskich znaków; nazwa projektu może zawęzić, słowo od czterech liter może mieć jedną literówkę. Jedno trafienie: przyjęte (literówka do potwierdzenia, MCP jej nie zapisze); kilka: nic się nie zapisuje, lista do wyboru z rodzajem i miejscem; podmiot bez trafienia: nowe zadanie (podgląd to mówi). W Skrzynce `/czeka …` bez podmiotu dotyczy zaznaczonych wpisów, a gdy nic nie jest zaznaczone, wpisu podświetlonego na liście.
+- Słowo w trakcie pisania (`/`, `/cz`, `^`, ` > ` bez niczego dalej, nazwa jeszcze bez jednego trafienia) daje neutralną podpowiedź, nie błąd.
 - Nie ma usuwania i nie da się tą drogą założyć projektu.
 
 ## Potwierdzanie
@@ -49,12 +54,14 @@ Reguły:
 ## Skrzynka
 
 - Jedno pole u góry; lista wpisów; przy każdym jedna lokalna podpowiedź miejsca albo „?”, gdy dopasowanie jest słabe.
-- Klawiatura: strzałki albo `j`/`k`, Enter przyjmuje podpowiedź (z potwierdzeniem), `>` otwiera wybór miejsca, `t` robi temat, spacja zaznacza, `u` cofa.
+- Klawiatura: strzałki albo `j`/`k`, Enter przyjmuje podpowiedź (z potwierdzeniem), `>` otwiera wybór miejsca, `t` robi temat, `/` zaczyna komendę dla wpisu, spacja zaznacza, `u` cofa.
+- Listy pod polem (miejsca po ` > `, komendy po `/`, zadania i tematy po nazwie, literówka, wybór przy niejednoznaczności, projekt dla `/temat`) działają tak samo: ↑/↓ wybór, Enter albo Tab wstawia, Esc najpierw zamyka listę, potem cofa; mysz podświetla to samo co klawiatura. Dopasowane litery są wyróżnione.
+- Przełącznik Komenda | Agent przy polu (⌘J). Agent dostaje wybrane wpisy i MontyBrain tylko do odczytu („Tylko MontyBrain”, w tle) albo, na jedną prośbę i po zgodzie, sesję z własnymi narzędziami użytkownika („Moje narzędzia”: Slack, poczta, sterowanie komputerem, jeśli są skonfigurowane). Ta sesja działa w aplikacji: panel z rozmową, wywołaniami narzędzi i prośbami o zgodę (Zezwól / Zezwól na tę sesję / Odmów), wiadomości w trakcie, Przerwij i Zakończ; zapis w MontyBrain i edycja jego plików są odrzucane bez pytania, a blok `montybrain-zmiany` z odpowiedzi staje się propozycjami do zaznaczenia. Sesja w Terminalu zostaje jako druga możliwość (odpowiedź wraca przez plik albo wklejenie). To samo („z moimi narzędziami”) jest przy zleceniu w widoku projektu.
 - Zaznaczenie kilku wpisów i linia `> cel` przenosi wszystkie; `/temat Nazwa > projekt` robi z nich jeden temat z tymi zadaniami, z zachowaniem identyfikatorów i notatek.
 
 ## MCP
 
-- `command { text, apply }`: domyślnie podgląd (plan i linie Markdown, które zostałyby zapisane); zapis dopiero z `apply: true`. Błąd zaczyna się od „Nothing was changed:” i przy niejednoznaczności wymienia możliwe slugi. Prośby z `?` są odrzucane: serwer MCP nie woła modelu.
+- `command { text, apply }`: domyślnie podgląd (plan i linie Markdown, które zostałyby zapisane); zapis dopiero z `apply: true`. Błąd zaczyna się od „Nothing was changed:” i przy niejednoznaczności wymienia możliwe slugi albo `^id` (także dla zadań i tematów wskazanych słowami). Prośby z `?` są odrzucane: serwer MCP nie woła modelu.
 - `connections { ref }`: połączenia w obie strony i łańcuch „czeka na”, czytane tak jak na mapie.
 - `create_task`, `update_task`, `create_topic`: pola `waits_for` i `related`, które dopisują po jednej linii.
 - Instrukcje serwera uczą składni na trzech przykładach.

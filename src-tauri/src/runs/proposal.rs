@@ -39,6 +39,11 @@ use serde_json::{Map, Value};
 pub const FENCE_INFO: &str = "montybrain-zmiany";
 /// The pre-rename info string, still accepted (prompts ask for [`FENCE_INFO`]).
 pub const LEGACY_FENCE_INFO: &str = "morwisko-zmiany";
+/// The proposals of the Skrzynka agent are stored under this "project" key:
+/// their changes are about inbox entries and may point at any project.
+pub const INBOX: &str = "";
+/// Entries in one "topic from entries" change.
+pub const MAX_TOPIC_ENTRIES: usize = 20;
 /// Changes per proposal; further items are dropped.
 pub const MAX_CHANGES: usize = 20;
 /// A larger block is not parsed at all.
@@ -49,7 +54,7 @@ pub const MAX_NEW_TOPICS: usize = 8;
 pub const MAX_TOPIC_TASKS: usize = 6;
 /// New tasks outside any topic per proposal.
 pub const MAX_LOOSE_TASKS: usize = 3;
-pub const MAX_REASON_CHARS: usize = 300;
+pub const MAX_REASON_CHARS: usize = 600;
 pub const MAX_TITLE_CHARS: usize = 200;
 pub const MAX_LOG_CHARS: usize = 2_000;
 pub const MAX_SUMMARY_CHARS: usize = 1_500;
@@ -113,6 +118,37 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         branches: Vec<BranchRef>,
     },
+    /// Skrzynka: move an inbox entry (id, links and notes kept).
+    MoveTask {
+        task: String,
+        title: String,
+        /// Where it was when proposed (the base).
+        from: TaskLocation,
+        to: TaskLocation,
+        /// "WhenUBuy / Checkout".
+        to_label: String,
+        reason: String,
+    },
+    /// Skrzynka: one new topic in `project` made of inbox entries.
+    TopicFromTasks {
+        project: String,
+        project_name: String,
+        title: String,
+        /// The slug it will get; the base of the stale check.
+        slug: String,
+        summary: String,
+        tasks: Vec<EntryRef>,
+        reason: String,
+    },
+}
+
+/// An inbox entry named by a change.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EntryRef {
+    pub id: String,
+    pub title: String,
+    /// Where it was when proposed.
+    pub from: TaskLocation,
 }
 
 /// A branch of one of the project's repositories.
@@ -150,15 +186,10 @@ fn parse_branches(
         Some(Value::Array(a)) => a,
         Some(_) => return Err("Gałęzie: zły format.".into()),
     };
-    if items.len() > MAX_BRANCHES {
-        return Err(format!(
-            "Za dużo gałęzi ({}, limit {MAX_BRANCHES}).",
-            items.len()
-        ));
-    }
     let p = snap.project(project).ok_or("Nie ma takiego projektu.")?;
     let mut out: Vec<BranchRef> = Vec::new();
-    for item in items {
+    // More than the limit: the first ones are kept.
+    for item in items.iter().take(MAX_BRANCHES) {
         let o = item.as_object().ok_or("Gałąź ma zły format.")?;
         let f = Fields { obj: o };
         f.only(&["repo", "branch"])?;
@@ -196,7 +227,15 @@ pub struct TopicTask {
 
 impl Change {
     pub fn location(&self, project: &str) -> TaskLocation {
+        if project == INBOX && matches!(self, Change::NewTask { .. } | Change::TaskStatus { .. }) {
+            return TaskLocation::Inbox;
+        }
         match self {
+            Change::MoveTask { to, .. } => to.clone(),
+            Change::TopicFromTasks { project, slug, .. } => TaskLocation::Topic {
+                project: project.clone(),
+                topic: slug.clone(),
+            },
             Change::NewTask {
                 topic: Some(topic), ..
             } => TaskLocation::Topic {
@@ -272,6 +311,45 @@ fn fence_line(line: &str) -> Option<(char, usize, &str)> {
         return None;
     }
     Some((c, n, info))
+}
+
+/// The single command of a `skrzynka-komenda` answer: the first non-empty
+/// line inside the first block with info string `info`, and the text outside
+/// the blocks (the agent's one-sentence reason).
+pub fn command_block(answer: &str, info: &str) -> (String, Option<String>) {
+    let lines: Vec<&str> = answer
+        .split('\n')
+        .map(|l| l.trim_end_matches('\r'))
+        .collect();
+    let mut outside: Vec<&str> = Vec::new();
+    let mut found: Option<String> = None;
+    let mut i = 0;
+    while i < lines.len() {
+        match fence_line(lines[i]) {
+            Some((c, n, inf)) => {
+                let close = (i + 1..lines.len()).find(|&j| {
+                    fence_line(lines[j])
+                        .is_some_and(|(c2, n2, i2)| c2 == c && n2 >= n && i2.is_empty())
+                });
+                let end = close.unwrap_or(lines.len());
+                if inf == info && found.is_none() {
+                    found = lines[i + 1..end]
+                        .iter()
+                        .map(|l| l.trim())
+                        .find(|l| !l.is_empty())
+                        .map(str::to_string);
+                } else if inf != info {
+                    outside.extend_from_slice(&lines[i..end.min(lines.len())]);
+                }
+                i = end + 1;
+            }
+            None => {
+                outside.push(lines[i]);
+                i += 1;
+            }
+        }
+    }
+    (outside.join("\n").trim().to_string(), found)
 }
 
 /// The answer split into the report and the proposal block(s).
@@ -353,21 +431,55 @@ fn field_name(field: &str) -> &str {
 /// A short single-line text shown to the user only (never written to the
 /// vault): whitespace collapsed, no control characters, not empty, capped.
 fn display_line(field: &str, s: &str, max: usize) -> Result<String, String> {
-    if s.chars().any(|c| c.is_control() && !c.is_whitespace()) {
-        return Err(format!("{} zawiera niedozwolone znaki.", field_name(field)));
-    }
+    // Control characters are dropped (display only), not a reason to drop the change.
+    let s: String = s
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
     let s = s.split_whitespace().collect::<Vec<_>>().join(" ");
     if s.is_empty() {
         return Err(format!("{}: puste.", field_name(field)));
     }
+    // Display-only text: a long one is shortened, never a reason to drop the
+    // whole change.
     if chars(&s) > max {
-        return Err(format!(
-            "{}: za długie ({} znaków, limit {max}).",
-            field_name(field),
-            chars(&s)
-        ));
+        let mut cut: String = s.chars().take(max - 1).collect();
+        cut.push('…');
+        return Ok(cut);
     }
     Ok(s)
+}
+
+/// When an item has no usable `reason` (display only).
+pub const NO_REASON: &str = "(agent nie podał uzasadnienia)";
+
+/// The `reason` of an item: optional and display only, so a missing, empty or
+/// malformed one is replaced, a long one shortened.
+fn reason_of(f: &Fields) -> String {
+    match f.obj.get("reason") {
+        Some(Value::String(s)) => {
+            display_line("reason", s, MAX_REASON_CHARS).unwrap_or_else(|_| NO_REASON.into())
+        }
+        _ => NO_REASON.into(),
+    }
+}
+
+/// Text that is written (a title, a summary, a journal entry) but harmless
+/// when shortened: cut at `max` characters with "…" instead of dropping the
+/// change (the user sees it in the review and can edit it). Structure checks
+/// (core `check::*`) still run on the result.
+fn shortened(s: &str, max: usize) -> String {
+    if chars(s) <= max {
+        return s.to_string();
+    }
+    let mut cut: String = s
+        .chars()
+        .take(max - 1)
+        .collect::<String>()
+        .trim_end()
+        .to_string();
+    cut.push('…');
+    cut
 }
 
 fn capped(field: &str, s: &str, max: usize) -> Result<(), String> {
@@ -396,14 +508,11 @@ struct Fields<'a> {
 }
 
 impl<'a> Fields<'a> {
+    /// Fields beyond `allowed` are ignored (nothing reads them, nothing writes
+    /// them): an extra field is no reason to drop a change.
     fn only(&self, allowed: &[&str]) -> Result<(), String> {
-        match self.obj.keys().find(|k| !allowed.contains(&k.as_str())) {
-            Some(k) => Err(format!(
-                "Agent dodał nieznane pole „{}”.",
-                clip_label(k, 40)
-            )),
-            None => Ok(()),
-        }
+        let _ = allowed;
+        Ok(())
     }
 
     fn str_opt(&self, key: &str) -> Result<Option<&'a str>, String> {
@@ -460,6 +569,17 @@ fn label_of(v: &Value, snap: &Snapshot, project: &str) -> String {
             "Nowy temat {}",
             get("title").map_or_else(|| "?".into(), |t| format!("„{}”", clip_label(t, 60)))
         ),
+        Some("move_task") => get("task")
+            .map(|t| t.trim().trim_start_matches('^'))
+            .and_then(|id| snap.task(id))
+            .map_or_else(
+                || "Przeniesienie wpisu".into(),
+                |t| format!("Przeniesienie „{}”", clip_label(&t.title, 60)),
+            ),
+        Some("topic_from_tasks") => format!(
+            "Temat z wpisów {}",
+            get("title").map_or_else(|| "?".into(), |t| format!("„{}”", clip_label(t, 60)))
+        ),
         Some(k) => format!("Zmiana „{}”", clip_label(k, 30)),
         None => "Zmiana bez rodzaju".into(),
     }
@@ -470,7 +590,26 @@ fn open_status(s: TaskStatus) -> bool {
 }
 
 fn task_in_project(t: &Task, project: &str) -> bool {
+    if project == INBOX {
+        return t.location == TaskLocation::Inbox;
+    }
     t.location.project() == Some(project)
+}
+
+/// An open inbox entry with this id.
+fn inbox_entry<'s>(snap: &'s Snapshot, raw: &str) -> Result<&'s Task, String> {
+    let id = raw.trim().trim_start_matches('^');
+    if !is_valid_id(id) {
+        return Err("Nieprawidłowy identyfikator zadania.".into());
+    }
+    let t = snap.task(id).ok_or("Nie ma takiego wpisu.")?;
+    if t.location != TaskLocation::Inbox {
+        return Err("Tego wpisu nie ma już w Skrzynce.".into());
+    }
+    if !open_status(t.status) {
+        return Err("Wpis jest już zrobiony.".into());
+    }
+    Ok(t)
 }
 
 fn topic_of<'s>(snap: &'s Snapshot, project: &str, slug: &str) -> Option<&'s Topic> {
@@ -487,7 +626,23 @@ fn same_title_at<'s>(snap: &'s Snapshot, loc: &TaskLocation, title: &str) -> Opt
         .find(|t| &t.location == loc && fold(&t.title) == want)
 }
 
+/// A status word as agents write it: case, `-`/`_`/spaces and Polish forms.
+fn status_key(v: &str) -> String {
+    fold(v).chars().filter(|c| c.is_alphanumeric()).collect()
+}
+
 fn parse_task_status(v: &str) -> Result<TaskStatus, String> {
+    match status_key(v).as_str() {
+        "todo" | "open" | "dozrobienia" | "otwarte" | "nowe" => return Ok(TaskStatus::Todo),
+        "doing" | "inprogress" | "wtoku" | "wtrakcie" | "started" => return Ok(TaskStatus::Doing),
+        "done" | "completed" | "complete" | "closed" | "zrobione" | "zrobiony" | "gotowe" => {
+            return Ok(TaskStatus::Done);
+        }
+        "blocked" | "zablokowane" | "zablokowany" | "waiting" | "czeka" => {
+            return Ok(TaskStatus::Blocked);
+        }
+        _ => {}
+    }
     serde_json::from_value(Value::String(v.into())).map_err(|_| {
         format!(
             "Agent podał nieznany status zadania „{}”.",
@@ -497,6 +652,16 @@ fn parse_task_status(v: &str) -> Result<TaskStatus, String> {
 }
 
 fn parse_topic_status(v: &str) -> Result<TopicStatus, String> {
+    match status_key(v).as_str() {
+        "planned" | "planowany" | "todo" | "plan" => return Ok(TopicStatus::Planned),
+        "inprogress" | "wtoku" | "doing" | "active" | "aktywny" => {
+            return Ok(TopicStatus::InProgress);
+        }
+        "blocked" | "zablokowany" => return Ok(TopicStatus::Blocked),
+        "waiting" | "czeka" | "oczekuje" => return Ok(TopicStatus::Waiting),
+        "done" | "zrobiony" | "zrobione" | "completed" | "closed" => return Ok(TopicStatus::Done),
+        _ => {}
+    }
     serde_json::from_value(Value::String(v.into())).map_err(|_| {
         format!(
             "Agent podał nieznany status tematu „{}”.",
@@ -507,10 +672,139 @@ fn parse_topic_status(v: &str) -> Result<TopicStatus, String> {
 
 /// Validates one raw item against the snapshot the run started from.
 fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, String> {
+    validate_item_as(v, snap, project, true)
+}
+
+/// [`validate_item`]; `lenient` (agent answers): repairable text is
+/// shortened or normalised instead of dropping the change. The user's own
+/// corrections are checked strictly (they are told what is wrong).
+fn validate_item_as(
+    v: &Value,
+    snap: &Snapshot,
+    project: &str,
+    lenient: bool,
+) -> Result<Change, String> {
+    let fit = |field: &str, s: &str, max: usize| -> Result<String, String> {
+        if lenient {
+            Ok(shortened(s, max))
+        } else {
+            capped(field, s, max).map(|()| s.to_string())
+        }
+    };
+    let title_fit = |s: &str| -> Result<String, String> {
+        let one = s.split_whitespace().collect::<Vec<_>>().join(" ");
+        fit("title", &one, MAX_TITLE_CHARS)
+    };
     let obj = v.as_object().ok_or("Zmiana ma zły format.")?;
     let f = Fields { obj };
     let kind = f.str("kind")?;
+    let inbox = project == INBOX;
+    match (inbox, kind) {
+        (false, "move_task" | "topic_from_tasks") => {
+            return Err("Ten rodzaj zmiany jest tylko dla Skrzynki.".into());
+        }
+        (true, "topic_log" | "new_topic") => {
+            return Err(
+                "W Skrzynce agent proponuje przeniesienia, tematy z wpisów i nowe zadania.".into(),
+            );
+        }
+        _ => {}
+    }
     match kind {
+        "move_task" => {
+            f.only(&["kind", "task", "to", "reason"])?;
+            let t = inbox_entry(snap, f.str("task")?)?;
+            let reason = reason_of(&f);
+            let to_raw = f.str("to")?.trim();
+            use montybrain_core::command::resolve::{Resolved, resolve_place};
+            let place = match resolve_place(snap, to_raw) {
+                Resolved::One(p) => p,
+                Resolved::Typo(p, _) => {
+                    return Err(format!(
+                        "Nie ma miejsca „{}” (może {}?).",
+                        clip_label(to_raw, 40),
+                        p.text
+                    ));
+                }
+                Resolved::Ambiguous(_) => {
+                    return Err(format!(
+                        "„{}” pasuje do kilku miejsc.",
+                        clip_label(to_raw, 40)
+                    ));
+                }
+                Resolved::Unknown(_) => {
+                    return Err(format!("Nie ma miejsca „{}”.", clip_label(to_raw, 40)));
+                }
+            };
+            if place.location == TaskLocation::Inbox {
+                return Err("Wpis jest już w Skrzynce.".into());
+            }
+            Ok(Change::MoveTask {
+                task: t.id.clone().unwrap_or_default(),
+                title: t.title.clone(),
+                from: t.location.clone(),
+                to: place.location,
+                to_label: place.label,
+                reason,
+            })
+        }
+        "topic_from_tasks" => {
+            f.only(&["kind", "project", "title", "summary", "tasks", "reason"])?;
+            let slug_in = f.str("project")?.trim();
+            let p = snap
+                .project(slug_in)
+                .ok_or_else(|| format!("Nie ma projektu „{}”.", clip_label(slug_in, 40)))?;
+            let raw_title = title_fit(f.str("title")?)?;
+            let title = check::topic_title(&raw_title).map_err(|e| core_rejects("title", e))?;
+            let slug = slugify(&title);
+            let summary = match f.str_opt("summary")? {
+                Some(s) => check::summary(&fit("summary", s, MAX_SUMMARY_CHARS)?)
+                    .map_err(|e| core_rejects("summary", e))?,
+                None => String::new(),
+            };
+            let reason = reason_of(&f);
+            let ids = match obj.get("tasks") {
+                Some(Value::Array(a)) if !a.is_empty() => a,
+                _ => {
+                    return Err(
+                        "Temat z wpisów potrzebuje listy „tasks” z identyfikatorami.".into(),
+                    );
+                }
+            };
+            if ids.len() > MAX_TOPIC_ENTRIES {
+                return Err(format!(
+                    "Za dużo wpisów ({}, limit {MAX_TOPIC_ENTRIES}).",
+                    ids.len()
+                ));
+            }
+            let mut tasks: Vec<EntryRef> = Vec::new();
+            for v in ids {
+                let raw = v.as_str().ok_or("Wpis tematu ma zły format.")?;
+                let t = inbox_entry(snap, raw)?;
+                let id = t.id.clone().unwrap_or_default();
+                // A repeated entry is counted once.
+                if tasks.iter().any(|e| e.id == id) {
+                    continue;
+                }
+                tasks.push(EntryRef {
+                    id,
+                    title: t.title.clone(),
+                    from: t.location.clone(),
+                });
+            }
+            if topic_exists(snap, &p.slug, &slug, &title) {
+                return Err(TOPIC_EXISTS.into());
+            }
+            Ok(Change::TopicFromTasks {
+                project: p.slug.clone(),
+                project_name: p.name.clone(),
+                title,
+                slug,
+                summary,
+                tasks,
+                reason,
+            })
+        }
         "task_status" => {
             f.only(&["kind", "task", "status", "reason"])?;
             let id = f.str("task")?.trim().trim_start_matches('^');
@@ -518,12 +812,16 @@ fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, St
                 return Err("Nieprawidłowy identyfikator zadania.".into());
             }
             let to = parse_task_status(f.str("status")?.trim())?;
-            let reason = display_line("reason", f.str("reason")?, MAX_REASON_CHARS)?;
+            let reason = reason_of(&f);
             let task = snap
                 .task(id)
                 .ok_or("Nie ma już takiego zadania w projekcie.")?;
             if !task_in_project(task, project) {
-                return Err("Zadanie nie należy do tego projektu.".into());
+                return Err(if inbox {
+                    "Tego zadania nie ma w Skrzynce.".into()
+                } else {
+                    "Zadanie nie należy do tego projektu.".into()
+                });
             }
             if !open_status(task.status) {
                 return Err("Zadanie jest już zrobione.".into());
@@ -543,18 +841,17 @@ fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, St
             f.only(&["kind", "topic", "text", "status", "summary", "branches"])?;
             let branches = parse_branches(obj.get("branches"), snap, project)?;
             let slug = f.str("topic")?.trim();
-            let text = f.str("text")?;
-            capped("text", text, MAX_LOG_CHARS)?;
-            let text = check::journal_text(text).map_err(|e| core_rejects("text", e))?;
+            let text = fit("text", f.str("text")?, MAX_LOG_CHARS)?;
+            let text = check::journal_text(&text).map_err(|e| core_rejects("text", e))?;
             let status = f
                 .str_opt("status")?
                 .map(|s| parse_topic_status(s.trim()))
                 .transpose()?;
             let summary = match f.str_opt("summary")? {
-                Some(s) => {
-                    capped("summary", s, MAX_SUMMARY_CHARS)?;
-                    Some(check::summary(s).map_err(|e| core_rejects("summary", e))?)
-                }
+                Some(s) => Some(
+                    check::summary(&fit("summary", s, MAX_SUMMARY_CHARS)?)
+                        .map_err(|e| core_rejects("summary", e))?,
+                ),
                 None => None,
             };
             let topic = topic_of(snap, project, slug)
@@ -572,11 +869,15 @@ fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, St
         }
         "new_task" => {
             f.only(&["kind", "title", "topic", "reason"])?;
-            let raw_title = f.str("title")?;
-            capped("title", raw_title, MAX_TITLE_CHARS)?;
-            let title = check::task_title(raw_title).map_err(|e| core_rejects("title", e))?;
-            let reason = display_line("reason", f.str("reason")?, MAX_REASON_CHARS)?;
+            let raw_title = title_fit(f.str("title")?)?;
+            let title = check::task_title(&raw_title).map_err(|e| core_rejects("title", e))?;
+            let reason = reason_of(&f);
             let topic = match f.str_opt("topic")?.map(str::trim).filter(|s| !s.is_empty()) {
+                Some(_) if inbox => {
+                    return Err(
+                        "Nowe zadanie ze Skrzynki trafia do Skrzynki: bez pola „topic”.".into(),
+                    );
+                }
                 Some(slug) => Some(
                     topic_of(snap, project, slug)
                         .ok_or_else(|| "W tym projekcie nie ma takiego tematu.".to_string())?,
@@ -601,21 +902,26 @@ fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, St
                 "kind", "title", "status", "summary", "repo", "text", "tasks", "reason", "branches",
             ])?;
             let branches = parse_branches(obj.get("branches"), snap, project)?;
-            let raw_title = f.str("title")?;
-            capped("title", raw_title, MAX_TITLE_CHARS)?;
-            let title = check::topic_title(raw_title).map_err(|e| core_rejects("title", e))?;
+            let raw_title = title_fit(f.str("title")?)?;
+            let title = check::topic_title(&raw_title).map_err(|e| core_rejects("title", e))?;
             let slug = slugify(&title);
             if slug.is_empty() {
                 return Err("Z tego tytułu nie da się utworzyć nazwy pliku tematu.".into());
             }
-            let status = parse_topic_status(f.str("status")?.trim())?;
-            let raw_summary = f.str("summary")?;
-            capped("summary", raw_summary, MAX_SUMMARY_CHARS)?;
-            let summary = check::summary(raw_summary).map_err(|e| core_rejects("summary", e))?;
-            let text = f.str("text")?;
-            capped("text", text, MAX_LOG_CHARS)?;
-            let text = check::journal_text(text).map_err(|e| core_rejects("text", e))?;
-            let reason = display_line("reason", f.str("reason")?, MAX_REASON_CHARS)?;
+            // A missing status is "planned", like a new topic in the app.
+            let status = match f
+                .str_opt("status")?
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                Some(st) => parse_topic_status(st)?,
+                None => TopicStatus::Planned,
+            };
+            let raw_summary = fit("summary", f.str("summary")?, MAX_SUMMARY_CHARS)?;
+            let summary = check::summary(&raw_summary).map_err(|e| core_rejects("summary", e))?;
+            let text = fit("text", f.str("text")?, MAX_LOG_CHARS)?;
+            let text = check::journal_text(&text).map_err(|e| core_rejects("text", e))?;
+            let reason = reason_of(&f);
             let repo = match f.str_opt("repo")?.map(str::trim).filter(|r| !r.is_empty()) {
                 Some(r) => {
                     let p = snap.project(project).ok_or("Nie ma takiego projektu.")?;
@@ -631,22 +937,30 @@ fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, St
             let tasks = match obj.get("tasks") {
                 None | Some(Value::Null) => Vec::new(),
                 Some(Value::Array(items)) => {
-                    if items.len() > MAX_TOPIC_TASKS {
+                    if !lenient && items.len() > MAX_TOPIC_TASKS {
                         return Err(format!(
                             "Za dużo zadań w temacie ({}, limit {MAX_TOPIC_TASKS}).",
                             items.len()
                         ));
                     }
+                    // More than the limit (agent text): the first ones are kept.
                     let mut out: Vec<TopicTask> = Vec::new();
                     for item in items {
-                        let t = item.as_object().ok_or("Zadanie tematu ma zły format.")?;
-                        let tf = Fields { obj: t };
-                        tf.only(&["title", "status"])?;
-                        let raw = tf.str("title")?;
-                        capped("title", raw, MAX_TITLE_CHARS)?;
-                        let t_title =
-                            check::task_title(raw).map_err(|e| core_rejects("title", e))?;
-                        let t_status = match tf.str_opt("status")?.map(str::trim) {
+                        if out.len() >= MAX_TOPIC_TASKS {
+                            break;
+                        }
+                        // A bare string is a title.
+                        let (raw, st) = match item {
+                            Value::String(s) => (s.as_str(), None),
+                            Value::Object(t) => {
+                                let tf = Fields { obj: t };
+                                (tf.str("title")?, tf.str_opt("status")?)
+                            }
+                            _ => return Err("Zadanie tematu ma zły format.".into()),
+                        };
+                        let t_title = check::task_title(&title_fit(raw)?)
+                            .map_err(|e| core_rejects("title", e))?;
+                        let t_status = match st.map(str::trim) {
                             None | Some("") => TaskStatus::Todo,
                             Some(st) => match parse_task_status(st)? {
                                 TaskStatus::Blocked => {
@@ -658,7 +972,11 @@ fn validate_item(v: &Value, snap: &Snapshot, project: &str) -> Result<Change, St
                                 other => other,
                             },
                         };
+                        // A repeated task is listed once (agent text).
                         if out.iter().any(|x| fold(&x.title) == fold(&t_title)) {
+                            if lenient {
+                                continue;
+                            }
                             return Err("Powtórzone zadanie w temacie.".into());
                         }
                         out.push(TopicTask {
@@ -705,6 +1023,8 @@ fn topic_exists(snap: &Snapshot, project: &str, slug: &str, title: &str) -> bool
 /// The key under which two changes count as the same target.
 fn target_key(c: &Change) -> String {
     match c {
+        Change::MoveTask { task, .. } => format!("task:{task}"),
+        Change::TopicFromTasks { project, slug, .. } => format!("topic:{project}/{slug}"),
         Change::NewTopic { slug, .. } => format!("topic:{slug}"),
         Change::TaskStatus { task, .. } => format!("task:{task}"),
         Change::TopicLog { topic, .. } => format!("log:{topic}"),
@@ -822,6 +1142,23 @@ pub fn parse(answer: &str, snap: &Snapshot, project: &str) -> Proposal {
         match validate_item(item, snap, project) {
             Ok(change) => {
                 let key = target_key(&change);
+                // An entry may be named by one change only.
+                let entries: Vec<String> = match &change {
+                    Change::TopicFromTasks { tasks, .. } => {
+                        tasks.iter().map(|e| format!("task:{}", e.id)).collect()
+                    }
+                    _ => Vec::new(),
+                };
+                if entries.iter().any(|k| seen.contains(k)) {
+                    drop(
+                        &mut out,
+                        i,
+                        label_of(item, snap, project),
+                        "Wpis jest już w innej propozycji tej listy.".into(),
+                    );
+                    continue;
+                }
+                seen.extend(entries);
                 let same_title = matches!(&change, Change::NewTopic { title, .. }
                     if out.changes.iter().any(|c| matches!(c, Change::NewTopic { title: t, .. } if fold(t) == fold(title))));
                 if matches!(change, Change::NewTopic { .. }) && (seen.contains(&key) || same_title)
@@ -981,7 +1318,7 @@ pub fn edit_change(
         }
         _ => return Err("Ta poprawka nie pasuje do rodzaju zmiany.".into()),
     };
-    let edited = validate_item(&raw, snap, project)?;
+    let edited = validate_item_as(&raw, snap, project, false)?;
     let key = target_key(&edited);
     for o in others {
         let same_topic_title = matches!((&edited, o), (Change::NewTopic { title: a, .. }, Change::NewTopic { title: b, .. }) if fold(a) == fold(b));
@@ -1062,7 +1399,39 @@ pub fn join_change(
 /// proposal was made.
 pub fn check_current(change: &Change, snap: &Snapshot, project: &str) -> Result<(), String> {
     let stale = |why: &str| Err(format!("{STALE} ({why})"));
+    let place_exists = |loc: &TaskLocation| match loc {
+        TaskLocation::Inbox => true,
+        TaskLocation::Project { project } => snap.project(project).is_some(),
+        TaskLocation::Topic { project, topic } => topic_of(snap, project, topic).is_some(),
+    };
     match change {
+        Change::MoveTask { task, from, to, .. } => match snap.task(task) {
+            None => stale("wpisu już nie ma"),
+            Some(t) if t.location != *from => stale("wpis przeniesiono"),
+            Some(t) if !open_status(t.status) => stale("wpis jest już zrobiony"),
+            Some(_) if !place_exists(to) => stale("miejsca docelowego już nie ma"),
+            Some(_) => Ok(()),
+        },
+        Change::TopicFromTasks {
+            project: p,
+            slug,
+            title,
+            tasks,
+            ..
+        } => {
+            if snap.project(p).is_none() {
+                return stale("projektu już nie ma");
+            }
+            if topic_exists(snap, p, slug, title) {
+                return stale("taki temat już jest");
+            }
+            for e in tasks {
+                if snap.task(&e.id).map(|t| &t.location) != Some(&e.from) {
+                    return stale(&format!("wpis „{}” przeniesiono", clip_label(&e.title, 40)));
+                }
+            }
+            Ok(())
+        }
         Change::TaskStatus { task, from, .. } => match snap.task(task) {
             None => stale("zadania już nie ma"),
             Some(t) if !task_in_project(t, project) => stale("zadanie przeniesiono"),
@@ -1261,6 +1630,147 @@ pub(crate) mod tests {
         format!("Raport: webhook gotowy.\n\n```{FENCE_INFO}\n{json}\n```\n")
     }
 
+    fn inbox_snap() -> Snapshot {
+        let mut s = snap();
+        s.tasks.push(task(
+            "ccccc2",
+            "Płytki do łazienki",
+            TaskStatus::Todo,
+            TaskLocation::Inbox,
+        ));
+        s.tasks.push(task(
+            "ccccc3",
+            "Fuga",
+            TaskStatus::Todo,
+            TaskLocation::Inbox,
+        ));
+        s.tasks.push(task(
+            "ccccc4",
+            "Zrobione",
+            TaskStatus::Done,
+            TaskLocation::Inbox,
+        ));
+        s
+    }
+
+    #[test]
+    fn inbox_proposals_have_their_own_kinds_and_rules() {
+        let s = inbox_snap();
+        let json = r#"{"changes":[
+  {"kind":"move_task","task":"ccccc1","to":"dom/kuchnia","reason":"Kuchnia."},
+  {"kind":"topic_from_tasks","project":"dom","title":"Łazienka","summary":"Remont.","tasks":["ccccc2","^ccccc3"],"reason":"Jeden remont."},
+  {"kind":"new_task","title":"Zmierzyć ścianę","reason":"Z wpisu."},
+  {"kind":"topic_from_tasks","project":"dom","title":"Inny","tasks":["ccccc1"],"reason":"r"},
+  {"kind":"new_task","title":"W temacie","topic":"kuchnia","reason":"r"},
+  {"kind":"topic_log","topic":"kuchnia","text":"t"},
+  {"kind":"move_task","task":"aaaaa2","to":"dom","reason":"Nie ze skrzynki."},
+  {"kind":"move_task","task":"ccccc4","to":"dom","reason":"Zrobione."},
+  {"kind":"move_task","task":"ccccc2","to":"nie-ma","reason":"r"},
+  {"kind":"topic_from_tasks","project":"dom","title":"Kuchnia","tasks":["ccccc3"],"reason":"r"}
+]}"#;
+        let p = parse(&answer(json), &s, INBOX);
+        assert_eq!(p.changes.len(), 3, "{p:#?}");
+        match &p.changes[0] {
+            Change::MoveTask {
+                task,
+                from,
+                to,
+                to_label,
+                ..
+            } => {
+                assert_eq!(task, "ccccc1");
+                assert_eq!(*from, TaskLocation::Inbox);
+                assert_eq!(*to, tp("dom", "kuchnia"));
+                assert_eq!(to_label, "DOM / Temat kuchnia");
+            }
+            o => panic!("{o:?}"),
+        }
+        match &p.changes[1] {
+            Change::TopicFromTasks {
+                project,
+                slug,
+                tasks,
+                ..
+            } => {
+                assert_eq!(project, "dom");
+                assert_eq!(slug, "lazienka");
+                assert_eq!(
+                    tasks.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(),
+                    ["ccccc2", "ccccc3"]
+                );
+            }
+            o => panic!("{o:?}"),
+        }
+        assert_eq!(p.changes[2].location(INBOX), TaskLocation::Inbox);
+        let reasons: Vec<&str> = p.dropped.iter().map(|d| d.reason.as_str()).collect();
+        assert!(
+            reasons.iter().any(|r| r.contains("innej propozycji")),
+            "{reasons:?}"
+        );
+        assert!(
+            reasons.iter().any(|r| r.contains("bez pola „topic”")),
+            "{reasons:?}"
+        );
+        assert!(
+            reasons
+                .iter()
+                .any(|r| r.contains("W Skrzynce agent proponuje")),
+            "{reasons:?}"
+        );
+        assert!(
+            reasons.iter().any(|r| r.contains("nie ma już w Skrzynce")),
+            "{reasons:?}"
+        );
+        assert!(
+            reasons.iter().any(|r| r.contains("już zrobiony")),
+            "{reasons:?}"
+        );
+        assert!(
+            reasons.iter().any(|r| r.contains("Nie ma miejsca")),
+            "{reasons:?}"
+        );
+        // A project's own proposal cannot carry these kinds.
+        let p = parse(
+            &answer(
+                r#"{"changes":[{"kind":"move_task","task":"ccccc1","to":"dom","reason":"r"}]}"#,
+            ),
+            &s,
+            "beeking",
+        );
+        assert!(p.changes.is_empty());
+        assert!(p.dropped[0].reason.contains("tylko dla Skrzynki"));
+        // Stale when an entry moved meanwhile.
+        let mut later = s.clone();
+        later
+            .tasks
+            .iter_mut()
+            .find(|t| t.id.as_deref() == Some("ccccc2"))
+            .unwrap()
+            .location = TaskLocation::Project {
+            project: "dom".into(),
+        };
+        let parsed = parse(&answer(json), &s, INBOX);
+        assert!(check_current(&parsed.changes[1], &later, INBOX).is_err());
+        assert!(check_current(&parsed.changes[0], &later, INBOX).is_ok());
+    }
+
+    #[test]
+    fn the_command_block_of_a_single_entry_answer() {
+        let (why, cmd) = command_block(
+            "Pasuje do checkoutu.\n\n```montybrain-komenda\n\n^a1b2c3 > whenubuy/checkout\n```\n",
+            "montybrain-komenda",
+        );
+        assert_eq!(why, "Pasuje do checkoutu.");
+        assert_eq!(cmd.as_deref(), Some("^a1b2c3 > whenubuy/checkout"));
+        let (_, none) = command_block(
+            "Nic nie pasuje.\n```montybrain-komenda\n```",
+            "montybrain-komenda",
+        );
+        assert!(none.is_none());
+        let (_, none) = command_block("Bez bloku.", "montybrain-komenda");
+        assert!(none.is_none());
+    }
+
     #[test]
     fn the_legacy_fence_info_is_still_accepted() {
         let text = "Raport.\n\n```morwisko-zmiany\n{\"changes\":[]}\n```\n";
@@ -1454,8 +1964,9 @@ pub(crate) mod tests {
             "Status zadania: Nieprawidłowy identyfikator zadania.",
             "Status zadania „Webhook zwrotów”: Agent podał nieznany status zadania „finished”.",
             "Status zadania „Webhook zwrotów”: Zadanie ma już ten status.",
-            "Status zadania „Webhook zwrotów”: Agent dodał nieznane pole „force”.",
-            "Status zadania „Webhook zwrotów”: Brakuje pola „reason”.",
+            // An extra field ("force") is ignored and a missing reason replaced:
+            // that change is kept, so the next one is a repeat.
+            "Status zadania „Webhook zwrotów”: Powtórzona zmiana tego samego zadania lub tematu.",
             "Status zadania „Webhook zwrotów”: Status: zły format.",
             "Zmiana „delete_task”: Agent podał nieznany rodzaj zmiany „delete_task”.",
             "Zmiana bez rodzaju: Brakuje pola „kind”.",
@@ -1487,7 +1998,7 @@ pub(crate) mod tests {
   {"kind": "new_task", "title": "x", "reason": "a\u001bb"}
 ]}"#,
         );
-        assert_eq!(r.len(), 7, "{r:#?}");
+        assert_eq!(r.len(), 6, "{r:#?}");
         assert!(
             r[0].contains("Opis tematu nie może zostać zapisany")
                 && r[0].contains("level-2 heading"),
@@ -1498,7 +2009,12 @@ pub(crate) mod tests {
         assert!(r[2].contains("code fence"), "{}", r[2]);
         assert!(r[3].contains("Wpis do dziennika"), "{}", r[3]);
         assert!(r[4].contains("Tytuł") && r[5].contains("Tytuł"));
-        assert!(r[6].contains("niedozwolone znaki"));
+        // A control character in display-only text is dropped, not the change.
+        let p = parse_json(r#"{"changes":[{"kind":"new_task","title":"x","reason":"a\u001bb"}]}"#);
+        let Change::NewTask { reason, .. } = &p.changes[0] else {
+            panic!()
+        };
+        assert_eq!(reason, "a b");
 
         // A journal text is written indented: structure-looking lines are kept
         // as text (core verifies the write again when it is applied).
@@ -1517,6 +2033,45 @@ pub(crate) mod tests {
             (title.as_str(), reason.as_str()),
             ("Pierwsza - [ ] druga", "r r")
         );
+    }
+
+    #[test]
+    fn repairable_text_is_normalised_not_dropped() {
+        let p = parse_json(
+            r#"{"changes": [
+  {"kind": "task_status", "task": "^aaaaa1", "status": "Zrobione"},
+  {"kind": "topic_log", "topic": "platnosci", "text": "t", "status": "W toku"},
+  {"kind": "new_topic", "title": "Bez statusu", "summary": "S.", "text": "T.", "reason": "", "tasks": ["Pierwsze", "Pierwsze", {"title": "Drugie"}]}
+]}"#,
+        );
+        assert_eq!(p.changes.len(), 3, "{:?}", p.dropped);
+        assert!(
+            matches!(&p.changes[0], Change::TaskStatus { to: TaskStatus::Done, reason, .. } if reason == NO_REASON)
+        );
+        let Change::NewTopic {
+            status,
+            tasks,
+            reason,
+            ..
+        } = &p.changes[2]
+        else {
+            panic!()
+        };
+        assert_eq!(*status, TopicStatus::Planned);
+        assert_eq!(
+            tasks.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
+            ["Pierwsze", "Drugie"]
+        );
+        assert_eq!(reason, NO_REASON);
+        // What protects the vault stays hard: unknown ids, places, kinds, structure.
+        let r = dropped_reasons(
+            r#"{"changes": [
+  {"kind": "task_status", "task": "../../etc", "status": "done"},
+  {"kind": "delete_task", "task": "aaaaa1"},
+  {"kind": "new_task", "title": "Zrobić @2026-11-20"}
+]}"#,
+        );
+        assert_eq!(r.len(), 3, "{r:#?}");
     }
 
     #[test]
@@ -1546,8 +2101,20 @@ pub(crate) mod tests {
             long(MAX_LOG_CHARS + 1),
             long(MAX_SUMMARY_CHARS + 1)
         ));
-        assert_eq!(r.len(), 4);
-        assert!(r.iter().all(|x| x.contains("za długie")), "{r:#?}");
+        // Long titles, reasons, entries and summaries are shortened with "…",
+        // not a reason to drop the change (the second log of one topic is a repeat).
+        assert!(r.iter().all(|x| !x.contains("za długie")), "{r:#?}");
+        let p = parse_json(&format!(
+            r#"{{"changes":[{{"kind":"new_task","title":"{}","reason":"{}"}}]}}"#,
+            long(MAX_TITLE_CHARS + 50),
+            long(MAX_REASON_CHARS + 50)
+        ));
+        let Change::NewTask { title, reason, .. } = &p.changes[0] else {
+            panic!("{p:?}")
+        };
+        assert_eq!(title.chars().count(), MAX_TITLE_CHARS);
+        assert!(title.ends_with('…') && reason.ends_with('…'));
+        assert_eq!(reason.chars().count(), MAX_REASON_CHARS);
         // Exactly at the limits is fine.
         let p = parse_json(&format!(
             r#"{{"changes":[{{"kind":"new_task","title":"{}","reason":"{}"}}]}}"#,
@@ -1710,7 +2277,11 @@ pub(crate) mod tests {
   {"kind":"new_topic","title":"Pola","status":"planned","summary":"S.","text":"T.","reason":"r","branches":[{"repo":"app","branch":"a","sha":"1"}]}
 ]}"#,
         );
-        assert_eq!(p.changes.len(), 2, "{:?}", p.dropped);
+        // Too many branches: the first six kept; an extra field ignored.
+        assert_eq!(p.changes.len(), 4, "{:?}", p.dropped);
+        assert!(
+            matches!(&p.changes[2], Change::NewTopic { branches, .. } if branches.len() == MAX_BRANCHES)
+        );
         let Change::NewTopic { branches, .. } = &p.changes[0] else {
             panic!()
         };
@@ -1729,8 +2300,6 @@ pub(crate) mod tests {
             [
                 "Gałąź: projekt nie ma repozytorium o tej nazwie.",
                 "Nieprawidłowa nazwa gałęzi „--upload-pack=x”.",
-                "Za dużo gałęzi (7, limit 6).",
-                "Agent dodał nieznane pole „sha”.",
             ]
         );
         // Without branches the JSON shape is unchanged (no empty list written).
@@ -1830,12 +2399,23 @@ pub(crate) mod tests {
                 "Nowy temat „Płatności”: Taki temat już istnieje.",
                 "Nowy temat „TEMAT PLATNOSCI”: Taki temat już istnieje.",
                 "Nowy temat „nowy TEMAT”: Taki temat już istnieje.",
-                "Nowy temat „Inne repo”: Agent dodał nieznane pole „repo2”.",
                 "Nowy temat „Zły status”: Agent podał nieznany status tematu „skonczony”.",
                 "Nowy temat „Obce repo”: Projekt nie ma repozytorium o tej nazwie.",
-                "Nowy temat „Za dużo zadań”: Za dużo zadań w temacie (7, limit 6).",
                 "Nowy temat „Zablokowane zadanie”: Zadanie nowego tematu może mieć status todo, doing albo done.",
             ]
+        );
+        // Kept, repaired: an extra field ignored, the first six of seven tasks.
+        let p = parse_json(&format!(
+            r#"{{"changes":[{},{}]}}"#,
+            topic_json("Inne repo", r#","repo2":"x""#),
+            topic_json("Za dużo zadań", "").replace(
+                r#""tasks":[{"title":"Testy","status":"todo"},{"title":"Webhook","status":"done"}]"#,
+                &format!(r#""tasks":[{}]"#, six.join(","))
+            ),
+        ));
+        assert_eq!(p.changes.len(), 2, "{:?}", p.dropped);
+        assert!(
+            matches!(&p.changes[1], Change::NewTopic { tasks, .. } if tasks.len() == MAX_TOPIC_TASKS)
         );
         // Hostile text: structure in the summary, a token-like task title, oversized text.
         let r = dropped_reasons(&format!(
@@ -1851,14 +2431,14 @@ pub(crate) mod tests {
             ),
             topic_json(r"Dwie\nlinie # tytuł", ""),
         ));
-        assert_eq!(r.len(), 3, "{r:#?}");
+        // The oversized journal entry is shortened, the others still refused.
+        assert_eq!(r.len(), 2, "{r:#?}");
         assert!(
             r[0].contains("Opis tematu nie może zostać zapisany"),
             "{}",
             r[0]
         );
         assert!(r[1].contains("Tytuł"), "{}", r[1]);
-        assert!(r[2].contains("za długie"), "{}", r[2]);
         // The multi-line title is collapsed to one line, as core stores it.
         let p = parse_json(&format!(
             r#"{{"changes":[{}]}}"#,

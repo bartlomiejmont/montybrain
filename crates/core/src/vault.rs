@@ -23,8 +23,11 @@ use crate::model::*;
 use crate::query::Snapshot;
 use crate::slug::{is_safe_component, slugify, unique_slug};
 use crate::task::{TaskBlock, TaskLine, parse_task_line, rewrite_continuation};
-use crate::validate::{Multi, link, multiline, one_line, strict_line};
+
+mod lines;
+use crate::validate::{Multi, link, multiline, one_line, strict_line, topic_title_line};
 use crate::verify::{Expect, check};
+pub use lines::{LineWritten, TopicFromTasks};
 
 /// Environment variable overriding the vault location.
 pub const ENV_VAR: &str = "MONTYBRAIN_DIR";
@@ -571,6 +574,29 @@ fn continuation_lines(links: &[String], notes: &str) -> Vec<String> {
         }
     }
     out
+}
+
+/// The slug a new topic file gets: exactly `exact` (refused when that file
+/// exists), else the slug of `title` made unique.
+pub(crate) fn exact_or_unique(
+    topics_dir: &Path,
+    title: &str,
+    exact: Option<&str>,
+) -> Result<String> {
+    match exact {
+        Some(s) => {
+            check_component("topic", s)?;
+            if topics_dir.join(format!("{s}.md")).exists() {
+                return Err(Error::invalid(format!(
+                    "a topic file {s}.md already exists; nothing was written"
+                )));
+            }
+            Ok(s.to_string())
+        }
+        None => Ok(unique_slug(&slugify(title), |s| {
+            topics_dir.join(format!("{s}.md")).exists()
+        })),
+    }
 }
 
 /// Default vault folder name in the home directory.
@@ -1251,7 +1277,30 @@ impl Vault {
         entry: Option<NewJournalEntry>,
         tasks: Vec<NewTask>,
     ) -> Result<TopicCreated> {
-        let title = one_line("title", &new.title)?;
+        self.create_topic_impl(project, new, entry, tasks, None)
+    }
+
+    /// [`Vault::create_topic_with`] at exactly `<project>/tematy/<slug>.md`:
+    /// refused (nothing written) when that file exists, checked inside the
+    /// lock. For writing exactly the path a preview showed.
+    pub fn create_topic_exact(
+        &self,
+        project: &str,
+        slug: &str,
+        new: NewTopic,
+    ) -> Result<TopicCreated> {
+        self.create_topic_impl(project, new, None, Vec::new(), Some(slug))
+    }
+
+    fn create_topic_impl(
+        &self,
+        project: &str,
+        new: NewTopic,
+        entry: Option<NewJournalEntry>,
+        tasks: Vec<NewTask>,
+        exact: Option<&str>,
+    ) -> Result<TopicCreated> {
+        let title = topic_title_line("title", &new.title)?;
         let summary = multiline("summary", &new.summary, Multi::Region)?;
         let entry_text = match &entry {
             Some(e) => {
@@ -1275,9 +1324,7 @@ impl Vault {
             self.check_repo(&txn, project, r)?;
         }
         let topics_dir = self.root.join(project).join(TOPICS_DIR);
-        let slug = unique_slug(&slugify(&title), |s| {
-            topics_dir.join(format!("{s}.md")).exists()
-        });
+        let slug = exact_or_unique(&topics_dir, &title, exact)?;
         let mut text = format!("---\nstatus: {}\n", new.status.file_value());
         if let Some(r) = repo {
             text.push_str(&format!("repo: {}\n", encode_scalar(r)));
@@ -1374,7 +1421,7 @@ impl Vault {
         let title = patch
             .title
             .as_deref()
-            .map(|t| one_line("title", t))
+            .map(|t| topic_title_line("title", t))
             .transpose()?;
         let summary = patch
             .summary

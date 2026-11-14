@@ -23,6 +23,7 @@ struct Client {
 struct Reply {
     text: String,
     is_error: bool,
+    structured: Value,
 }
 
 impl Client {
@@ -112,6 +113,7 @@ impl Client {
                 .unwrap_or_default()
                 .to_string(),
             is_error: r["isError"].as_bool().unwrap_or(false),
+            structured: r["structuredContent"].clone(),
         }
     }
 
@@ -125,6 +127,25 @@ impl Client {
         let r = self.call(name, args);
         assert!(r.is_error, "{name} should have failed, got: {}", r.text);
         r.text
+    }
+
+    /// Preview `text`, then apply it with the preview's plan token.
+    /// The preview's `plan` token, from the structured result.
+    fn plan_token(&mut self, text: &str) -> String {
+        let r = self.call("command", json!({"text": text}));
+        assert!(!r.is_error, "{}", r.text);
+        r.structured["plan"]
+            .as_str()
+            .expect("structured plan token")
+            .to_string()
+    }
+
+    fn command_apply(&mut self, text: &str) -> String {
+        let token = self.plan_token(text);
+        self.ok(
+            "command",
+            json!({"text": text, "apply": true, "plan": token}),
+        )
     }
 
     fn read(&self, rel: &str) -> String {
@@ -193,6 +214,11 @@ fn seed(root: &Path) {
     std::fs::write(inbox, s).unwrap();
 }
 
+fn token_of(preview: &str) -> String {
+    let i = preview.find("plan: \"").expect("plan token in the preview") + 7;
+    preview[i..i + 16].to_string()
+}
+
 fn id_of(text: &str) -> String {
     let i = text.find(" ^").expect("task id in output") + 2;
     text[i..i + 6].to_string()
@@ -207,6 +233,14 @@ fn handshake_and_tool_list() {
     );
     let instr = init["result"]["instructions"].as_str().unwrap();
     assert!(instr.contains("overview") && instr.contains("log_update"));
+    // The syntax is taught on three examples.
+    for ex in [
+        "Zadzwonić do sądu @jutro !wysoki",
+        "^a1b2c3 [x] > whenubuy/checkout",
+        "[[whenubuy/checkout]] /czeka [[firma/krs]]",
+    ] {
+        assert!(instr.contains(ex), "{ex}");
+    }
 
     let list = c.request("tools/list", json!({}));
     let tools = list["result"]["tools"].as_array().unwrap();
@@ -218,6 +252,8 @@ fn handshake_and_tool_list() {
     assert_eq!(
         names,
         [
+            "command",
+            "connections",
             "create_task",
             "create_topic",
             "get_topic",
@@ -922,4 +958,345 @@ fn read_only_start_creates_nothing() {
         "read-only start created the vault directory"
     );
     assert_eq!(all_paths(&base), Vec::<PathBuf>::new());
+}
+
+#[test]
+fn command_previews_then_applies() {
+    let mut c = Client::start(seed);
+    let before = tree(&c.root);
+    let p = c.ok(
+        "command",
+        json!({"text": "Naprawić alerty > whenubuy/sledzenie-bledow !wysoki"}),
+    );
+    assert!(p.starts_with("Preview (nothing written yet):"), "{p}");
+    assert!(p.contains("whenubuy/tematy/sledzenie-bledow.md"), "{p}");
+    assert!(p.contains("- [ ] Naprawić alerty !wysoki ^"), "{p}");
+    // A preview writes nothing, not even the id of the hand-written task.
+    let after_preview = tree(&c.root);
+    assert_eq!(after_preview, before, "a preview wrote something");
+    assert!(!c.read("skrzynka.md").contains(" ^"));
+    let w = c.command_apply("Naprawić alerty > whenubuy/sledzenie-bledow !wysoki");
+    assert!(w.starts_with("Written:"), "{w}");
+    assert!(w.contains("- [ ] Naprawić alerty !wysoki ^"), "{w}");
+    assert_ne!(tree(&c.root), after_preview);
+    let id = id_of(&w);
+    let t = c.read("whenubuy/tematy/sledzenie-bledow.md");
+    assert!(
+        t.contains(&format!("- [ ] Naprawić alerty !wysoki ^{id}")),
+        "{t}"
+    );
+
+    // Status + move + a waits line, in one text.
+    let w = c.command_apply(&format!("^{id} [x] > dom/remont"));
+    assert!(w.contains("dom/tematy/remont.md"), "{w}");
+    let w = c.command_apply("[[dom/remont]] /czeka [[whenubuy/testy-a-b]]");
+    assert!(w.contains("Czeka na: [[whenubuy/testy-a-b]]"), "{w}");
+    assert!(
+        c.read("dom/tematy/remont.md")
+            .contains("\nCzeka na: [[whenubuy/testy-a-b]]\n")
+    );
+    let conn = c.ok("connections", json!({"ref": "whenubuy/testy-a-b"}));
+    assert!(
+        conn.contains("Waited for by:\n- [[dom/remont]] Remont"),
+        "{conn}"
+    );
+    let conn = c.ok("connections", json!({"ref": "[[dom/remont]]"}));
+    assert!(
+        conn.contains("Waits for:\n- [[whenubuy/testy-a-b]] Testy A/B"),
+        "{conn}"
+    );
+    assert!(
+        conn.contains("Wait chain: [[whenubuy/testy-a-b]]"),
+        "{conn}"
+    );
+}
+
+#[test]
+fn command_errors_change_nothing() {
+    let mut c = Client::start(|root| {
+        seed(root);
+        let v = Vault::open(root).unwrap();
+        v.create_topic(
+            "dom",
+            NewTopic {
+                title: "Testy A/B".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    });
+    c.ok("overview", json!({}));
+    let before = tree(&c.root);
+    // Ambiguous: a topic slug in two projects; the slugs are listed.
+    let e = c.err("command", json!({"text": "x > testy-a-b", "apply": true}));
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    assert!(
+        e.contains("dom/testy-a-b") && e.contains("whenubuy/testy-a-b"),
+        "{e}"
+    );
+    // A typo is never applied by an agent.
+    let e = c.err("command", json!({"text": "x > whenbuy", "apply": true}));
+    assert!(
+        e.starts_with("Nothing was changed:") && e.contains("whenubuy"),
+        "{e}"
+    );
+    // Agent requests are refused.
+    let e = c.err("command", json!({"text": "?dopasuj"}));
+    assert!(
+        e.starts_with("Nothing was changed:") && e.contains("never calls a model"),
+        "{e}"
+    );
+    let e = c.err("command", json!({"text": "^zzzzzz [x]", "apply": true}));
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    let e = c.err("command", json!({"text": "", "apply": true}));
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    assert_eq!(tree(&c.root), before);
+}
+
+#[test]
+fn command_takes_plain_words_for_tasks_and_topics() {
+    let mut c = Client::start(seed);
+    let a = id_of(&c.ok(
+        "create_task",
+        json!({"title": "Bramka płatności", "project": "whenubuy"}),
+    ));
+    let u1 = id_of(&c.ok("create_task", json!({"title": "Umowa najmu"})));
+    let u2 = id_of(&c.ok("create_task", json!({"title": "Umowa z bankiem"})));
+    // The subject and the reference by name; diacritics and case ignored.
+    let w = c.command_apply("bramka PLATNOSCI /czeka remont");
+    assert!(w.contains("Czeka na: [[dom/remont]]"), "{w}");
+    assert!(
+        c.read("whenubuy/projekt.md").contains(&format!(
+            "Bramka płatności ^{a}\n  Czeka na: [[dom/remont]]"
+        )),
+        "{}",
+        c.read("whenubuy/projekt.md")
+    );
+    // Several fit: nothing written, the candidates listed with their ids.
+    let before = tree(&c.root);
+    let e = c.err("command", json!({"text": "Bramka /powiaz umowa"}));
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    assert!(
+        e.contains(&format!("^{u1}")) && e.contains(&format!("^{u2}")),
+        "{e}"
+    );
+    // A typo in a name is never applied by an agent.
+    let e = c.err(
+        "command",
+        json!({"text": "Bramka /powiaz umowa najmy", "apply": true}),
+    );
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    assert_eq!(tree(&c.root), before);
+}
+
+#[test]
+fn waits_for_and_related_fields_add_one_line_each() {
+    let mut c = Client::start(seed);
+    let a = id_of(&c.ok(
+        "create_task",
+        json!({"title": "Bramka", "project": "whenubuy"}),
+    ));
+    let b = id_of(&c.ok(
+        "create_task",
+        json!({"title": "Karty", "project": "whenubuy", "notes": "Zapisane karty.", "waits_for": [format!("^{a}")], "related": ["whenubuy/testy-a-b"]}),
+    ));
+    let s = c.read("whenubuy/projekt.md");
+    assert!(
+        s.contains(&format!(
+            "  Zapisane karty.\n  Czeka na: ^{a}\n  Powiązane: [[whenubuy/testy-a-b]]"
+        )),
+        "{s}"
+    );
+    // update_task appends once, keeps the rest.
+    c.ok(
+        "update_task",
+        json!({"id": a, "related": ["[[dom/remont]]"]}),
+    );
+    c.ok(
+        "update_task",
+        json!({"id": a, "related": ["[[dom/remont]]"]}),
+    );
+    let s = c.read("whenubuy/projekt.md");
+    assert_eq!(s.matches("Powiązane: [[dom/remont]]").count(), 1, "{s}");
+    let e = c.err(
+        "update_task",
+        json!({"id": a, "waits_for": [format!("^{a}")]}),
+    );
+    assert!(e.contains("itself"), "{e}");
+    let e = c.err(
+        "create_task",
+        json!({"title": "x", "waits_for": ["nie-ma-takiego"]}),
+    );
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    c.ok(
+        "create_topic",
+        json!({"project": "dom", "title": "Kuchnia", "summary": "Plan.", "waits_for": ["[[dom/remont]]"], "related": [format!("^{b}")]}),
+    );
+    let t = c.read("dom/tematy/kuchnia.md");
+    assert!(
+        t.contains(&format!(
+            "Plan.\nCzeka na: [[dom/remont]]\nPowiązane: ^{b}\n"
+        )),
+        "{t}"
+    );
+    let conn = c.ok("connections", json!({"ref": format!("^{a}")}));
+    assert!(
+        conn.contains("Waited for by:") && conn.contains("Karty"),
+        "{conn}"
+    );
+}
+
+#[test]
+fn read_only_allows_command_preview_only() {
+    let mut c = Client::start_with_env(seed, &[("MONTYBRAIN_READONLY", "1")]);
+    let before = tree(&c.root);
+    let p = c.ok("command", json!({"text": "Coś nowego > dom"}));
+    assert!(p.starts_with("Preview"), "{p}");
+    let e = c.err(
+        "command",
+        json!({"text": "Coś nowego > dom", "apply": true}),
+    );
+    assert!(e.starts_with("Nothing was changed: read-only run"), "{e}");
+    assert!(
+        c.ok("connections", json!({"ref": "dom/remont"}))
+            .contains("Connections of")
+    );
+    let e = c.err(
+        "create_task",
+        json!({"title": "x", "waits_for": ["dom/remont"]}),
+    );
+    assert!(e.starts_with("read-only run:"), "{e}");
+    assert_eq!(tree(&c.root), before);
+}
+
+#[test]
+fn command_applies_only_the_previewed_plan() {
+    let mut c = Client::start(seed);
+    c.ok("overview", json!({}));
+    let text = "/temat Biuro > dom";
+    let p = c.ok("command", json!({"text": text}));
+    assert!(p.contains("dom/tematy/biuro.md"), "{p}");
+    let token = token_of(&p);
+    // No token: nothing written, the preview comes back.
+    let before = tree(&c.root);
+    let e = c.err("command", json!({"text": text, "apply": true}));
+    assert!(
+        e.starts_with("Nothing was changed:") && e.contains("plan: \""),
+        "{e}"
+    );
+    assert_eq!(tree(&c.root), before);
+    // Someone takes the slug in between: the plan would write biuro-2.md now.
+    c.ok("create_topic", json!({"project": "dom", "title": "Biuro"}));
+    let before = tree(&c.root);
+    let e = c.err(
+        "command",
+        json!({"text": text, "apply": true, "plan": token}),
+    );
+    assert!(
+        e.starts_with("Nothing was changed:") && e.contains("biuro-2.md"),
+        "{e}"
+    );
+    assert_eq!(tree(&c.root), before);
+    // The new token writes the new plan.
+    let w = c.ok(
+        "command",
+        json!({"text": text, "apply": true, "plan": token_of(&e)}),
+    );
+    assert!(w.contains("# Biuro") && w.contains("biuro-2.md"), "{w}");
+}
+
+#[test]
+fn a_typo_preview_says_to_send_the_exact_slug() {
+    let mut c = Client::start(seed);
+    let p = c.ok("command", json!({"text": "x > whenbuy"}));
+    assert!(p.contains("exact slug") && !p.contains("plan: \""), "{p}");
+}
+
+#[test]
+fn six_character_topic_slugs_are_topics_when_no_task_has_that_id() {
+    let mut c = Client::start(seed);
+    // `remont` (dom/remont) has six lowercase letters, like a task id.
+    let conn = c.ok("connections", json!({"ref": "remont"}));
+    assert!(conn.starts_with("Connections of [[dom/remont]]"), "{conn}");
+    let w = c.ok(
+        "create_task",
+        json!({"title": "Kafelki", "project": "dom", "waits_for": ["remont"]}),
+    );
+    let id = id_of(&w);
+    assert!(
+        c.read("dom/projekt.md")
+            .contains(&format!("^{id}\n  Czeka na: [[dom/remont]]"))
+    );
+    // With `^` it must be a task.
+    let e = c.err("connections", json!({"ref": "^remont"}));
+    assert!(e.contains("no task"), "{e}");
+}
+
+#[test]
+fn the_plan_token_is_a_structured_field() {
+    let mut c = Client::start(seed);
+    // A title that quotes a fake token in the prose.
+    let text = "Sprawdzić plan: \"0000000000000000\" > dom";
+    let r = c.call("command", json!({"text": text}));
+    assert!(!r.is_error, "{}", r.text);
+    let token = r.structured["plan"].as_str().unwrap().to_string();
+    assert_ne!(token, "0000000000000000");
+    assert_eq!(r.structured["written"], json!(false));
+    let e = c.err(
+        "command",
+        json!({"text": text, "apply": true, "plan": "0000000000000000"}),
+    );
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    let w = c.call(
+        "command",
+        json!({"text": text, "apply": true, "plan": token}),
+    );
+    assert!(
+        !w.is_error && w.structured["written"] == json!(true),
+        "{}",
+        w.text
+    );
+}
+
+#[test]
+fn a_new_task_plan_cannot_be_applied_twice() {
+    let mut c = Client::start(seed);
+    let text = "Kupić mleko > dom";
+    let token = c.plan_token(text);
+    c.ok(
+        "command",
+        json!({"text": text, "apply": true, "plan": token}),
+    );
+    let before = tree(&c.root);
+    let e = c.err(
+        "command",
+        json!({"text": text, "apply": true, "plan": token}),
+    );
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    assert_eq!(tree(&c.root), before);
+    assert_eq!(c.read("dom/projekt.md").matches("Kupić mleko").count(), 1);
+}
+
+#[test]
+fn the_token_covers_notes_and_summaries() {
+    let mut c = Client::start(seed);
+    let id = id_of(&c.ok("create_task", json!({"title": "Bramka", "project": "dom"})));
+    let edit = format!("^{id} !wysoki");
+    let t1 = c.plan_token(&edit);
+    let link = "[[dom/remont]] /czeka [[whenubuy/testy-a-b]]";
+    let t2 = c.plan_token(link);
+    c.ok(
+        "update_task",
+        json!({"id": id, "notes": "Zmienione po podglądzie."}),
+    );
+    c.ok(
+        "log_update",
+        json!({"project": "dom", "topic": "remont", "text": "x", "summary": "Nowy opis."}),
+    );
+    let before = tree(&c.root);
+    let e = c.err("command", json!({"text": edit, "apply": true, "plan": t1}));
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    let e = c.err("command", json!({"text": link, "apply": true, "plan": t2}));
+    assert!(e.starts_with("Nothing was changed:"), "{e}");
+    assert_eq!(tree(&c.root), before);
 }

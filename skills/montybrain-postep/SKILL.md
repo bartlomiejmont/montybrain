@@ -5,7 +5,7 @@ description: "Sprawdź postęp otwartych zadań z MontyBrain (serwer MCP `montyb
 
 # Postęp otwartych zadań
 
-Zestawiasz dwie rzeczy: otwarte zadania w MontyBrain i faktyczny stan repozytoriów projektu. Z MontyBrain korzystasz przez narzędzia serwera MCP `montybrain` (`overview`, `list_tasks`, `get_topic`, `search`). Jeśli tych narzędzi nie ma w sesji, powiedz to wprost i zakończ.
+Zestawiasz dwie rzeczy: otwarte zadania w MontyBrain i faktyczny stan repozytoriów projektu. Z MontyBrain korzystasz przez narzędzia serwera MCP `montybrain` (`overview`, `list_tasks`, `get_topic`, `search`, `connections` dla łańcucha „czeka na”). Jeśli tych narzędzi nie ma w sesji, powiedz to wprost i zakończ.
 
 ## Zasady
 

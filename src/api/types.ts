@@ -367,6 +367,19 @@ export type ProposedChange =
       tasks: { title: string; status: TaskStatus }[];
       reason: string;
       branches?: BranchRef[];
+    }
+  /** Skrzynka: move an inbox entry (id, links and notes kept). */
+  | { kind: "move_task"; task: string; title: string; from: TaskLocation; to: TaskLocation; to_label: string; reason: string }
+  /** Skrzynka: one new topic made of inbox entries. */
+  | {
+      kind: "topic_from_tasks";
+      project: string;
+      project_name: string;
+      title: string;
+      slug: string;
+      summary: string;
+      tasks: { id: string; title: string; from: TaskLocation }[];
+      reason: string;
     };
 
 /** A branch of one of the project's repositories. */
@@ -553,3 +566,240 @@ export interface UndoReport {
   items: UndoResult[];
   updates: ProjectUpdateView[];
 }
+
+// --- the command field (montybrain_core::command, src-tauri/src/command_line.rs) ---
+
+/** `[from, to)` in UTF-16 code units (JavaScript string indices). */
+export interface Span {
+  from: number;
+  to: number;
+}
+
+export interface Place {
+  location: TaskLocation;
+  /** "WhenUBuy / Checkout". */
+  label: string;
+  /** What to type after ` > `. */
+  text: string;
+}
+
+export interface Choice {
+  label: string;
+  /** Replaces the span of the choice. */
+  insert: string;
+  kind: "project" | "topic" | "inbox" | "task" | string;
+  /** One edit away from what was typed ("literówka"). */
+  typo: boolean;
+}
+
+export interface SpanChoice {
+  span: Span;
+  choice: Choice;
+  /** The parts of `choice.label` matching the text in `span` (UTF-16 ranges). */
+  marks?: Span[];
+}
+
+export type CommandOp =
+  | { kind: "create_task"; location: TaskLocation; task: NewTask }
+  | { kind: "edit_task"; id: string; title: string; from: TaskLocation; to: TaskLocation; before: unknown; after: unknown }
+  | { kind: "create_topic"; project: string; title: string; slug: string; summary: string; tasks: { id: string; from: TaskLocation; fields: unknown }[] }
+  | { kind: "append_line"; target: unknown; title: string; line: string; already: boolean };
+
+export interface CommandStep {
+  op: CommandOp;
+  /** Polish, one line. */
+  summary: string;
+  /** The file written, relative to the vault. */
+  file: string;
+  /** The Markdown lines as they will be (a new task's id as `^······`). */
+  lines: string[];
+  /** For edits: the line as it is now. */
+  before?: string[];
+}
+
+export interface CommandPlan {
+  steps: CommandStep[];
+  /** Plain capture saves at once; anything else waits for "Potwierdź". */
+  confirm: boolean;
+}
+
+/** `typing`: a word is still being typed at the caret; the reading is a neutral hint. */
+export type CommandState = "empty" | "capture" | "confirm" | "agent" | "invalid" | "typing";
+
+export interface Similar {
+  id: string;
+  title: string;
+  place: Place;
+  score: number;
+}
+
+export interface AgentAsk {
+  verb: "rozpisz" | "dopasuj" | "free";
+  text: string;
+  ids: string[];
+}
+
+export interface CommandPreview {
+  text: string;
+  state: CommandState;
+  /** The live reading under the field. */
+  reading: string;
+  plan: CommandPlan | null;
+  problems: string[];
+  warnings: string[];
+  choices: SpanChoice[];
+  typo: boolean;
+  similar: Similar[];
+  agent: AgentAsk | null;
+}
+
+export interface CompletionItem {
+  label: string;
+  insert: string;
+  detail: string;
+  /** `inbox`, `project`, `topic`, `task`, `priority`, `date`, `command`, `agent`. */
+  kind?: string;
+  /** The parts of `label` matching what was typed (UTF-16 ranges). */
+  marks?: Span[];
+  /** The same for `detail`. */
+  detail_marks?: Span[];
+}
+
+export interface Completions {
+  span: Span;
+  /** `place`, `topic`, `task`, `ref`, `priority`, `date`, `command`, `agent`. */
+  kind: string;
+  items: CompletionItem[];
+}
+
+export interface FieldPreview {
+  preview: CommandPreview;
+  completions: Completions | null;
+}
+
+export interface FieldInput {
+  text: string;
+  /** Caret (UTF-16 index), for autocomplete. */
+  caret?: number | null;
+  /** Selected inbox entries. */
+  selection?: string[];
+  /** The focused inbox entry: the subject when nothing is selected. */
+  focus?: string | null;
+  /** Where a plain new task goes (default: the inbox). */
+  location?: TaskLocation | null;
+  /** Which field it is (`inbox`, `quick`, `palette`): the undo scope. */
+  source?: string | null;
+}
+
+export interface LineWritten {
+  file: string;
+  line: number;
+  text: string;
+}
+
+export interface CommandApplied {
+  steps: { summary: string; ok: boolean; message: string }[];
+  /** The exact lines written (the echo). */
+  echo: LineWritten[];
+  /** The first failure, in Polish (later steps were not run). */
+  error: string | null;
+  /** Steps not run after a failure. */
+  remaining: string[];
+  /** After a failure, the written steps were taken back: nothing of the plan is in the vault. */
+  rolled_back?: boolean;
+  /** After a failure, what could not be taken back (still written). */
+  left_written?: string[];
+}
+
+export type CommandApplyResult =
+  | { kind: "written"; reading: string; applied: CommandApplied; undo: number | null }
+  | { kind: "stale"; message: string; preview: CommandPreview }
+  | { kind: "refused"; message: string; preview: CommandPreview | null };
+
+export interface CommandUndoReport {
+  reading: string;
+  /** The field the undone write came from. */
+  source: string;
+  items: { status: "undone" | "changed" | "failed"; message: string }[];
+  /** Some steps failed; they can be retried with this token. */
+  retry: number | null;
+}
+
+export interface Captured {
+  task: Task;
+  undo: number | null;
+}
+
+export interface InboxSuggestion {
+  id: string;
+  /** `null`: weak, the row shows "?". */
+  best: { place: Place; score: number } | null;
+  candidates: { place: Place; score: number }[];
+}
+
+/** What the Skrzynka agent can reach: `montybrain` (in the background, MontyBrain read-only, nothing else) or `mine` (a session in Terminal with the user's own tools; MontyBrain stays read-only). */
+export type InboxAgentTools = "montybrain" | "mine";
+
+export interface InboxAgentRequest {
+  text: string;
+  selection: string[];
+  mode: "command" | "proposals";
+  provider: ProviderId;
+  tools?: InboxAgentTools;
+}
+
+/** `waiting`: the Terminal session has not written its answer yet; `received`: its proposal is in the review. */
+export interface InboxAgentCheck {
+  status: "waiting" | "received";
+  count: number;
+}
+
+export interface InboxAgentAnswer {
+  command: string | null;
+  note: string;
+}
+
+// --- In-app agent session (src-tauri runs/session) -----------------------------
+
+export type SessionScope = { kind: "inbox" } | { kind: "project"; project: string };
+export type SessionStatus = "starting" | "working" | "needs_you" | "idle" | "ended" | "failed" | "stopped";
+export type SessionToolStatus = "running" | "done" | "failed";
+export type SessionPermState = "pending" | "allowed" | "allowed_session" | "denied" | "auto_allowed" | "auto_denied" | "withdrawn";
+
+export interface SessionQuestion {
+  id: string;
+  header: string;
+  question: string;
+  options: string[];
+}
+
+export type SessionEntry =
+  | { kind: "user"; id: number; text: string }
+  | { kind: "assistant"; id: number; text: string }
+  | { kind: "tool"; id: number; name: string; summary: string; detail: string; status: SessionToolStatus; output: string }
+  | { kind: "permission"; id: number; title: string; detail: string; tool: string; state: SessionPermState; can_session: boolean; note: string; questions: SessionQuestion[] }
+  | { kind: "notice"; id: number; text: string; error: boolean };
+
+export interface SessionView {
+  id: string;
+  provider: ProviderId;
+  scope: SessionScope;
+  request: string;
+  status: SessionStatus;
+  entries: SessionEntry[];
+  started_at: string;
+  ended_at: string | null;
+  proposal: { count: number; at: string } | null;
+  error: string | null;
+  remembered: string[];
+}
+
+export interface SessionStartRequest {
+  scope: "inbox" | "project";
+  project?: string | null;
+  provider: ProviderId;
+  text: string;
+  selection?: string[];
+}
+
+export type SessionAnswer = "allow" | "allow_session" | "deny";

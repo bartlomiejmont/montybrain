@@ -27,6 +27,10 @@ const SHARED: &[&str] = &[
     "set_autostart",
     "quick_close",
     "quick_resize",
+    "command_preview",
+    "command_apply",
+    "command_undo",
+    "capture_task",
 ];
 
 /// Agent runs and project updates: main window only.
@@ -51,6 +55,18 @@ const RUNS: &[&str] = &[
     "confirm_waiting",
     "set_auto_update",
     "set_update_sources",
+    "inbox_suggestions",
+    "inbox_agent",
+    "inbox_agent_answer",
+    "inbox_agent_check",
+    "inbox_agent_paste",
+    "agent_session_start",
+    "agent_session_get",
+    "agent_session_send",
+    "agent_session_answer",
+    "agent_session_interrupt",
+    "agent_session_stop",
+    "agent_session_close",
 ];
 
 fn main() {

@@ -344,6 +344,28 @@ export function describeChange(c: ProposedChange): ChangeText {
         detailLabel: null,
         tasks: [],
       };
+    case "move_task":
+      return {
+        kind: "Przeniesienie wpisu",
+        title: c.title,
+        what: `do: ${c.to_label}`,
+        detail: c.reason,
+        summary: null,
+        topic: false,
+        detailLabel: null,
+        tasks: [],
+      };
+    case "topic_from_tasks":
+      return {
+        kind: "Temat z wpisów",
+        title: c.title,
+        what: `w projekcie ${c.project_name} · ${plural(c.tasks.length, "wpis", "wpisy", "wpisów")} (z identyfikatorami i notatkami)`,
+        detail: c.reason,
+        summary: c.summary || null,
+        topic: true,
+        detailLabel: null,
+        tasks: c.tasks.map((t) => ({ title: t.title, status: `^${t.id}` })),
+      };
   }
 }
 
@@ -351,7 +373,7 @@ export function describeChange(c: ProposedChange): ChangeText {
 export function groupChanges(p: StoredProposal): { topics: number[]; tasks: number[] } {
   const topics: number[] = [];
   const tasks: number[] = [];
-  p.changes.forEach((c, i) => (c.change.kind === "new_topic" || c.change.kind === "topic_log" ? topics : tasks).push(i));
+  p.changes.forEach((c, i) => (c.change.kind === "new_topic" || c.change.kind === "topic_log" || c.change.kind === "topic_from_tasks" ? topics : tasks).push(i));
   return { topics, tasks };
 }
 

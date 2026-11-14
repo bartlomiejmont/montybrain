@@ -53,6 +53,8 @@ pub(crate) struct Expect<'a> {
     pub add_tasks: &'a [String],
     /// Exactly this task is removed.
     pub remove_task: Option<&'a str>,
+    /// Exactly these tasks are removed (several from one file).
+    pub remove_tasks: &'a [String],
     /// Exactly one journal entry is added.
     pub add_journal: bool,
     /// Exactly one journal entry is removed.
@@ -136,6 +138,17 @@ pub(crate) fn check(
     let mut expected = before.tasks.clone();
     if let Some(id) = e.remove_task {
         match expected.iter().position(|t| t.as_deref() == Some(id)) {
+            Some(p) => {
+                expected.remove(p);
+            }
+            None => return Err(format!("task ^{id} is not in the file")),
+        }
+    }
+    for id in e.remove_tasks {
+        match expected
+            .iter()
+            .position(|t| t.as_deref() == Some(id.as_str()))
+        {
             Some(p) => {
                 expected.remove(p);
             }

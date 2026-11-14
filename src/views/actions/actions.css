@@ -510,3 +510,42 @@
 .run-next {
   margin: 12px 0 0;
 }
+
+/* The in-app agent session, while there is one. */
+.act-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+}
+
+.act-session .ags-dot.st-working,
+.act-session .ags-dot.st-starting {
+  background: var(--kind-task);
+}
+
+.act-session .ags-dot.st-needs_you {
+  background: var(--mark);
+}
+
+.act-session-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act-session-label {
+  color: var(--text-3);
+}
+
+.act-session-status {
+  flex: none;
+  color: var(--text-2);
+}

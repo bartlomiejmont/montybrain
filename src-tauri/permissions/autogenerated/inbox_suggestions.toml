@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-inbox-suggestions"
+description = "Enables the inbox_suggestions command without any pre-configured scope."
+commands.allow = ["inbox_suggestions"]
+
+[[permission]]
+identifier = "deny-inbox-suggestions"
+description = "Denies the inbox_suggestions command without any pre-configured scope."
+commands.deny = ["inbox_suggestions"]

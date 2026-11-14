@@ -5,7 +5,7 @@ description: "Podsumowuj pracę z użyciem MontyBrain (serwer MCP `montybrain`).
 
 # Podsumowanie pracy w MontyBrain
 
-MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat (status, krótki opis stanu, dziennik) → Zadanie. Korzystasz z niego przez narzędzia serwera MCP `montybrain`: `overview`, `list_tasks`, `search`, `get_topic`, `create_task`, `update_task`, `create_topic`, `log_update`. Jeśli tych narzędzi nie ma w sesji, powiedz to wprost; podsumowanie możesz wtedy podać tylko w rozmowie.
+MontyBrain trzyma pracę użytkownika w plikach Markdown: Projekt → Temat (status, krótki opis stanu, dziennik) → Zadanie. Korzystasz z niego przez narzędzia serwera MCP `montybrain`: `overview`, `list_tasks`, `search`, `get_topic`, `connections`, `create_task`, `update_task`, `create_topic`, `log_update`, `command`. Jeśli tych narzędzi nie ma w sesji, powiedz to wprost; podsumowanie możesz wtedy podać tylko w rozmowie.
 
 Ustal najpierw, o co chodzi: **zapis postępu z tej sesji** czy **raport** za okres. Gdy nie wynika to z prośby, a w wątku była praca, zrób zapis postępu.
 
@@ -14,7 +14,7 @@ Ustal najpierw, o co chodzi: **zapis postępu z tej sesji** czy **raport** za ok
 1. **Zbierz fakty.** Przejrzyj cały wątek: co zmieniono, co uruchomiono i z jakim wynikiem, co zostało otwarte. Jeśli pracowałeś w repozytorium, sprawdź `git status` i `git log` z tej sesji, żeby opierać się na stanie faktycznym. Podawaj tylko to, co się wydarzyło: nieuruchomionych testów nie opisuj jako zielonych.
 2. **Znajdź miejsce.** `overview`, potem `get_topic` dla tematu, którego dotyczyła praca. Gdy nie ma pasującego tematu, zaproponuj nowy (`create_topic`) albo zapytaj, do którego dopisać. Nie zgaduj projektu.
 3. **Zadania.** Zadania tematu wykonane w sesji oznacz `update_task` ze `status: "done"`; rozpoczęte i niedokończone ustaw na `doing`; zablokowane na `blocked` z notatką, na co czekają. Do zadań dołącz linki do MR-ów i wątku (`add_links`).
-4. **Reszta pracy.** To, co zostało do zrobienia, zapisz jako nowe zadania (`create_task`), po sprawdzeniu przez `search`, czy już nie istnieją.
+4. **Reszta pracy.** To, co zostało do zrobienia, zapisz jako nowe zadania (`create_task`), po sprawdzeniu przez `search`, czy już nie istnieją. Gdy nowe zadanie czeka na coś, podaj to w `waits_for` (`^id` albo `[[projekt/temat]]`).
 5. **Dziennik.** Jeden wpis `log_update` w temacie:
    - `text`: 1–3 zdania po polsku: co zrobiono, z jakim wynikiem, co dalej. Konkret zamiast ogólników („Migracja tabeli cen na stagingu przeszła, 2 testy integracyjne nadal czerwone”, nie „postęp w migracji”).
    - `status`: zmień tylko, gdy stan tematu naprawdę się zmienił (np. `waiting`, gdy czeka na review; `done`, gdy zamknięty).

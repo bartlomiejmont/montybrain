@@ -7,6 +7,9 @@ import type { MontyBrainApi } from "./api";
 import { createMockApi } from "./mock";
 import { UPDATE_SCENARIOS, type UpdateScenario } from "./mock-updates";
 import { createTauriApi } from "./tauri";
+import { MOCK_COMMAND_STATES, type MockCommandState } from "./mock-command";
+import { MOCK_SESSION_STATES, type MockSessionState } from "./mock-session";
+export { MOCK_COMMAND_TEXT, type MockCommandState } from "./mock-command";
 
 export type { MontyBrainApi } from "./api";
 export * from "./types";
@@ -20,6 +23,20 @@ const query = () => new URLSearchParams(typeof window === "undefined" ? "" : win
 /** A browser-mock URL switch (`null` inside the app), e.g. `?recipe=aktualizacja` for Akcje. */
 export function mockQuery(name: string): string | null {
   return isTauri() ? null : query().get(name);
+}
+
+/** The `?cmd=` state of the command field in the browser mock (see api/mock-command.ts). */
+/** `?session=…`: an in-app agent session on screen (browser mock only). */
+export function mockSessionState(): MockSessionState | null {
+  if (isTauri()) return null;
+  const v = query().get("session");
+  return MOCK_SESSION_STATES.includes(v as MockSessionState) ? (v as MockSessionState) : null;
+}
+
+export function mockCommandState(): MockCommandState | null {
+  if (isTauri()) return null;
+  const v = query().get("cmd");
+  return MOCK_COMMAND_STATES.includes(v as MockCommandState) ? (v as MockCommandState) : null;
 }
 
 /** The `?update=` scenario of the browser mock (never set inside the app). */
@@ -47,4 +64,4 @@ function mockRunOptions() {
 
 export const api: MontyBrainApi = isTauri()
   ? createTauriApi()
-  : createMockApi({ latencyMs: 40, runs: mockRunOptions(), updateScenario: mockUpdateScenario() ?? undefined, drift: query().get("drift") === "none" ? "none" : undefined, today: query().get("today") === "full" ? "full" : undefined, map: mockMap() });
+  : createMockApi({ latencyMs: 40, runs: mockRunOptions(), updateScenario: mockUpdateScenario() ?? undefined, drift: query().get("drift") === "none" ? "none" : undefined, today: query().get("today") === "full" ? "full" : undefined, map: mockMap(), inbox: query().get("inbox") === "demo" || query().has("cmd") ? "demo" : undefined, inboxProposal: query().get("inboxagent") === "proposals", session: mockSessionState() ?? undefined });

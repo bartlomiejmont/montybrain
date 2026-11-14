@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: core events and window dragging, every app command including the agent runs (list_recipes, list_providers, start_run, cancel_run, list_runs), project updates (list_updates, apply_update, undo_update, dismiss_update, edit_update, join_update, set_auto_update, set_update_sources), drift (list_drift, refresh_drift, link_branch, ignore_branch) and waiting items (list_waiting, set_waiting, confirm_waiting). Vault access goes through the app's own commands.",
+  "description": "Main window: core events and window dragging, every app command including the agent runs (list_recipes, list_providers, start_run, cancel_run, list_runs), project updates (list_updates, apply_update, undo_update, dismiss_update, edit_update, join_update, set_auto_update, set_update_sources), drift (list_drift, refresh_drift, link_branch, ignore_branch) waiting items (list_waiting, set_waiting, confirm_waiting), the command field (command_preview, command_apply, command_undo, capture_task) and the inbox suggestions and agent (inbox_suggestions, inbox_agent, inbox_agent_answer, inbox_agent_check, inbox_agent_paste) and the in-app agent session (agent_session_start, agent_session_get, agent_session_send, agent_session_answer, agent_session_interrupt, agent_session_stop, agent_session_close). Vault access goes through the app's own commands.",
   "windows": [
     "main"
   ],
@@ -50,6 +50,22 @@
     "allow-set-waiting",
     "allow-confirm-waiting",
     "allow-set-auto-update",
-    "allow-set-update-sources"
+    "allow-set-update-sources",
+    "allow-command-preview",
+    "allow-command-apply",
+    "allow-command-undo",
+    "allow-capture-task",
+    "allow-inbox-suggestions",
+    "allow-inbox-agent",
+    "allow-inbox-agent-answer",
+    "allow-inbox-agent-check",
+    "allow-inbox-agent-paste",
+    "allow-agent-session-start",
+    "allow-agent-session-get",
+    "allow-agent-session-send",
+    "allow-agent-session-answer",
+    "allow-agent-session-interrupt",
+    "allow-agent-session-stop",
+    "allow-agent-session-close"
   ]
 }

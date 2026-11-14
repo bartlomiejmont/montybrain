@@ -5,7 +5,8 @@ import { Columns3, Inbox, NotebookPen, Sun } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import type { JournalEntry, SearchHit, Snapshot, Task, Topic } from "../api";
+import { mockCommandState, MOCK_COMMAND_TEXT, type JournalEntry, type SearchHit, type Snapshot, type Task, type Topic } from "../api";
+import { CommandField } from "./CommandField";
 import { fragment, highlight, searchTerms, type Segment } from "../lib/highlight";
 import { formatStamp } from "../lib/dates";
 import { taskHref, topicHref } from "../lib/nav";
@@ -37,7 +38,8 @@ export function Marked({ segments }: { segments: Segment[] }) {
 
 export function Palette() {
   const { view } = useVault();
-  const [open, setOpen] = useState(false);
+  // `?palette=confirm` (browser mock): open on the command step, for screenshots.
+  const [open, setOpen] = useState(() => mockCommandState() !== null && typeof window !== "undefined" && new URLSearchParams(window.location.search).has("palette"));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -77,7 +79,11 @@ function PaletteDialog({
   // Read at activation time: the item resolves against the newest snapshot.
   const latestSnapshot = useRef(snapshot);
   latestSnapshot.current = snapshot;
-  const [query, setQuery] = useState("");
+  const mockPalette = open0();
+  const [query, setQuery] = useState(mockPalette ?? "");
+  // "Nowe…" chosen: the palette becomes the command field (the same one as Skrzynka).
+  const [command, setCommand] = useState<string | null>(mockPalette);
+  const [newReading, setNewReading] = useState<{ q: string; text: string } | null>(null);
   const [result, setResult] = useState<{ q: string; hits: SearchHit[] }>({ q: "", hits: [] });
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -116,6 +122,19 @@ function PaletteDialog({
     return () => window.clearTimeout(t);
   }, [query, version, api, notify]);
 
+  // The reading of the query as a new task or command (for the "Nowe" row).
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) return;
+    const t = window.setTimeout(() => {
+      api
+        .commandPreview({ text: q })
+        .then((r) => setNewReading({ q, text: r.preview.reading || (r.preview.problems[0] ?? "") }))
+        .catch(() => {});
+    }, DEBOUNCE_MS);
+    return () => window.clearTimeout(t);
+  }, [query, api]);
+
   const items = useMemo(() => buildItems(snapshot, query, result.hits), [snapshot, query, result.hits]);
   const settled = !query.trim() || result.q === query.trim();
   const terms = useMemo(() => searchTerms(query), [query]);
@@ -139,6 +158,10 @@ function PaletteDialog({
       const item = resolveItem(latestSnapshot.current, picked);
       if (!item) {
         notify("Tego już nie ma — zostało usunięte poza aplikacją.");
+        return;
+      }
+      if (item.group === "new") {
+        setCommand(item.text);
         return;
       }
       onClose();
@@ -213,10 +236,46 @@ function PaletteDialog({
         onMouseMove={() => i !== active && setActive(i)}
         onClick={() => choose(item)}
       >
-        <ItemRow item={item} snapshot={snapshot} today={today} terms={terms} />
+        {item.group === "new" ? (
+          <div className="pal-line">
+            <span className="pal-lead" aria-hidden>
+              +
+            </span>
+            <span className="pal-title">{newReading && newReading.q === item.text ? newReading.text : `Nowe: ${item.text}`}</span>
+            <span className="pal-ctx">↵ dalej</span>
+          </div>
+        ) : (
+          <ItemRow item={item} snapshot={snapshot} today={today} terms={terms} />
+        )}
       </li>,
     );
   });
+
+  if (command !== null) {
+    return createPortal(
+      <div className="pal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+        <div ref={rootRef} className="pal pal-command" role="dialog" aria-modal="true" aria-label="Nowe zadanie albo komenda">
+          <CommandField
+            variant="palette"
+            source="palette"
+            initialText={command}
+            autoFocus
+            autoSubmit={!mockPalette}
+            startConfirmed={!!mockPalette}
+            onEscape={() => {
+              setCommand(null);
+              requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+            onWritten={() => window.setTimeout(onClose, 900)}
+          />
+          <div className="pal-foot" aria-hidden>
+            <span>esc w polu pustym: wróć do wyszukiwania</span>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <div className="pal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -264,8 +323,17 @@ function Context({ snapshot, project, topic }: { snapshot: Snapshot; project: st
   );
 }
 
+/** The mock's `?palette` URL state: the example text to open the command step with. */
+function open0(): string | null {
+  const state = mockCommandState();
+  if (!state || typeof window === "undefined" || !new URLSearchParams(window.location.search).has("palette")) return null;
+  return MOCK_COMMAND_TEXT[state].text;
+}
+
 function ItemRow({ item, snapshot, today, terms }: { item: PaletteItem; snapshot: Snapshot; today: string; terms: string[] }) {
   switch (item.group) {
+    case "new":
+      return null;
     case "nav":
       return (
         <div className="pal-line">

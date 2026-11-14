@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { Snapshot, Task, TaskLocation, Topic } from "../api/types";
 import { addDays, formatAge, formatDue, formatStamp, isOverdue } from "./dates";
 import { countTasks, groupToday, journalOf, moveTargets, sortTopics, splitDone, taskDraftKey } from "./group";
-import { parseQuickAdd } from "./quickadd";
 import { fold, linkLabel, plural, slugify, uniqueSlug } from "./text";
 
 const TODAY = "2026-11-13"; // a Friday
@@ -87,23 +86,7 @@ describe("dates", () => {
   });
 });
 
-describe("quick add", () => {
-  it("parses trailing priority and due tokens", () => {
-    expect(parseQuickAdd("Zrobić MR !wysoki @jutro", TODAY)).toEqual({
-      title: "Zrobić MR",
-      priority: "high",
-      due: "2026-11-14",
-    });
-    expect(parseQuickAdd("Spotkanie @2026-11-20T14:00", TODAY)).toEqual({ title: "Spotkanie", due: "2026-11-20T14:00" });
-    expect(parseQuickAdd("Coś @dziś !niski", TODAY)).toEqual({ title: "Coś", priority: "low", due: TODAY });
-  });
-  it("leaves non-tokens and lone tokens in the title", () => {
-    expect(parseQuickAdd("Napraw @mention parsing", TODAY)).toEqual({ title: "Napraw @mention parsing" });
-    expect(parseQuickAdd("Data @2026-02-30", TODAY)).toEqual({ title: "Data @2026-02-30" });
-    expect(parseQuickAdd("!wysoki", TODAY)).toEqual({ title: "!wysoki" });
-    expect(parseQuickAdd("Dwa @jutro @dziś", TODAY)).toEqual({ title: "Dwa @jutro", due: TODAY });
-  });
-});
+// The quick-add syntax moved to montybrain_core::command (Rust tests there).
 
 describe("group", () => {
   const inbox: TaskLocation = { kind: "inbox" };

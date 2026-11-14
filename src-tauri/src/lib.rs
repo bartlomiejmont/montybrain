@@ -20,6 +20,7 @@ use montybrain_core::{DEFAULT_DEBOUNCE, Vault, VaultWatcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime};
 
+pub mod command_line;
 pub mod commands;
 pub mod drift;
 pub mod legacy_autostart;
@@ -145,6 +146,7 @@ pub fn run() {
                 state.snapshot().warnings.len()
             ));
             app.manage(state);
+            app.manage(command_line::CommandUndo::default());
             start_watcher(app.handle(), &vault);
             runs::init(app.handle());
             native::init(app.handle())?;
@@ -175,6 +177,22 @@ pub fn run() {
             commands::set_autostart,
             commands::quick_close,
             commands::quick_resize,
+            commands::command_preview,
+            commands::command_apply,
+            commands::command_undo,
+            commands::capture_task,
+            commands::inbox_suggestions,
+            commands::inbox_agent,
+            commands::inbox_agent_answer,
+            commands::inbox_agent_check,
+            commands::inbox_agent_paste,
+            commands::agent_session_start,
+            commands::agent_session_get,
+            commands::agent_session_send,
+            commands::agent_session_answer,
+            commands::agent_session_interrupt,
+            commands::agent_session_stop,
+            commands::agent_session_close,
             commands::list_recipes,
             commands::list_providers,
             commands::start_run,

@@ -3,9 +3,7 @@ import { useEffect, type ReactNode } from "react";
 
 import type { Task, TaskLocation } from "../api";
 import { splitDone } from "../lib/group";
-import { parseQuickAdd } from "../lib/quickadd";
 import { useReveal } from "../store/ui";
-import { useView } from "../store/vault";
 import { useActions } from "./actions";
 import { TaskRow } from "./TaskRow";
 import { SubmitInput, useStoredFlag } from "./ui";
@@ -34,8 +32,7 @@ export function TaskList({
   /** Put the quick-add input above the tasks (inbox). */
   addFirst?: boolean;
 }) {
-  const view = useView();
-  const { createTask } = useActions();
+  const { captureTask } = useActions();
   const { open, done } = splitDone(tasks);
   const [showDone, setShowDone] = useStoredFlag(`montybrain.done.${listId}`, false);
   const reveal = useReveal();
@@ -52,12 +49,12 @@ export function TaskList({
           <SubmitInput
             className="field-inline"
             placeholder={`${addPlaceholder}…`}
-            title="Enter dodaje. Na końcu możesz dopisać !wysoki, !niski, @dziś, @jutro albo @2026-11-20"
+            title="Enter dodaje. Na końcu możesz dopisać !wysoki, !niski, @dziś, @jutro, @pt, @+3d albo @2026-11-20"
             aria-label={addPlaceholder}
             draftKey={`add:${listId}`}
             autoFocus={autoFocusAdd}
             onSubmit={async (v) => {
-              const created = await createTask(addTo, parseQuickAdd(v, view.today));
+              const created = await captureTask(addTo, v);
               return created !== undefined;
             }}
           />

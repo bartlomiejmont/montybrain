@@ -58,6 +58,7 @@ pub const MONTYBRAIN_READ_TOOLS: &[&str] = &[
     "mcp__montybrain__list_tasks",
     "mcp__montybrain__get_topic",
     "mcp__montybrain__search",
+    "mcp__montybrain__connections",
 ];
 
 pub const MONTYBRAIN_WRITE_TOOLS: &[&str] = &[
@@ -84,6 +85,9 @@ pub const CLAUDE_DENIED_TOOLS: &[&str] = &[
 
 /// Claude Code `--allowedTools` for a background run: MontyBrain tools only.
 pub fn claude_allowed_tools(plan: &Plan) -> Vec<&'static str> {
+    if !plan.recipe.vault_tools {
+        return Vec::new();
+    }
     let mut tools = MONTYBRAIN_READ_TOOLS.to_vec();
     if plan.writes() {
         tools.extend_from_slice(MONTYBRAIN_WRITE_TOOLS);
@@ -182,6 +186,10 @@ pub fn toml_string(s: &str) -> String {
 
 /// The `-c` values that attach `montybrain-mcp` to a Codex run.
 pub fn codex_mcp_overrides(plan: &Plan, mcp: &McpServer) -> Result<Vec<String>, String> {
+    codex_server_overrides(mcp, plan.read_only())
+}
+
+pub fn codex_server_overrides(mcp: &McpServer, read_only: bool) -> Result<Vec<String>, String> {
     let mut v = vec![
         format!(
             "mcp_servers.montybrain.command={}",
@@ -192,7 +200,7 @@ pub fn codex_mcp_overrides(plan: &Plan, mcp: &McpServer) -> Result<Vec<String>, 
             toml_string(utf8(mcp.vault_root)?)
         ),
     ];
-    if plan.read_only() {
+    if read_only {
         v.push(format!("mcp_servers.montybrain.env.{ENV_READONLY}=\"1\""));
     }
     Ok(v)
@@ -200,6 +208,9 @@ pub fn codex_mcp_overrides(plan: &Plan, mcp: &McpServer) -> Result<Vec<String>, 
 
 /// The `--mcp-config` JSON of a Claude Code run.
 pub fn claude_mcp_config(plan: &Plan, mcp: &McpServer) -> Result<String, String> {
+    if !plan.recipe.vault_tools {
+        return Ok(serde_json::json!({"mcpServers": {}}).to_string());
+    }
     let mut env = serde_json::Map::new();
     env.insert(ENV_VAULT.into(), utf8(mcp.vault_root)?.into());
     if plan.read_only() {
@@ -312,8 +323,14 @@ pub fn background_args_with(
             a.push(utf8(config)?.into());
             a.push("--disallowedTools".into());
             a.extend(CLAUDE_DENIED_TOOLS.iter().map(|t| t.to_string()));
-            a.push("--allowedTools".into());
-            a.extend(claude_allowed_tools(plan).into_iter().map(String::from));
+            if plan.recipe.vault_tools {
+                a.push("--allowedTools".into());
+                a.extend(claude_allowed_tools(plan).into_iter().map(String::from));
+            } else {
+                // No tools at all: the data is in the prompt. The deny rule
+                // beats any allow rule in the user's own settings.
+                a.push("mcp__montybrain".into());
+            }
         }
         ProviderId::Codex => {
             a.extend(["exec", "--json", "--skip-git-repo-check"].map(String::from));
@@ -327,11 +344,96 @@ pub fn background_args_with(
             a.push("-C".into());
             a.push(utf8(cwd)?.into());
             a.push("--ignore-user-config".into());
-            for o in codex_mcp_overrides(plan, mcp)? {
-                a.extend(["-c".into(), o]);
+            if plan.recipe.vault_tools {
+                for o in codex_mcp_overrides(plan, mcp)? {
+                    a.extend(["-c".into(), o]);
+                }
             }
             a.extend(extra);
             a.push(prompt.into());
+        }
+    }
+    Ok(a)
+}
+
+/// Every MontyBrain tool that can write (also `command`, whose `apply` writes).
+pub const MONTYBRAIN_WRITING_TOOLS: &[&str] = &[
+    "mcp__montybrain__create_task",
+    "mcp__montybrain__update_task",
+    "mcp__montybrain__create_topic",
+    "mcp__montybrain__log_update",
+    "mcp__montybrain__command",
+];
+
+/// The `--mcp-config` JSON of a Terminal Skrzynka session: `montybrain-mcp`
+/// read-only (it refuses every write).
+pub fn read_only_mcp_config(mcp: &McpServer) -> Result<String, String> {
+    Ok(serde_json::json!({
+        "mcpServers": {
+            "montybrain": {
+                "command": utf8(mcp.binary)?,
+                "args": [],
+                "env": {ENV_VAULT: utf8(mcp.vault_root)?, ENV_READONLY: "1"},
+            }
+        }
+    })
+    .to_string())
+}
+
+/// Options of a Terminal Skrzynka session ("Moje narzędzia"), between the
+/// program and the prompt. The user's own configuration stays (their MCP
+/// servers, connectors, skills, Codex computer use if they turned it on) and
+/// tools ask for approval in the terminal; MontyBrain is attached read-only
+/// and cannot be written:
+/// * Claude Code: our `montybrain-mcp` with `MONTYBRAIN_READONLY=1` on top of
+///   the user's servers, every writing MontyBrain tool denied by name (also a
+///   `montybrain` server of the user's own), file edits in the vault denied,
+///   the one answer file allowed, and the default permission mode (prompts,
+///   whatever the user's default is). `--permission-mode` also ends the
+///   variadic lists before the prompt.
+/// * Codex: the `montybrain` server overridden to the read-only one, the
+///   workspace-write sandbox rooted in the answers directory (shell commands
+///   can write only there, not in the vault) and approvals on request.
+pub fn inbox_terminal_args(
+    provider: ProviderId,
+    mcp: &McpServer,
+    mcp_config: Option<&Path>,
+    answers_dir: &Path,
+    answer: &Path,
+) -> Result<Vec<String>, String> {
+    let vault = utf8(mcp.vault_root)?.trim_end_matches('/');
+    let mut a: Vec<String> = Vec::new();
+    match provider {
+        ProviderId::Claude => {
+            let config = mcp_config.ok_or("Błąd wewnętrzny: brak konfiguracji MCP.")?;
+            a.push("--mcp-config".into());
+            a.push(utf8(config)?.into());
+            a.push("--add-dir".into());
+            a.push(utf8(answers_dir)?.into());
+            // One rule per argv element (paths may contain spaces); `//`
+            // starts an absolute path in Claude Code permission rules.
+            a.push("--disallowedTools".into());
+            a.extend(MONTYBRAIN_WRITING_TOOLS.iter().map(|t| t.to_string()));
+            a.push(format!("Edit(/{vault}/**)"));
+            a.push(format!("Write(/{vault}/**)"));
+            a.push("--allowedTools".into());
+            let answer = utf8(answer)?;
+            a.push(format!("Edit(/{answer})"));
+            a.push(format!("Write(/{answer})"));
+            a.extend(["--permission-mode".into(), "default".into()]);
+        }
+        ProviderId::Codex => {
+            for o in codex_server_overrides(mcp, true)? {
+                a.extend(["-c".into(), o]);
+            }
+            a.extend([
+                "-s".into(),
+                "workspace-write".into(),
+                "-a".into(),
+                "on-request".into(),
+                "-C".into(),
+                utf8(answers_dir)?.into(),
+            ]);
         }
     }
     Ok(a)
@@ -458,6 +560,7 @@ mod tests {
             "mcp__montybrain__list_tasks",
             "mcp__montybrain__get_topic",
             "mcp__montybrain__search",
+            "mcp__montybrain__connections",
         ];
         for (recipe, params) in [
             ("postep", vec![("project", "beeking")]),
@@ -756,6 +859,121 @@ mod tests {
         assert!(ro.contains(&("MONTYBRAIN_READONLY".into(), "1".into())));
         assert!(!ro.iter().any(|(k, _)| k == "MORWISKO_READONLY"));
         assert!(!ro.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY"));
+    }
+
+    #[test]
+    fn inbox_terminal_args_keep_montybrain_read_only() {
+        let server = McpServer {
+            binary: Path::new("/bin/montybrain-mcp"),
+            vault_root: Path::new("/Users/a/Mój vault"),
+        };
+        let dir = Path::new("/c/terminal dir");
+        let answer = Path::new("/c/terminal dir/r1.odpowiedz.md");
+        let a = inbox_terminal_args(
+            ProviderId::Claude,
+            &server,
+            Some(Path::new("/c/r1.mcp.json")),
+            dir,
+            answer,
+        )
+        .unwrap();
+        let deny = a.iter().position(|x| x == "--disallowedTools").unwrap();
+        let allow = a.iter().position(|x| x == "--allowedTools").unwrap();
+        for t in MONTYBRAIN_WRITING_TOOLS {
+            assert!(a[deny..allow].iter().any(|x| x == t), "{t}: {a:?}");
+        }
+        assert!(
+            a[deny..allow].contains(&"Edit(//Users/a/Mój vault/**)".to_string()),
+            "{a:?}"
+        );
+        assert_eq!(a[allow + 1], "Edit(//c/terminal dir/r1.odpowiedz.md)");
+        // The variadic lists end before the prompt.
+        assert_eq!(a[a.len() - 2..], ["--permission-mode", "default"]);
+        let json: serde_json::Value =
+            serde_json::from_str(&read_only_mcp_config(&server).unwrap()).unwrap();
+        assert_eq!(
+            json["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_READONLY"],
+            "1"
+        );
+        assert_eq!(
+            json["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_DIR"],
+            "/Users/a/Mój vault"
+        );
+        let c = inbox_terminal_args(ProviderId::Codex, &server, None, dir, answer).unwrap();
+        assert!(
+            c.contains(&"mcp_servers.montybrain.env.MONTYBRAIN_READONLY=\"1\"".to_string()),
+            "{c:?}"
+        );
+        assert!(
+            c.windows(2)
+                .any(|w| w[0] == "-s" && w[1] == "workspace-write")
+        );
+        assert!(
+            c.windows(2)
+                .any(|w| w[0] == "-C" && w[1] == "/c/terminal dir")
+        );
+        assert!(
+            !c.iter()
+                .any(|x| x.contains("danger") || x == "--approve-for-me")
+        );
+    }
+
+    #[test]
+    fn inbox_background_runs_get_montybrain_read_only_only() {
+        let plan = super::super::recipes::validate(
+            &super::super::recipes::tests::req(
+                "skrzynka",
+                "claude",
+                "background",
+                &[("dane", "x")],
+            ),
+            &super::super::recipes::tests::projects(),
+        )
+        .unwrap();
+        let server = McpServer {
+            binary: Path::new("/bin/montybrain-mcp"),
+            vault_root: Path::new("/v"),
+        };
+        let a = background_args(
+            &plan,
+            "p",
+            Path::new("/tmp"),
+            &server,
+            Some(Path::new("/tmp/c.json")),
+        )
+        .unwrap();
+        // Only the MontyBrain read tools; every built-in tool denied.
+        let allow = a.iter().position(|x| x == "--allowedTools").unwrap();
+        assert_eq!(
+            a[allow + 1..],
+            MONTYBRAIN_READ_TOOLS
+                .iter()
+                .map(|t| t.to_string())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            !a.iter().any(|x| x == "mcp__montybrain__create_task"),
+            "{a:?}"
+        );
+        assert!(a.iter().any(|x| x == "--strict-mcp-config"));
+        let cfg: serde_json::Value =
+            serde_json::from_str(&claude_mcp_config(&plan, &server).unwrap()).unwrap();
+        assert_eq!(
+            cfg["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_READONLY"],
+            "1"
+        );
+        let plan = super::super::recipes::validate(
+            &super::super::recipes::tests::req("skrzynka", "codex", "background", &[("dane", "x")]),
+            &super::super::recipes::tests::projects(),
+        )
+        .unwrap();
+        let a = background_args(&plan, "p", Path::new("/tmp"), &server, None).unwrap();
+        assert!(
+            a.contains(&"mcp_servers.montybrain.env.MONTYBRAIN_READONLY=\"1\"".to_string()),
+            "{a:?}"
+        );
+        assert!(a.windows(2).any(|w| w[0] == "-s" && w[1] == "read-only"));
+        assert!(a.iter().any(|x| x == "--ignore-user-config"));
     }
 
     #[test]

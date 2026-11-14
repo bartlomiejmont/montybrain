@@ -28,10 +28,33 @@ report-only background runs, e.g. for Codex:
 | `get_topic` `{project, topic, include_done?, tasks_limit?, tasks_offset?, journal_limit?, journal_offset?}` | Full topic: status, repo, summary, tasks, journal. 50 tasks and 30 journal entries per page by default (max 500); the output says how to get the next page. |
 | `list_tasks` `{project?, topic?, inbox_only?, status?[], due_from?, due_to?, include_done?, limit?, offset?}` | Filtered task list, 50 per page by default (max 500); `… and N more (pass offset=…)` when cut. |
 | `search` `{query, limit?, offset?}` | Search tasks, topics and journal (case and diacritics insensitive). 20 results per kind by default (max 500); `limit`/`offset` apply to each kind. |
-| `create_task` `{title, project?, topic?, status?, priority?, due?, links?[], notes?}` | No project: inbox; project only: project-level task. |
-| `update_task` `{id, title?, status?, priority?, due?, clear_due?, add_links?[], remove_links?[], notes?, move_to?{inbox?, project?, topic?}}` | Edit, change status, complete or move a task. Edits and the move are one core transaction (`update_and_move_task`): both happen or neither does. |
-| `create_topic` `{project, title, status?, repo?, summary?}` | New topic in an existing project. |
+| `create_task` `{title, project?, topic?, status?, priority?, due?, links?[], notes?, waits_for?[], related?[]}` | No project: inbox; project only: project-level task. `waits_for` / `related` (`^id` or `[[project/topic]]`) add one `Czeka na: …` / `Powiązane: …` line each to the notes. |
+| `update_task` `{id, title?, status?, priority?, due?, clear_due?, add_links?[], remove_links?[], notes?, move_to?{inbox?, project?, topic?}, waits_for?[], related?[]}` | Edit, change status, complete or move a task. Edits and the move are one core transaction (`update_and_move_task`): both happen or neither does. `waits_for` / `related` then append one line each (already present lines are skipped; the other note lines are not touched). |
+| `create_topic` `{project, title, status?, repo?, summary?, waits_for?[], related?[]}` | New topic in an existing project; `waits_for` / `related` end the summary with one line each. |
+| `command` `{text, apply?, plan?}` | One line of the command language (below), in two calls. Without `apply`: a preview — the plan with each file and the exact Markdown lines (a new task already with the id it will get), warnings, similar open tasks, and a `plan` token in the structured result (`structuredContent.plan`; the prose repeats it, but use the field). Nothing is written, not even ids. With `apply: true` and that token: the plan is rebuilt and written only when its token is the same — the token covers the new task's id, the new topic's exact path, and everything an edit or an appended line depends on (the task's title, links, notes; the topic's summary), all re-checked inside the lock while writing. Otherwise nothing is written and the new preview is returned; `apply: true` without a token writes nothing and returns the preview. Applying the same token twice is refused (the id exists). A plan is written all or nothing: if a step fails, the steps already written are taken back. Every error starts with `Nothing was changed:` — except one that starts with `The write failed and could not be fully taken back`, which lists exactly what is still written. A typo correction is never applied (send the exact slug); `?` requests are refused (the server never calls a model). In read-only runs only the preview works. |
+| `connections` `{ref}` | Connections of one task (`^id`; six lowercase characters without `^` are a task id when such a task exists, else a topic slug) or topic (`[[project/topic]]`, `project/topic`, a unique topic slug), read like the app's map: what it waits for, what waits for it, related items, the "waits for" chain (cycles marked) and dangling references. |
 | `log_update` `{project, topic, text, status?, summary?, author?}` | Append a journal entry, optionally changing topic status/summary in the same write. Author defaults to `agent`. |
+
+The command language (full rules in [`docs/format.md` §13](../../docs/format.md)):
+
+```text
+Zadzwonić do sądu @jutro !wysoki            task in the inbox
+Podpiąć karty > whenubuy/checkout           task in a topic
+[/] Dokończyć opis > mapa-mysli             doing, topic found by its unique slug
+/temat Płatności mobilne > whenubuy         new topic
+/temat ^a1b2c3 > firma                      topic from an existing entry
+^a1b2c3 [x] !wysoki @2026-11-20 > whenubuy  status, priority, due date, move
+^a1b2c3 /czeka ^c3d4e5                      "Czeka na: ^c3d4e5" in the notes
+[[whenubuy/checkout]] /powiaz [[firma/krs]] "Powiązane: [[firma/krs]]" in the summary
+^a1b2c3 /czeka odpis z sądu                 the same, the task or topic found by its name
+umowa z dostawcą /powiaz płatności          subject and reference by name (no ` > `)
+```
+
+After `/czeka` / `/powiaz`, and at the start of a line that has one of them and no ` > `,
+plain words name an open task or topic (title, slug, project name; case, Polish characters
+and one typo ignored). One hit is used; several are an error listing their `^id` /
+`[[project/topic]]`; a subject that finds nothing becomes a new task (`[ ] Title …` always
+does).
 
 Conventions: `project` / `topic` accept the slug or the display name. An exact slug match
 always wins; otherwise slugs, names and the slugified input are compared case and diacritics

@@ -53,7 +53,7 @@ describe("palette results after an external change", () => {
       { kind: "topic", topic },
       ...(entry ? [{ kind: "journal" as const, entry }] : []),
     ]);
-    for (const i of items) if (i.group !== "nav") expect(resolveItem(after, i)).toBeNull();
+    for (const i of items) if (i.group !== "nav" && i.group !== "new") expect(resolveItem(after, i)).toBeNull();
     expect(buildItems(after, "x", [{ kind: "topic", topic }]).some((i) => i.group === "topic")).toBe(false);
     const renamed = structuredClone(before);
     renamed.topics[0]!.title = "Nowy tytuł";
@@ -93,5 +93,12 @@ describe("palette results after an external change", () => {
     expect(nextActive({ items: old, active: chosen, query: q }, fresh, `${q}x`)).toBe(0);
     // the chosen item vanished: fall back to the top
     expect(nextActive({ items: old, active: chosen, query: q }, fresh.slice(0, 1).concat([]), q)).toBe(0);
+  });
+
+  it("ends with the query as a new task or command", () => {
+    const snap = structuredClone(before);
+    const items = buildItems(snap, "Kupić mleko", []);
+    expect(items.at(-1)).toEqual({ group: "new", key: "new", text: "Kupić mleko" });
+    expect(buildItems(snap, "", []).some((i) => i.group === "new")).toBe(false);
   });
 });

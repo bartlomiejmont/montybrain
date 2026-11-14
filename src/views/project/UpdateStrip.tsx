@@ -71,6 +71,8 @@ import {
 import { navigate } from "../../router/router";
 import { readPref, writePref } from "../../store/ui";
 import { runStore, useRuns } from "../../store/runs";
+import { sessionStore } from "../../store/session";
+import { MY_TOOLS_CONSENT, MY_TOOLS_CONSENT_KEY } from "../../lib/agentMode";
 import { updateStore, useProviders, useUpdates } from "../../store/updates";
 import { useVault, useView } from "../../store/vault";
 import { Markdown } from "../actions/Markdown";
@@ -399,6 +401,10 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
         return { kind: "task_status", status: taskStatus };
       case "new_task":
         return { kind: "new_task", title };
+      case "move_task":
+      case "topic_from_tasks":
+        // Not editable: the review offers no "Edytuj" for these kinds.
+        throw new Error("Tej propozycji nie da się poprawić.");
     }
   };
   async function save() {
@@ -671,6 +677,23 @@ function ChangeRow({
               )}
               <p className="upd-change-detail">{sc.change.reason}</p>
             </>
+          ) : sc.change.kind === "topic_from_tasks" ? (
+            <>
+              {t.summary && (
+                <div className="upd-change-summary">
+                  <span className="upd-change-summary-label">Opis stanu</span>
+                  <p>{t.summary}</p>
+                </div>
+              )}
+              <ul className="upd-topic-tasks" aria-label={`Wpisy tematu ${t.title}`}>
+                {t.tasks.map((x, k) => (
+                  <li key={k}>
+                    <span className="upd-topic-task-title">{x.title}</span> <span className="upd-topic-task-status">{x.status}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="upd-change-detail">{t.detail}</p>
+            </>
           ) : (
             <>
               <p className="upd-change-detail">{t.detail}</p>
@@ -680,7 +703,7 @@ function ChangeRow({
           {(c.kind === "new_topic" || c.kind === "topic_log") && (c.branches?.length ?? 0) > 0 && (
             <p className="upd-change-detail upd-branches">Gałęzie: {c.branches!.map((b) => `${b.repo}/${b.branch}`).join(", ")}</p>
           )}
-          {editable && !o && (
+          {editable && !o && c.kind !== "move_task" && c.kind !== "topic_from_tasks" && (
             <span className="upd-row-actions">
               <button ref={editBtn} type="button" className="upd-link upd-edit-btn" disabled={busy} onClick={() => setEditing(true)}>
                 Edytuj
@@ -788,6 +811,7 @@ function RequestInput({
   history,
   collapsed = false,
   onStart,
+  onSession,
   onEnableHistory,
 }: {
   project: Project;
@@ -800,6 +824,8 @@ function RequestInput({
   /** While a review is open: a quiet "Nowe zlecenie…" that opens the field. */
   collapsed?: boolean;
   onStart: (text: string, mode: RunMode) => Promise<boolean>;
+  /** The in-app session with the user's own tools ("z moimi narzędziami"). */
+  onSession?: (text: string) => Promise<boolean>;
   onEnableHistory: () => void;
 }) {
   const slug = project.slug;
@@ -808,6 +834,7 @@ function RequestInput({
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [consent, setConsent] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const wasOpened = useRef(false);
@@ -839,6 +866,16 @@ function RequestInput({
     setBusy(false);
     if (ok) setText("");
     requestAnimationFrame(() => ref.current?.focus());
+  }
+  async function session(agreed = false) {
+    const t = text.trim();
+    if (!t || !chosen || busy || !onSession) return;
+    if (!agreed && readPref(MY_TOOLS_CONSENT_KEY) !== "1") return setConsent(true);
+    setConsent(false);
+    setBusy(true);
+    const ok = await onSession(t);
+    setBusy(false);
+    if (ok) setText("");
   }
   const id = `upd-ask-${slug}`;
   if (collapsed && !open) {
@@ -905,6 +942,17 @@ function RequestInput({
         >
           w Terminalu
         </button>
+        {onSession && (
+          <button
+            type="button"
+            className="upd-link upd-ask-term"
+            disabled={!ready}
+            title={chosen ? `Sesja ${PROVIDER_LABEL[chosen]} w aplikacji, z twoimi narzędziami (Slack, poczta, sterowanie komputerem, jeśli je masz); MontyBrain tylko do odczytu, zmiany jako propozycje` : undefined}
+            onClick={() => void session()}
+          >
+            z moimi narzędziami
+          </button>
+        )}
       </div>
       <p className="upd-ask-hint" id={`${id}-note`}>
         {requestNote(history)}
@@ -918,6 +966,17 @@ function RequestInput({
         )}
         {focused && <span className="upd-ask-keys"> Enter: zleć, Shift+Enter: nowa linia.</span>}
       </p>
+      {consent && (
+        <InlineConfirm
+          question={MY_TOOLS_CONSENT}
+          confirmLabel="Rozumiem, uruchom"
+          onConfirm={() => {
+            writePref(MY_TOOLS_CONSENT_KEY, "1");
+            void session(true);
+          }}
+          onCancel={() => setConsent(false)}
+        />
+      )}
       {confirm && (
         <InlineConfirm
           question={recheckQuestion(pending, true, chosen)}
@@ -1096,7 +1155,7 @@ function DroppedBox({ proposal }: { proposal: StoredProposal }) {
   );
 }
 
-function Review({
+export function Review({
   project,
   proposal,
   autoFocus,
@@ -1450,6 +1509,16 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
       return false;
     }
   }
+  async function startSession(text: string): Promise<boolean> {
+    if (!chosen) return false;
+    try {
+      await sessionStore.begin({ scope: "project", project: project.slug, provider: chosen, text });
+      return true;
+    } catch (e) {
+      notify(describeError(e));
+      return false;
+    }
+  }
   async function cancel() {
     if (strip.kind !== "running") return;
     try {
@@ -1533,6 +1602,7 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
       history={view?.sources.history ?? false}
       collapsed={collapsed}
       onStart={startRequest}
+      onSession={startSession}
       onEnableHistory={openHistory}
     />
   );

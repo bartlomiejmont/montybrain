@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-inbox-agent"
+description = "Enables the inbox_agent command without any pre-configured scope."
+commands.allow = ["inbox_agent"]
+
+[[permission]]
+identifier = "deny-inbox-agent"
+description = "Denies the inbox_agent command without any pre-configured scope."
+commands.deny = ["inbox_agent"]

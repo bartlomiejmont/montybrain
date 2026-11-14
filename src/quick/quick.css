@@ -249,3 +249,35 @@ body.quick-body {
     animation: none;
   }
 }
+
+/* The command field in the window: the reading, plan and echo grow the panel. */
+.qc-row.qc-field {
+  height: auto;
+  min-height: 56px;
+  align-items: flex-start;
+  padding: 8px 18px 10px;
+}
+
+.qc-row.qc-field .qc-ring {
+  margin-top: 13px;
+}
+
+.qc-row.qc-field .cf {
+  flex: 1;
+  min-width: 0;
+}
+
+.qc-row.qc-field .cf-input {
+  font-size: 17px;
+  letter-spacing: -0.005em;
+}
+
+.qc-echo {
+  padding: 0 18px 12px 45px;
+}
+
+.qc-undone {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+}

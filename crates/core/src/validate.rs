@@ -40,6 +40,20 @@ pub(crate) fn one_line(field: &str, s: &str) -> Result<String> {
     Ok(s)
 }
 
+/// A topic title: [`one_line`], without `[` or `]` (a topic is referenced as
+/// `[[projekt/slug]]`; brackets in its title would make a reference by title
+/// impossible and confusing next to the slug).
+pub(crate) fn topic_title_line(field: &str, s: &str) -> Result<String> {
+    let t = one_line(field, s)?;
+    if t.contains(['[', ']']) {
+        return Err(bad(
+            field,
+            "must not contain [ or ] (topics are referenced as [[project/slug]])",
+        ));
+    }
+    Ok(t)
+}
+
 /// A strict single-line value (colour, repository name and path): surrounding
 /// whitespace is trimmed, line breaks and control characters are rejected.
 pub(crate) fn strict_line(field: &str, s: &str) -> Result<String> {

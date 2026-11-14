@@ -573,3 +573,94 @@ note with references round-trips byte for byte.
   the slug. Slugs are ids that agents and the app use.
 * Avoid ending a title with something that looks like a token (`@2026-…`, `!wysoki`,
   `^abc123`, `✓…`).
+
+## 13. The command language (input only)
+
+Skrzynka, the quick-capture window, the "Nowe" row of ⌘K and the MCP `command`
+tool read one line of text with one parser (`montybrain_core::command`). Nothing
+of the syntax below reaches the files except what it means: tasks, topics and
+lines written in the formats above.
+
+```text
+Zadzwonić do sądu @jutro !wysoki            task in Skrzynka
+Podpiąć karty > whenubuy/checkout           task in a topic
+Sprawdzić fakturę > whenubuy                project-level task
+[/] Dokończyć opis > mapa-mysli             doing; a bare topic slug when it is unique
+/temat Płatności mobilne > whenubuy         new topic
+/temat ^a1b2c3 > firma                      topic from an entry (the entry becomes its task)
+^a1b2c3 > whenubuy/checkout                 move
+^a1b2c3 [x]                                 status
+^a1b2c3 !wysoki @2026-11-20                 priority and due date
+^a1b2c3 /czeka ^c3d4e5                      adds the line "Czeka na: ^c3d4e5" to the notes
+[[whenubuy/checkout]] /czeka [[firma/krs]]  adds "Czeka na: [[firma/krs]]" to the summary
+^a1b2c3 /powiaz [[whenubuy/platnosci]]      adds "Powiązane: [[whenubuy/platnosci]]"
+^a1b2c3 /czeka odpis z sądu                 the same, the task or topic found by its name
+umowa z dostawcą /powiaz płatności          subject and reference by name (no ` > `)
+[ ] Umowa z dostawcą /powiaz ^a1b2c3        `[ ]` first: always a new task
+?rozpisz ^a1b2c3                            a request to the app's agent
+?dopasuj                                    the agent proposes places (selection or all of Skrzynka)
+```
+
+* `!priorytet`, `@termin`, `^id`, `[[projekt/temat]]` and the boxes `[ ] [/] [x] [!]`
+  mean what they mean in files (§7). In a new task's title only trailing `!…` and
+  `@…` words count, read right to left like in a task line; `@` before something that
+  is not a date stays in the title (`Fix @mention`).
+* Relative dates are written as plain dates: `@dzis`/`@dziś`, `@jutro`, `@pojutrze`,
+  `@pn` … `@nd` (the next such day after today; on a Monday `@pn` is in a week),
+  `@+3d` (days), `@+2t` (weeks, up to 3650 days). Absolute: `@YYYY-MM-DD[THH:MM]`.
+* ` > ` must be a word of its own (`a>b` is text); `\>` is a literal `>`, a leading
+  `\?` a literal `?`. Unknown `/words` are text.
+* After ` > `: `skrzynka`, `projekt`, `projekt/temat` or a topic. An exact slug wins;
+  then slugs and names are compared ignoring case and Polish characters; a word that
+  is a project and a topic means the project. Two hits or none: nothing is written
+  and the choices are listed. A name one edit away from exactly one place is offered
+  as a typo ("literówka") and still has to be confirmed (the MCP tool never applies
+  it). Archived projects and done topics are found only by their exact slug.
+* Text that starts with `^id` (or several) edits those tasks; text that starts with
+  ` > `, `/czeka`, `/powiaz` or only attributes applies to the entries selected in
+  Skrzynka, or, with none selected, to the entry focused in its list.
+  `/temat Nazwa > projekt` with a selection makes one topic of the selected
+  entries; ids, links and notes are kept (whole blocks move).
+* After `/czeka` and `/powiaz` a task or topic can be named by plain words instead
+  of `^id` / `[[…]]`; likewise plain words at the start of a line that has
+  `/czeka` or `/powiaz` and no ` > ` name the task or topic to change. The words are
+  searched in open tasks (title) and open topics of active projects (title, slug),
+  ignoring case and Polish characters; the project's (and topic's) name may narrow
+  them (`umowa firma`), and a word of four letters or more may be one edit off. The
+  whole name first, then names whose words start with the words typed, then one
+  typo away: exactly one hit of the best kind is used (a typo still has to be
+  confirmed and is never applied by the MCP tool); several: nothing is written and
+  they are listed (kind, place, `^id` or `[[projekt/temat]]`). A subject that finds
+  nothing makes a new task with that title (said in the preview); a reference that
+  finds nothing is a problem. A leading box (`[ ] Tytuł /powiaz …`) keeps it a new
+  task. Done tasks and topics are referred to by `^id` / `[[…]]`.
+* `/czeka` and `/powiaz` append exactly one standalone line (§11a) at the end of the
+  summary (topics) or of the notes (tasks); nothing around it is rewritten. An
+  identical line already there is not added twice.
+* There is no delete and no project creation this way.
+* Everything except plain capture (a title with optional `!`/`@`, into Skrzynka or
+  the place picked in the quick-capture window) is shown as a plan first (the files
+  and the exact lines) and written on confirmation; the plan is rebuilt before
+  writing and refused when the data changed meanwhile. The MCP `command` tool does
+  the same in two calls: the preview returns a `plan` token, and `apply: true` writes
+  only a plan with that token.
+* A plan is written all or nothing: when a step fails, the steps already written are
+  taken back (each only while unchanged); only if that cannot complete does the app
+  or the MCP tool report exactly what stays written.
+* A new task's id is chosen with the plan (shown in the preview, written exactly,
+  refused if it exists: a plan cannot be applied twice); a new topic is written at
+  exactly the previewed path. An edit or an appended line is written only while the
+  task (title, links, notes, fields) or the topic summary is still as previewed.
+* Topic titles cannot contain `[` or `]` (topics are referenced as
+  `[[projekt/slug]]`); existing titles with brackets are referenced by their slug.
+* A text with any problem is not a plan: its reading is the problem. Topic titles
+  that would read as structure (`## …`, `---`, `- …`, a fence) are refused, and a
+  connection line that would not read back as one (notes or a summary ending in an
+  unclosed code block) is refused before anything is written.
+* `\>` is a literal `>` also in a destination; a name with a slash in it
+  ("Testy A/B") is matched as a whole name before being read as `projekt/temat`.
+* While a line is being typed (the app passes the caret), a word still being
+  typed at the caret (`/`, `/cz`, `^`, `[[kr`, `!`, `@ju`, a lone ` > ` or
+  `/czeka`, or a name with no single match yet) reads as "typing": a neutral hint
+  instead of an error, and nothing to write. Without a caret (the MCP tool, a
+  write) every problem counts.

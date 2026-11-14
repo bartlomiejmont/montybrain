@@ -16,6 +16,12 @@ use super::command::SCRUBBED_ENV;
 
 /// Launch files older than this are removed before a new launch.
 pub const KEEP_FILES_FOR: Duration = Duration::from_secs(60 * 60);
+/// The answer file of a Terminal Skrzynka session (`<run id>.odpowiedz.md`).
+pub const ANSWER_SUFFIX: &str = ".odpowiedz.md";
+/// The read-only MCP config of a Terminal Skrzynka session (Claude Code).
+pub const MCP_SUFFIX: &str = ".mcp.json";
+/// Answers and configs stay longer than launchers: the session may take a while.
+pub const KEEP_ANSWERS_FOR: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// `'…'` with embedded single quotes as `'\''`: safe for any string without NUL.
 pub fn shell_quote(s: &str) -> String {
@@ -73,20 +79,24 @@ fn cleanup(dir: &Path, keep: Duration) {
     let now = SystemTime::now();
     for e in entries.flatten() {
         let p = e.path();
-        let ours = p
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.ends_with(".command") || n.ends_with(".prompt.txt"));
-        let old = e
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+        let launcher = name.ends_with(".command") || name.ends_with(".prompt.txt");
+        let answer = name.ends_with(ANSWER_SUFFIX) || name.ends_with(MCP_SUFFIX);
+        let age = e
             .metadata()
             .and_then(|m| m.modified())
             .ok()
-            .and_then(|t| now.duration_since(t).ok())
-            .is_some_and(|age| age > keep);
-        if ours && old {
+            .and_then(|t| now.duration_since(t).ok());
+        let old = |limit: Duration| age.is_some_and(|a| a > limit);
+        if (launcher && old(keep)) || (answer && old(keep.max(KEEP_ANSWERS_FOR))) {
             let _ = std::fs::remove_file(&p);
         }
     }
+}
+
+/// A file only the user can read (0600), replacing an old one.
+pub fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    write_file(path, bytes, 0o600)
 }
 
 fn write_file(path: &Path, bytes: &[u8], mode: u32) -> std::io::Result<()> {

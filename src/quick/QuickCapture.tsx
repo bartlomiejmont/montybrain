@@ -1,44 +1,43 @@
-// The quick-capture window: one input, a compact destination picker, Enter
-// saves, Esc closes. Same quick-add tokens as everywhere else (!wysoki, @jutro,
-// @2026-11-20T09:00). The window is created hidden once and re-shown by the
-// global shortcut; every show resets it (`onQuickShow`).
+// The quick-capture window: the command field of Skrzynka (same reading,
+// confirm step and echo, read by the backend), a compact destination picker
+// for plain capture, Enter saves, Esc closes. The window is created hidden
+// once and re-shown by the global shortcut; every show resets it
+// (`onQuickShow`).
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { api } from "../api";
-import type { NewTask, Snapshot, TaskLocation } from "../api/types";
-import { formatDue, toIsoDate } from "../lib/dates";
+import { api, mockCommandState, MOCK_COMMAND_TEXT } from "../api";
+import type { LineWritten, Snapshot, TaskLocation } from "../api/types";
+import { CommandField, Echo, type CommandFieldHandle } from "../components/CommandField";
 import { describeError } from "../lib/errors";
-import { parseQuickAdd } from "../lib/quickadd";
+import { describeUndo } from "../lib/undo";
 import { destinations, filterDestinations, resolveDestination, type Destination } from "./destinations";
 
-const CLOSE_AFTER_SAVE_MS = 850;
+/** Long enough to read the echo and press "Cofnij". */
+const CLOSE_AFTER_SAVE_MS = 3500;
 
 function Dot({ color }: { color: string | null }) {
   return <span className="qc-dot" style={{ background: color ?? "var(--text-4)" }} aria-hidden />;
 }
 
-function tokenChips(task: NewTask, today: string): string[] {
-  const out: string[] = [];
-  if (task.due) out.push(formatDue(task.due, today));
-  if (task.priority === "high") out.push("wysoki");
-  if (task.priority === "low") out.push("niski");
-  return out;
-}
-
 export function QuickCapture() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [saved, setSaved] = useState<TaskLocation | null>(null);
-  const [value, setValue] = useState("");
   const [picking, setPicking] = useState(false);
   const [filter, setFilter] = useState("");
   const [cursor, setCursor] = useState(0);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ title: string; where: string } | null>(null);
+  const mock = mockCommandState();
+  // `?cmd=echo` (browser mock): the saved state with its echo and "Cofnij".
+  const [done, setDone] = useState<{ reading: string; echo: LineWritten[]; undo: number | null; undone?: string; failed?: boolean } | null>(
+    mock === "echo"
+      ? { reading: "Nowe zadanie „Kupić filtry” w: Skrzynka", echo: [{ file: "skrzynka.md", line: 9, text: "- [ ] Kupić filtry ^m3n4b5" }], undo: 1 }
+      : null,
+  );
+  const [generation, setGeneration] = useState(0);
+  const fieldRef = useRef<CommandFieldHandle>(null);
 
   const boxRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const closeTimer = useRef<number | undefined>(undefined);
@@ -46,9 +45,6 @@ export function QuickCapture() {
   const all = useMemo(() => (snap ? destinations(snap) : []), [snap]);
   const dest = all.length ? resolveDestination(all, saved) : null;
   const shown = useMemo(() => filterDestinations(all, filter), [all, filter]);
-  const today = toIsoDate(new Date());
-  const parsed = useMemo(() => parseQuickAdd(value, today), [value, today]);
-  const chips = value.trim() ? tokenChips(parsed, today) : [];
 
   const load = useCallback(async () => {
     try {
@@ -62,14 +58,13 @@ export function QuickCapture() {
 
   const reset = useCallback(() => {
     window.clearTimeout(closeTimer.current);
-    setValue("");
     setPicking(false);
     setFilter("");
     setError(null);
-    setDone(null);
-    setBusy(false);
+    if (mockCommandState() !== "echo") setDone(null);
+    setGeneration((g) => g + 1);
     void load();
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => fieldRef.current?.focus());
   }, [load]);
 
   useEffect(() => {
@@ -115,7 +110,7 @@ export function QuickCapture() {
 
   function closePicker() {
     setPicking(false);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => fieldRef.current?.focus());
   }
 
   function choose(d: Destination) {
@@ -124,39 +119,24 @@ export function QuickCapture() {
     void api.updateSettings({ quick_destination: d.location }).catch(() => {});
   }
 
-  async function save() {
-    if (busy || done || !dest) return;
-    if (!value.trim()) return;
-    if (!parsed.title.trim()) {
-      setError("Wpisz tytuł zadania.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createTask(dest.location, parsed);
-      setDone({ title: parsed.title, where: dest.full });
-      setValue("");
-      closeTimer.current = window.setTimeout(close, CLOSE_AFTER_SAVE_MS);
-    } catch (e) {
-      setError(describeError(e));
-      requestAnimationFrame(() => inputRef.current?.focus());
-    } finally {
-      setBusy(false);
-    }
+  function onWritten(w: { reading: string; echo: LineWritten[]; undo: number | null }) {
+    setDone(w);
+    closeTimer.current = window.setTimeout(close, CLOSE_AFTER_SAVE_MS);
   }
 
-  function onInputKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void save();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    } else if (e.key === "Tab") {
-      e.preventDefault();
-      openPicker();
+  /** "Cofnij" next to the echo: takes back this write; on success says so and closes,
+   *  on failure stays open with "Spróbuj cofnąć jeszcze raz". */
+  async function undoDone(token: number | null) {
+    if (!done) return;
+    window.clearTimeout(closeTimer.current);
+    try {
+      const r = await api.commandUndo(token, "quick");
+      const v = describeUndo(r, token);
+      setDone({ ...done, undo: v.retry, undone: v.text, failed: v.failed });
+      // Only a complete answer closes the window; a failure stays with a retry.
+      if (!v.failed) closeTimer.current = window.setTimeout(close, 1200);
+    } catch (e) {
+      setDone({ ...done, undone: describeError(e), failed: true });
     }
   }
 
@@ -181,6 +161,7 @@ export function QuickCapture() {
   return (
     <div className="qc" ref={boxRef} onKeyDown={(e) => done && e.key === "Escape" && close()}>
       {done ? (
+        <>
         <div className="qc-row qc-done" role="status">
           <span className="qc-check" aria-hidden>
             <svg viewBox="0 0 16 16" width="16" height="16">
@@ -189,26 +170,42 @@ export function QuickCapture() {
             </svg>
           </span>
           <span className="qc-done-text">
-            Dodano <span className="qc-done-where">· {done.where}</span>
+            Zapisano <span className="qc-done-where">· {done.reading}</span>
           </span>
         </div>
+        <div className="qc-echo">
+          {done.undone ? (
+            <p className="qc-undone" role="status">
+              {done.undone}
+              {done.failed && done.undo !== null && (
+                <>
+                  {" "}
+                  <button type="button" className="cf-link" onClick={() => void undoDone(done.undo)}>
+                    Spróbuj cofnąć jeszcze raz
+                  </button>
+                </>
+              )}
+            </p>
+          ) : (
+            <Echo echo={done.echo} onUndo={done.undo !== null ? () => void undoDone(done.undo) : undefined} />
+          )}
+        </div>
+        </>
       ) : (
-        <div className="qc-row" data-tauri-drag-region>
+        <div className="qc-row qc-field" data-tauri-drag-region onKeyDown={(e) => e.key === "Tab" && !e.shiftKey && !e.defaultPrevented && (e.preventDefault(), openPicker())}>
           <span className="qc-ring" aria-hidden />
-          <input
-            ref={inputRef}
-            className="qc-input"
-            value={value}
-            placeholder="Nowe zadanie…"
-            aria-label="Nowe zadanie"
-            spellCheck={false}
-            autoComplete="off"
-            disabled={busy}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={onInputKey}
+          <CommandField
+            key={generation}
+            ref={fieldRef}
+            variant="quick"
+            source="quick"
+            location={dest?.location ?? null}
+            placeholder="Nowe zadanie albo komenda…"
+            autoFocus
+            initialText={mock && mock !== "topic" && mock !== "agent" ? MOCK_COMMAND_TEXT[mock].text : ""}
+            startConfirmed={mock === "confirm"}
+            onEscape={close}
+            onWritten={onWritten}
           />
         </div>
       )}
@@ -234,16 +231,10 @@ export function QuickCapture() {
               {error}
             </span>
           ) : (
-            <span className="qc-chips" aria-live="polite">
-              {chips.map((c) => (
-                <span key={c} className="qc-chip">
-                  {c}
-                </span>
-              ))}
-            </span>
+            <span className="qc-chips" />
           )}
           <span className="qc-hints" aria-hidden>
-            <kbd>↵</kbd> zapisz <kbd>⇥</kbd> miejsce <kbd>esc</kbd>
+            <kbd>↵</kbd> zapisz <kbd>⇥</kbd> miejsce <kbd>&gt;</kbd> komenda <kbd>esc</kbd>
           </span>
         </div>
       )}

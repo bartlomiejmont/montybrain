@@ -40,6 +40,7 @@ pub mod proposal;
 pub mod providers;
 pub mod recipes;
 pub mod runner;
+pub mod session;
 pub mod terminal;
 
 pub use runner::{
@@ -279,6 +280,24 @@ fn cache_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     }
 }
 
+/// The in-app agent session (one at a time), see [`session`].
+pub struct AgentSessions(pub Arc<session::Sessions>);
+
+struct TauriSessionSink<R: Runtime>(AppHandle<R>);
+
+impl<R: Runtime> session::SessionSink for TauriSessionSink<R> {
+    fn changed(&self, v: &session::SessionView) {
+        if let Err(err) = self.0.emit(session::SESSION_UPDATED, v) {
+            crate::log(&format!("emit {} failed: {err}", session::SESSION_UPDATED));
+        }
+    }
+
+    fn answer(&self, v: &session::SessionView, text: &str) -> Result<usize, String> {
+        let label: String = v.request.chars().take(300).collect();
+        crate::updates::agent_answer(&self.0, &v.scope.key(), &v.id, v.provider, text, &label)
+    }
+}
+
 /// Called once from `setup`.
 pub fn init<R: Runtime>(app: &AppHandle<R>) {
     let home = app
@@ -298,12 +317,19 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
         std::env::vars_os().collect(),
     );
     app.manage(Runs(Arc::new(manager)));
+    app.manage(AgentSessions(Arc::new(session::Sessions::new(Arc::new(
+        TauriSessionSink(app.clone()),
+    )))));
 }
 
 /// On quit: stop a running background run (its whole process group).
 pub fn shutdown<R: Runtime>(app: &AppHandle<R>) {
     if let Some(runs) = app.try_state::<Runs>() {
         runs.0.shutdown(Duration::from_secs(1));
+    }
+    // The in-app session's process group is killed, never left running.
+    if let Some(s) = app.try_state::<AgentSessions>() {
+        s.0.shutdown();
     }
 }
 

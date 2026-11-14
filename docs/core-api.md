@@ -250,6 +250,8 @@ Behaviour worth knowing:
 * Slugs come from the name or title (`slugify`), with `-2`, `-3`, … added on
   collision. They never change afterwards, even if you rename. Use `Project.slug`
   and `Topic.slug` as ids.
+* Topic titles cannot contain `[` or `]` (`InvalidInput`): topics are referenced as
+  `[[projekt/slug]]`.
 * Titles and names are collapsed to one line (whitespace normalised). An empty
   title or name is rejected with `InvalidInput`.
 * A task title that would read back differently (for example ending in `@2026-11-20`
@@ -351,6 +353,72 @@ fn demo() -> Result<()> {
     Ok(())
 }
 ```
+
+## The command language (`command`, `refs`)
+
+One parser and resolver for Skrzynka, the quick-capture window, ⌘K and the MCP
+`command` tool ([`format.md` §13](format.md)). Pure apart from reading task lines
+from the vault for the exact preview.
+
+```rust
+command::preview(&Snapshot, text, &Context) -> Preview      // reading, plan (steps with file + exact lines), problems, warnings, choices, typo flag, similar tasks, agent request
+command::run(&Vault, text, &Context, expected: Option<&Plan>, exact: bool) -> Result<Outcome, Refusal>
+    // re-reads the vault and rebuilds the plan; Stale when it differs from `expected`;
+    // Typo when `exact` and the plan rests on a typo correction; then writes step by step,
+    // all or nothing: on a failure the written steps are taken back (`Applied::rolled_back`),
+    // and only what could not be taken back stays (`Applied::left_written`, `Applied::undo`)
+command::undo(&Vault, &[UndoStep]) -> Vec<UndoOutcome>      // newest first, each only while unchanged (the whole task / the whole notes or summary as written)
+command::plan_token(&Plan) -> String                        // stable fingerprint: MCP `command` applies only the previewed plan
+command::exec::polish_error(&Error) -> String               // a core error as one Polish sentence
+command::complete(&Snapshot, text, caret_utf16, today) -> Option<Completions>  // items with kind and the matched UTF-16 ranges (`marks`)
+command::search(&Snapshot, words, exclude) -> Vec<Hit>      // open tasks and topics by plain words (whole name, word starts, one typo)
+command::resolve_search(&Snapshot, words, exclude) -> Resolved<Hit>
+command::mark_ranges(label, typed) -> Vec<Span>             // what matched, for marking lists
+command::inbox_suggestions(&Snapshot, today) -> Vec<InboxSuggestion>
+command::candidates(&Snapshot, title, today) -> Vec<Candidate>
+command::similar_tasks(&Snapshot, title, exclude) -> Vec<Similar>
+```
+
+`Context { today, selection, focus, caret, default_location, vault }`: the clock is
+injected (relative dates), `selection` (else `focus`, the entry focused in Skrzynka)
+is the subject of a command that starts with ` > `, `/…` or only attributes,
+`default_location` is where a plain new task goes, and `caret` (only while typing)
+turns a word still being typed at the caret into `State::Typing` (a neutral hint)
+instead of an error.
+
+Mutations added for it (each one locked, verified and atomic like the others):
+
+```rust
+Vault::append_summary_line(project, topic, line) -> Result<LineWritten>   // one standalone `Czeka na:` / `Powiązane:` line at the end of the summary
+Vault::remove_summary_line(project, topic, line) -> Result<bool>          // exactly that line (outside code), the last one
+Vault::remove_summary_line_if(project, topic, line, guard) -> Result<bool> // only while `guard(&Topic)` holds inside the lock
+Vault::append_task_note_line(id, line) -> Result<(Task, LineWritten)>     // the last line of the task's block
+Vault::remove_task_note_line(id, line) -> Result<bool>
+Vault::remove_task_note_line_if(id, line, guard) -> Result<bool>          // only while `guard(&Task)` holds inside the lock
+Vault::update_and_move_task_if(id, guard, patch, to) -> Result<Option<Task>>
+Vault::create_topic_from_tasks(project, NewTopic, ids) -> Result<TopicFromTasks>   // new file first, then the sources
+Vault::create_topic_from_tasks_if(project, NewTopic, ids, guard) -> Result<Option<TopicFromTasks>>  // every task checked inside the same lock
+Vault::dissolve_topic_if(project, topic, expected_contents, origins) -> Result<Option<Vec<Task>>>  // its undo
+Vault::render_new_task_line(&NewTask, today) -> Result<String>            // the line create_task would write (no id)
+Vault::create_task_with_id(location, NewTask, id) -> Result<Task>          // exactly that id; refused when it exists (checked in the lock)
+Vault::create_topic_exact(project, slug, NewTopic) -> Result<TopicCreated> // exactly <slug>.md; refused when it exists (checked in the lock)
+Vault::append_summary_line_if / append_task_note_line_if(…, guard)         // only while the topic / task is as the preview saw it
+```
+
+`refs::{parse_refs, build_graph, neighbours, wait_chain, connection_line}`: the
+reading of references the map uses (§11a), for `connections` and `/czeka`.
+
+### Local suggestions (`command::suggest`)
+
+Words: folded, split on non-alphanumerics, words under 3 characters and stop words
+dropped, each cut to 5 characters. A destination (active project, open topic) gets
+3 points per title stem found in a topic title, 2 in the project name/slug, 2 in a
+repository name, 1 in the topic summary; +0.5 for a topic with a journal entry in
+the last 14 days; divided by `sqrt(number of title stems)`. The best candidate is
+suggested when its score is at least `STRONG_SCORE` (2.0) and it beats the second
+by at least `MARGIN` (0.75); otherwise the row shows "?". Duplicate hint: an open
+task with at least 2 shared stems and a Jaccard index of at least
+`SIMILAR_JACCARD` (0.6), or the same folded title.
 
 ## Other public helpers
 

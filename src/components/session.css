@@ -1,0 +1,445 @@
+/* The in-app agent session: a panel over the right side of the window. */
+
+.ags {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 48px));
+  border-left: 1px solid var(--line);
+  background: var(--bg-side);
+}
+
+.ags-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 30px 14px 8px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.ags-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ags-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.ags-title {
+  display: -webkit-box;
+  margin: 3px 0 2px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.ags-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.ags-remembered {
+  overflow: hidden;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ags-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-4);
+}
+
+.st-working .ags-dot,
+.st-starting .ags-dot,
+.ags-indicator .ags-dot {
+  background: var(--kind-task);
+  animation: ags-pulse 1.4s ease-in-out infinite;
+}
+
+.st-needs_you .ags-dot,
+.ags-indicator.attention .ags-dot {
+  background: var(--mark);
+  animation: none;
+}
+
+.st-failed .ags-dot {
+  background: var(--danger);
+}
+
+@keyframes ags-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ags-dot {
+    animation: none !important;
+  }
+}
+
+.ags-head-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.ags-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ags-btn:hover:not(:disabled),
+.ags-btn:focus-visible {
+  background: var(--bg-active);
+  outline: none;
+}
+
+.ags-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.ags-btn.primary {
+  border-color: var(--text-3);
+  background: var(--bg-active);
+}
+
+.ags-btn.danger {
+  color: var(--danger);
+}
+
+.ags-btn:disabled {
+  color: var(--text-4);
+  cursor: default;
+}
+
+.ags-icon {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.ags-icon:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.ags-reach {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.ags-body {
+  flex: 1;
+  min-height: 0;
+  padding: 10px 16px;
+  overflow-y: auto;
+}
+
+.ags-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ags-user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg-active);
+}
+
+.ags-who {
+  display: block;
+  color: var(--text-3);
+  font-size: 10.5px;
+}
+
+.ags-user-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ags-assistant {
+  color: var(--text);
+  font-size: 13px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ags-assistant p {
+  margin: 0 0 6px;
+}
+
+.ags-tool-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 0;
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ags-tool-head:disabled {
+  cursor: default;
+}
+
+.ags-tool-head .chev {
+  flex: none;
+  transition: transform 120ms var(--ease);
+}
+
+.ags-tool-head .chev.open {
+  transform: rotate(90deg);
+}
+
+.ags-tool-name {
+  flex: none;
+  color: var(--text-2);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+}
+
+.ags-tool-sum {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ags-tool-st {
+  flex: none;
+  margin-left: auto;
+}
+
+.ags-tool.st-failed .ags-tool-st {
+  color: var(--danger);
+}
+
+.ags-tool-more {
+  padding: 2px 0 4px 17px;
+}
+
+.ags-tool-label {
+  margin: 4px 0 2px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.ags-pre {
+  max-height: 220px;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  overflow: auto;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-2);
+  font: 11px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ags-card {
+  font-size: 12px;
+}
+
+.ags-card.pending {
+  padding: 10px 12px;
+  border: 1px solid var(--mark);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.ags-card-ask {
+  margin: 0 0 2px;
+  color: var(--mark);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ags-card-title {
+  color: var(--text-2);
+}
+
+.ags-card-title.strong {
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  word-break: break-word;
+}
+
+.ags-card-line {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 0;
+  color: var(--text-3);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ags-card.locked .ags-card-line {
+  cursor: default;
+}
+
+.ags-card-state {
+  flex: none;
+  color: var(--text-3);
+}
+
+.ags-card.st-denied .ags-card-state {
+  color: var(--danger);
+}
+
+.ags-card-note {
+  margin: 2px 0 0 16px;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.ags-card.locked .ags-card-title {
+  color: var(--text-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-4);
+}
+
+.ags-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ags-question {
+  margin-top: 6px;
+}
+
+.ags-q-head {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.ags-q-text {
+  margin: 0;
+  color: var(--text);
+}
+
+.ags-notice {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.ags-notice.error,
+.ags-error {
+  color: var(--danger);
+}
+
+.ags-error {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.ags-proposal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.ags-foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.ags-input {
+  flex: 1;
+  min-height: 52px;
+  max-height: 160px;
+  resize: vertical;
+  font-size: 12.5px;
+}
+
+.ags-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ags-indicator:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ags-indicator.attention {
+  color: var(--text);
+}

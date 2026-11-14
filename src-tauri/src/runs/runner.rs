@@ -170,7 +170,7 @@ pub struct RunContext {
 
 /// The request text of a `zlecenie` plan.
 fn request_text(plan: &Plan) -> Option<String> {
-    (plan.recipe.id == RecipeId::Zlecenie)
+    matches!(plan.recipe.id, RecipeId::Zlecenie | RecipeId::Skrzynka)
         .then(|| plan.params.text.clone())
         .flatten()
 }
@@ -631,9 +631,104 @@ impl RunManager {
             RunMode::Background => self.start_background(plan, binary, projects, vault_root, extra),
             RunMode::Terminal => {
                 let prompt = recipes::prompt(&plan, None);
-                self.start_terminal(&plan, &binary, &prompt, projects, &extra.agent)
+                self.start_terminal(&plan, &binary, &prompt, projects, vault_root, &extra.agent)
             }
         }
+    }
+
+    /// Where a Terminal Skrzynka session writes its answer (see
+    /// [`recipes::ANSWER_PATH_PLACEHOLDER`]).
+    pub fn answer_path(&self, run_id: &str) -> PathBuf {
+        self.cfg
+            .terminal_dir
+            .join(format!("{run_id}{}", terminal::ANSWER_SUFFIX))
+    }
+
+    /// Everything to start an in-app session ([`super::session`]): the CLI,
+    /// its argv with MontyBrain read-only, the scrubbed environment, the
+    /// working directory and the first message. Files go to a private
+    /// per-session directory (old ones are removed).
+    #[allow(clippy::too_many_arguments)]
+    pub fn session_launch(
+        &self,
+        provider: ProviderId,
+        scope: super::session::Scope,
+        request: &str,
+        prompt: String,
+        projects: &[Project],
+        vault_root: &Path,
+        agent: &AgentChoice,
+    ) -> Result<super::session::Launch, String> {
+        let binary = self.resolver.resolve(provider)?;
+        let mcp = self.resolve_mcp()?;
+        let vault = std::path::absolute(vault_root)
+            .map_err(|e| format!("Nieprawidłowy katalog MontyBrain: {e}"))?;
+        let vault_str = vault
+            .to_str()
+            .ok_or("Ścieżka MontyBrain nie jest w UTF-8")?
+            .to_string();
+        let root = self.cfg.terminal_dir.with_file_name("sessions");
+        super::session::private_dir(&root)?;
+        cleanup_sessions(&root, Duration::from_secs(24 * 60 * 60));
+        let id = format!("sesja-{}", super::now_string().replace([':', '-'], ""));
+        let dir = root.join(&id);
+        super::session::private_dir(&dir)?;
+        let server = McpServer {
+            binary: &mcp,
+            vault_root: &vault,
+        };
+        let extra = agent::args(provider, agent);
+        let (args, cwd) = match provider {
+            ProviderId::Claude => {
+                let config = dir.join("montybrain.mcp.json");
+                terminal::write_private(
+                    &config,
+                    command::read_only_mcp_config(&server)?.as_bytes(),
+                )
+                .map_err(|e| format!("Nie udało się przygotować sesji agenta: {e}"))?;
+                let config = config
+                    .to_str()
+                    .ok_or("Ścieżka nie jest w UTF-8")?
+                    .to_string();
+                // A request about a project works in its repository, if it has one.
+                let cwd = match &scope {
+                    super::session::Scope::Project { project } => {
+                        command::repo_dirs(projects, Some(project), &self.cfg.home)
+                            .into_iter()
+                            .next()
+                    }
+                    super::session::Scope::Inbox => None,
+                }
+                .unwrap_or_else(|| self.cfg.home.clone());
+                (
+                    super::session::claude::args(&config, &vault_str, &extra),
+                    cwd,
+                )
+            }
+            ProviderId::Codex => {
+                // The sandbox (workspace-write) is rooted in the session directory.
+                let overrides = command::codex_server_overrides(&server, true)?;
+                (super::session::codex::args(&overrides, &extra), dir.clone())
+            }
+        };
+        let env = command::child_env(
+            self.parent_env.clone(),
+            providers::child_path(&self.cfg.home),
+            false,
+        );
+        Ok(super::session::Launch {
+            provider,
+            scope,
+            request: request.to_string(),
+            prompt,
+            binary,
+            args,
+            cwd,
+            env,
+            vault,
+            home: self.cfg.home.clone(),
+            id,
+        })
     }
 
     /// `montybrain-mcp`, looked up like the providers.
@@ -1346,8 +1441,19 @@ repozytorium MontyBrain i spróbuj ponownie.",
         binary: &Path,
         prompt: &str,
         projects: &[Project],
+        vault_root: &Path,
         agent: &AgentChoice,
     ) -> Result<RunInfo, String> {
+        let inbox = plan.recipe.id == RecipeId::Skrzynka;
+        // Skrzynka with the user's own tools: MontyBrain read-only, the answer
+        // through one file (checked before anything is recorded).
+        let mcp = if inbox {
+            Some(self.resolve_mcp()?)
+        } else {
+            None
+        };
+        let vault_root = std::path::absolute(vault_root)
+            .map_err(|e| format!("Nieprawidłowy katalog MontyBrain: {e}"))?;
         let cwd = match (&plan.recipe.id, &plan.params.project) {
             (RecipeId::Postep | RecipeId::Aktualizacja | RecipeId::Zlecenie, Some(slug)) => {
                 command::repo_dirs(projects, Some(slug), &self.cfg.home)
@@ -1364,12 +1470,62 @@ repozytorium MontyBrain i spróbuj ponownie.",
             self.new_record(&mut st, plan, None, agent)
         };
         let id = info.id.clone();
+        let mut args = agent::args(plan.provider, agent);
+        let mut prompt = prompt.to_string();
+        let mut cwd = cwd;
+        if let Some(mcp) = &mcp {
+            let prepared = (|| -> Result<(), String> {
+                let dir = &self.cfg.terminal_dir;
+                std::fs::create_dir_all(dir)
+                    .and_then(|()| {
+                        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+                    })
+                    .map_err(|e| format!("Nie udało się przygotować sesji w Terminalu: {e}"))?;
+                let answer = self.answer_path(&id);
+                let _ = std::fs::remove_file(&answer);
+                let server = command::McpServer {
+                    binary: mcp,
+                    vault_root: &vault_root,
+                };
+                let config = match plan.provider {
+                    ProviderId::Claude => {
+                        let file = dir.join(format!("{id}{}", terminal::MCP_SUFFIX));
+                        terminal::write_private(
+                            &file,
+                            command::read_only_mcp_config(&server)?.as_bytes(),
+                        )
+                        .map_err(|e| format!("Nie udało się przygotować sesji w Terminalu: {e}"))?;
+                        Some(file)
+                    }
+                    ProviderId::Codex => {
+                        // Codex: the sandbox is rooted where the answer goes.
+                        cwd = dir.clone();
+                        None
+                    }
+                };
+                args.extend(command::inbox_terminal_args(
+                    plan.provider,
+                    &server,
+                    config.as_deref(),
+                    dir,
+                    &answer,
+                )?);
+                let answer = answer.to_str().ok_or("Ścieżka nie jest w UTF-8")?;
+                prompt = prompt.replace(recipes::ANSWER_PATH_PLACEHOLDER, answer);
+                Ok(())
+            })();
+            if let Err(e) = prepared {
+                self.finish(&id, RunStatus::Failed, None, Some(e.clone()));
+                self.push(&id, EventKind::Error, e);
+                return Ok(self.get(&id).unwrap_or(info));
+            }
+        }
         match terminal::launch(
             &self.cfg.terminal_dir,
             &id,
             binary,
-            &agent::args(plan.provider, agent),
-            prompt,
+            &args,
+            &prompt,
             &cwd,
             path,
             &self.cfg.open_cmd,
@@ -1393,6 +1549,29 @@ repozytorium MontyBrain i spróbuj ponownie.",
             }
         }
         Ok(self.get(&id).unwrap_or(info))
+    }
+}
+
+/// Removes session directories older than `keep`.
+fn cleanup_sessions(root: &Path, keep: Duration) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    let now = std::time::SystemTime::now();
+    for e in entries.flatten() {
+        let old = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| now.duration_since(t).ok())
+            .is_some_and(|age| age > keep);
+        let ours = e
+            .file_name()
+            .to_str()
+            .is_some_and(|n| n.starts_with("sesja-"));
+        if ours && old {
+            let _ = std::fs::remove_dir_all(e.path());
+        }
     }
 }
 
@@ -2032,6 +2211,137 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"ok"}'"#;
         assert!(list.windows(2).all(|w| w[0].id != w[1].id));
         assert_eq!(list[0].recipe, "poczta");
         assert!(!list.iter().any(|r| r.id == info.id), "oldest dropped");
+    }
+
+    #[test]
+    fn a_terminal_inbox_session_gets_montybrain_read_only_and_an_answer_file() {
+        let env = setup("true", "true", |_| {});
+        let dir = env.tmp.path().join("cache/terminal");
+        let params = [
+            ("text", "sprawdź na Slacku"),
+            ("dane", "- ^aaaaa1 „Faktura”"),
+        ];
+        let info = env
+            .start("skrzynka", "claude", "terminal", &params)
+            .unwrap();
+        assert_eq!(info.status, RunStatus::Succeeded, "{info:?}");
+        let body = std::fs::read_to_string(dir.join(format!("{}.command", info.id))).unwrap();
+        let answer = env.mgr.answer_path(&info.id);
+        for part in [
+            "'--mcp-config'",
+            "'--disallowedTools'",
+            "'mcp__montybrain__create_task'",
+            "'mcp__montybrain__command'",
+            "'--permission-mode' 'default' \"$prompt\"",
+        ] {
+            assert!(body.contains(part), "{part}: {body}");
+        }
+        assert!(
+            body.contains(&format!("'Write(/{})'", answer.display())),
+            "{body}"
+        );
+        assert!(
+            body.contains(&format!("'Edit(/{}/**)'", env.vault().display())),
+            "{body}"
+        );
+        let prompt = std::fs::read_to_string(dir.join(format!("{}.prompt.txt", info.id))).unwrap();
+        assert!(prompt.contains(&answer.display().to_string()), "{prompt}");
+        assert!(!prompt.contains(recipes::ANSWER_PATH_PLACEHOLDER));
+        let mcp: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(dir.join(format!("{}{}", info.id, terminal::MCP_SUFFIX)))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            mcp["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_READONLY"],
+            "1"
+        );
+
+        // Codex: the read-only server, a sandbox rooted where the answer goes.
+        let c = env.start("skrzynka", "codex", "terminal", &params).unwrap();
+        let body = std::fs::read_to_string(dir.join(format!("{}.command", c.id))).unwrap();
+        assert!(
+            body.contains("mcp_servers.montybrain.env.MONTYBRAIN_READONLY=\"1\""),
+            "{body}"
+        );
+        assert!(
+            body.contains("'-s' 'workspace-write' '-a' 'on-request'"),
+            "{body}"
+        );
+        assert!(body.contains(&format!("cd '{}'", dir.display())), "{body}");
+
+        // Without montybrain-mcp there is no read-only MontyBrain: refused.
+        std::fs::remove_file(env.mcp()).unwrap();
+        let e = env
+            .start("skrzynka", "claude", "terminal", &params)
+            .unwrap_err();
+        assert!(e.contains("montybrain-mcp"), "{e}");
+    }
+
+    #[test]
+    fn a_session_launch_has_montybrain_read_only_and_no_secrets() {
+        let env = setup("true", "true", |_| {});
+        let l = env
+            .mgr
+            .session_launch(
+                ProviderId::Claude,
+                crate::runs::session::Scope::Inbox,
+                "x",
+                "P".into(),
+                &env.projects,
+                &env.vault(),
+                &AgentChoice::default(),
+            )
+            .unwrap();
+        assert!(
+            l.args
+                .windows(2)
+                .any(|w| w[0] == "--permission-prompt-tool" && w[1] == "stdio")
+        );
+        let cfg = l.args[l.args.iter().position(|a| a == "--mcp-config").unwrap() + 1].clone();
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&cfg).unwrap()).unwrap();
+        assert_eq!(
+            json["mcpServers"]["montybrain"]["env"]["MONTYBRAIN_READONLY"],
+            "1"
+        );
+        assert!(
+            !l.env
+                .iter()
+                .any(|(k, _)| k == "ANTHROPIC_API_KEY" || k == "CLAUDECODE")
+        );
+        let c = env
+            .mgr
+            .session_launch(
+                ProviderId::Codex,
+                crate::runs::session::Scope::Project {
+                    project: "beeking".into(),
+                },
+                "x",
+                "P".into(),
+                &env.projects,
+                &env.vault(),
+                &AgentChoice::default(),
+            )
+            .unwrap();
+        assert_eq!(c.args[0], "app-server");
+        assert!(c.args.iter().any(|a| a.contains("MONTYBRAIN_READONLY")));
+        assert!(c.cwd.starts_with(env.tmp.path().join("cache/sessions")));
+        // Without montybrain-mcp: refused.
+        std::fs::remove_file(env.mcp()).unwrap();
+        assert!(
+            env.mgr
+                .session_launch(
+                    ProviderId::Claude,
+                    crate::runs::session::Scope::Inbox,
+                    "x",
+                    "P".into(),
+                    &env.projects,
+                    &env.vault(),
+                    &AgentChoice::default()
+                )
+                .is_err()
+        );
     }
 
     #[test]

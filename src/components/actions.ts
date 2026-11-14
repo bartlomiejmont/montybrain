@@ -25,6 +25,8 @@ export function useActions() {
       moveTask: (task: Task, to: TaskLocation) => withId(task, (id) => run((a) => a.moveTask(id, to))),
       deleteTask: (task: Task) => withId(task, (id) => run((a) => a.deleteTask(id))),
       createTask: (location: TaskLocation, input: NewTask) => run((a) => a.createTask(location, input)),
+      /** A "dodaj zadanie" field: the text is read by the backend (title + trailing `!`/`@`). */
+      captureTask: (location: TaskLocation, text: string) => run((a) => a.captureTask(location, text)),
       openUrl: (url: string) => run((a) => a.openUrl(url)),
       reveal: (path: string) => run((a) => a.revealPath(path)),
     };

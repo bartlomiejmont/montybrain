@@ -8,6 +8,7 @@ import { createMockRuns, type MockRunOptions } from "./mock-runs";
 import { addMapDemo, buildLargeFixture } from "./mock-map";
 import { createMockSignals } from "./mock-signals";
 import { createMockUpdates, type UpdateScenario } from "./mock-updates";
+import { addInboxDemo, createMockCommand } from "./mock-command";
 import { DEFAULT_SHORTCUT, canonicalShortcut } from "./shortcut";
 import { AGENT_EFFORTS } from "./types";
 import type {
@@ -26,9 +27,14 @@ import type {
   VaultChanged,
 } from "./types";
 import { addDays, toIsoDate, toIsoMinute } from "../lib/dates";
+import { createMockSession, mockSessionView, type MockSessionState } from "./mock-session";
 import { fold, oneLine, slugify, uniqueSlug } from "../lib/text";
 
 export interface MockOptions {
+  /** `?inbox=demo`: more inbox entries for the command field states. */
+  inbox?: "demo";
+  /** `?inboxagent=proposals`: an agent proposal waiting in Skrzynka. */
+  inboxProposal?: boolean;
   /** Clock; defaults to the real one. */
   now?: () => Date;
   /** Initial data; defaults to the Polish fixtures. */
@@ -47,6 +53,8 @@ export interface MockOptions {
   map?: "demo" | "large";
   /** `none`: the drift detector has not collected anything yet. */
   drift?: "none" | "default";
+  /** `?session=…`: an in-app agent session already on screen. */
+  session?: MockSessionState;
 }
 
 /** Shortcuts the mock pretends are taken by the system (to exercise errors). */
@@ -135,6 +143,8 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
   const latency = opts.latencyMs ?? 0;
   const db: Snapshot = clone(opts.snapshot ?? (opts.map === "large" ? buildLargeFixture(toIsoDate(now())) : buildFixtures(toIsoDate(now()), toIsoMinute(now()))));
   if (opts.map === "demo") addMapDemo(db, toIsoDate(now()));
+  if (opts.inbox === "demo" || opts.inboxProposal) addInboxDemo(db);
+  const sessionMock = createMockSession(opts.session ? mockSessionView(opts.session) : null);
   let version = 1;
   const listeners = new Set<(e: VaultChanged) => void>();
   const settingsListeners = new Set<(s: AppSettings) => void>();
@@ -226,6 +236,7 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
       setTaskStatus: (id, status) => api.updateTask(id, { status }),
       addJournal: (project, topic, author, text, status, summary) => api.addJournalEntry(project, topic, { author, text, status, summary }),
       createTask: (location, title) => api.createTask(location, { title }),
+      moveTask: (id, to) => api.moveTask(id, to),
       async createTopicWith(projectSlug, input, author, text, tasks) {
         const t = await api.createTopic(projectSlug, { title: input.title, status: input.status, summary: input.summary, repo: input.repo });
         await api.addJournalEntry(projectSlug, t.slug, { author, text });
@@ -347,6 +358,16 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
   function checkRepo(p: Project, repo: string | null | undefined) {
     if (repo && !p.repos.some((r) => r.name === repo)) throw invalid(`unknown repo "${repo}" for project ${p.slug}`);
   }
+
+  const commandMock = createMockCommand({
+    snapshot: () => db,
+    createTask: (location, input) => api.createTask(location, input),
+    moveTask: (id, to) => api.moveTask(id, to),
+    deleteTask: (id) => api.deleteTask(id),
+    createTopic: (project, title) => api.createTopic(project, { title }),
+    deleteTopic: (project, slug) => api.deleteTopic(project, slug),
+    today: () => toIsoDate(now()),
+  });
 
   const api: MontyBrainApi & { snapshotForTests(): Snapshot } = {
     mode: "mock",
@@ -629,6 +650,39 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
 
     async quickResize() {},
 
+    ...commandMock,
+    ...sessionMock,
+    async inboxAgent(request) {
+      await wait();
+      const at = toIsoMinute(now()) + ":00";
+      return {
+        id: `mock-inbox-${Date.now()}`,
+        recipe: request.mode === "command" && request.tools !== "mine" ? "skrzynka-komenda" : "skrzynka",
+        recipe_title: request.mode === "command" && request.tools !== "mine" ? "Komenda dla wpisu" : "Porządek w Skrzynce",
+        provider: request.provider,
+        mode: request.tools === "mine" ? "terminal" : "background",
+        project: null,
+        request: request.text,
+        model: null,
+        effort: null,
+        status: "succeeded",
+        started_at: at,
+        finished_at: at,
+        result: null,
+        error: null,
+        events: [],
+      };
+    },
+
+    async inboxAgentCheck() {
+      await wait();
+      return { status: "waiting" as const, count: 0 };
+    },
+    async inboxAgentPaste() {
+      await wait();
+      throw new Error("W odpowiedzi agenta nie ma propozycji do wczytania (podgląd w przeglądarce).");
+    },
+
     listRecipes: runsMock.listRecipes,
     listProviders: runsMock.listProviders,
     startRun: runsMock.startRun,
@@ -677,6 +731,47 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
       return () => quickShowListeners.delete(cb);
     },
   };
+  if (opts.inboxProposal) {
+    const at = toIsoMinute(now());
+    updatesMock.seedProposal("", {
+      run_id: "mock-inbox-proposal",
+      provider: "claude",
+      trigger: "manual",
+      created_at: at,
+      report: "Trzy wpisy dotyczą jednego remontu łazienki, więc proponuję jeden temat. Webhook zwrotów pasuje do płatności.",
+      request: "?dopasuj",
+      changes: [
+        {
+          change: {
+            kind: "topic_from_tasks",
+            project: "remont-kuchni",
+            project_name: "Remont kuchni",
+            title: "Łazienka",
+            slug: "lazienka",
+            summary: "Wycena płytek, fuga i hydraulik.",
+            tasks: ["d1e2m3", "d1e2m4", "d1e2m5"].map((id) => ({ id, title: db.tasks.find((t) => t.id === id)?.title ?? id, from: { kind: "inbox" as const } })),
+            reason: "Wszystkie trzy wpisy dotyczą remontu łazienki.",
+          },
+          outcome: null,
+        },
+        {
+          change: {
+            kind: "move_task",
+            task: "d1e2m6",
+            title: db.tasks.find((t) => t.id === "d1e2m6")?.title ?? "",
+            from: { kind: "inbox" },
+            to: { kind: "topic", project: "whenubuy", topic: "platnosci-stripe-przelewy24" },
+            to_label: "WhenUBuy / Płatności: Stripe → Przelewy24",
+            reason: "Webhook zwrotów jest częścią integracji płatności.",
+          },
+          outcome: null,
+        },
+      ],
+      dropped: [],
+      dropped_more: 0,
+      problem: null,
+    });
+  }
   return api;
 }
 

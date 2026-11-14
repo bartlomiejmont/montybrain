@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { AgentSessionPanel } from "./components/AgentSession";
 import { Palette } from "./components/Palette";
 import { Sidebar } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
@@ -48,6 +49,7 @@ export function App() {
         </div>
       </main>
       <Toasts />
+      <AgentSessionPanel />
       <Palette />
     </div>
   );

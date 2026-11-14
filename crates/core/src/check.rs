@@ -30,9 +30,10 @@ pub fn task_title(title: &str) -> Result<String> {
     Ok(title)
 }
 
-/// A topic title as `create_topic` takes it: collapsed to one line, not empty.
+/// A topic title as `create_topic` takes it: collapsed to one line, not
+/// empty, without `[` or `]`.
 pub fn topic_title(title: &str) -> Result<String> {
-    one_line("title", title)
+    crate::validate::topic_title_line("title", title)
 }
 
 /// The text of a journal entry (`add_journal_entry`): multi-line, written

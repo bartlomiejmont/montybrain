@@ -174,6 +174,8 @@ export interface MockVaultOps {
   deleteTopicIf(project: string, slug: string, stamp: string): Promise<boolean>;
   /** Stores a branch link (the drift sidecar); optional in tests. */
   link?(repo: string, branch: string, topic: string): void;
+  /** Moves a task (Skrzynka proposals); optional in tests. */
+  moveTask?(id: string, to: TaskLocation): Promise<unknown>;
   /** A topic's `zaktualizowano` (core's `stamp_of`) and putting an old value back (core's `restoring`). */
   updatedOf(project: string, topic: string): string | null;
   setUpdated(project: string, topic: string, value: string): void;
@@ -381,6 +383,14 @@ export function buildProposal(snap: Snapshot, project: string, runId: string, pr
 }
 
 function staleReason(c: StoredChange["change"], snap: Snapshot, project: string): string | null {
+  if (c.kind === "move_task") {
+    const t = snap.tasks.find((x) => x.id === c.task);
+    return t && t.location.kind === "inbox" ? null : "zmienione w międzyczasie (wpis przeniesiono)";
+  }
+  if (c.kind === "topic_from_tasks") {
+    const moved = c.tasks.some((e) => snap.tasks.find((x) => x.id === e.id)?.location.kind !== "inbox");
+    return moved ? "zmienione w międzyczasie (wpis przeniesiono)" : null;
+  }
   if (c.kind === "task_status") {
     const t = snap.tasks.find((x) => x.id === c.task);
     if (!t) return "zmienione w międzyczasie (zadania już nie ma)";
@@ -643,6 +653,13 @@ export function createMockUpdates(
     async listUpdates(): Promise<ProjectUpdateView[]> {
       return views();
     },
+    /** Puts a proposal under `project` (`""` = Skrzynka) — mock URL states. */
+    seedProposal(project: string, proposal: StoredProposal) {
+      const s = state(project);
+      s.proposal = structuredClone(proposal);
+      s.last = { at: proposal.created_at, provider: proposal.provider, trigger: "manual", outcome: { kind: "proposed", count: proposal.changes.length }, request: proposal.request ?? null };
+      changed();
+    },
     async applyUpdate(runId: string, indices: number[]): Promise<ApplyReport> {
       const entry = [...states.entries()].find(([, s]) => s.proposal?.run_id === runId);
       if (!entry) throw new Error("Tej propozycji już nie ma: została odrzucona albo zastąpiona nowszą.");
@@ -685,12 +702,17 @@ export function createMockUpdates(
                 status: c.status ? [j.topic.status, c.base_status] : null,
                 summary: c.summary !== null ? [j.topic.summary, c.base_summary] : null,
               });
+            } else if (c.kind === "move_task") {
+              await vault.moveTask?.(c.task, c.to);
+            } else if (c.kind === "topic_from_tasks") {
+              const r = await vault.createTopicWith(c.project, { title: c.title, status: "planned", summary: c.summary, repo: null }, author(p.provider), "Temat z wpisów ze Skrzynki.", []);
+              for (const e of c.tasks) await vault.moveTask?.(e.id, { kind: "topic", project: c.project, topic: r.slug });
             } else if (c.kind === "new_topic") {
               const r = await vault.createTopicWith(project, { title: c.title, status: c.status, summary: c.summary, repo: c.repo }, author(p.provider), c.text, c.tasks);
               written.push({ index, kind: "new_topic", topic: r.slug, stamp: r.stamp });
               for (const b of c.branches ?? []) vault.link?.(b.repo, b.branch, r.slug);
             } else {
-              const location: TaskLocation = c.topic ? { kind: "topic", project, topic: c.topic } : { kind: "project", project };
+              const location: TaskLocation = c.topic ? { kind: "topic", project, topic: c.topic } : project ? { kind: "project", project } : { kind: "inbox" };
               const t = await vault.createTask(location, c.title);
               written.push({ index, kind: "new_task", task: t.id!, title: t.title, location });
             }
