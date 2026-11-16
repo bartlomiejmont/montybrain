@@ -108,7 +108,6 @@ pre code { font: inherit; }
 
 /* Download */
 .download-section { padding: clamp(24px, 4vw, 44px); border: 1px solid var(--line); border-radius: 12px; background: var(--bg-side); }
-.download-section h2 br { display: none; }
 .download-intro { max-width: 540px; color: var(--text-2); margin-top: 12px; }
 .release-pending { margin-top: 24px; padding: 14px 16px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--bg-field); }
 .release-pending .step-label { margin-bottom: 6px; color: var(--text); }
