@@ -1,3 +1,4 @@
+import { t as tr, message } from "../i18n";
 // Skrzynka: one command field on top, the entries below, each with one local
 // destination suggestion ("?" when the match is weak), keyboard flow and
 // multi-select. Commands and suggestions are read and written by the backend
@@ -62,7 +63,7 @@ function Suggestion({ s, onAccept, onAsk }: { s: InboxSuggestion | undefined; on
       <button
         type="button"
         className="ibx-sugg"
-        title={`Lokalna podpowiedź (wynik ${s.best.score.toFixed(1)}). Enter: przenieś, z potwierdzeniem.`}
+        title={tr("Lokalna podpowiedź (wynik {0}). Enter: przenieś, z potwierdzeniem.", s.best.score.toFixed(1))}
         onClick={(e) => {
           e.stopPropagation();
           onAccept();
@@ -80,8 +81,8 @@ function Suggestion({ s, onAccept, onAsk }: { s: InboxSuggestion | undefined; on
     <button
       type="button"
       className="ibx-sugg weak"
-      title={near ? `Słabe dopasowanie: ${near}. Kliknij, żeby zapytać agenta.` : "Nic lokalnie nie pasuje. Kliknij, żeby zapytać agenta."}
-      aria-label="Słabe dopasowanie: zapytaj agenta"
+      title={near ? tr("Słabe dopasowanie: {0}. Kliknij, żeby zapytać agenta.", near) : tr("Nic lokalnie nie pasuje. Kliknij, żeby zapytać agenta.")}
+      aria-label={tr("Słabe dopasowanie: zapytaj agenta")}
       onClick={(e) => {
         e.stopPropagation();
         onAsk();
@@ -102,12 +103,12 @@ export function InboxView() {
   const [showDone, setShowDone] = useStoredFlag("montybrain.done.inbox", false);
   /** The last Skrzynka write, undoable from the "Cofnij" next to it until undone. */
   const [lastWrite, setLastWrite] = useState<{ reading: string; token: number | null } | null>(
-    mock === "echo" ? { reading: "Nowe zadanie „Podpiąć zapisane karty” w: WhenUBuy / Płatności: Stripe → Przelewy24 · priorytet wysoki", token: 1 } : null,
+    mock === "echo" ? { reading: tr("Nowe zadanie „Podpiąć zapisane karty” w: WhenUBuy / Płatności: Stripe → Przelewy24 · priorytet wysoki"), token: 1 } : null,
   );
   const [cursor, setCursor] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Map<string, InboxSuggestion>>(new Map());
   const [agentRun, setAgentRun] = useState<{ id: string; mode: "command" | "proposals" } | null>(null);
-  const [agentNote, setAgentNote] = useState<string | null>(mock === "agent" ? "Agent: wpis dotyczy webhooka zwrotów, który jest w temacie płatności (Stripe → Przelewy24)." : null);
+  const [agentNote, setAgentNote] = useState<string | null>(mock === "agent" ? tr("Agent: wpis dotyczy webhooka zwrotów, który jest w temacie płatności (Stripe → Przelewy24).") : null);
   const field = useRef<CommandFieldHandle>(null);
   const agentField = useRef<AgentFieldHandle>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -172,16 +173,16 @@ export function InboxView() {
   async function askAgent(mode: "command" | "proposals", text: string, ids: string[], with_: InboxAgentTools = "montybrain") {
     const p = provider();
     if (!p) {
-      notify("Żaden agent nie jest dostępny (Claude Code ani Codex).");
+      notify(tr("Żaden agent nie jest dostępny (Claude Code ani Codex)."));
       return;
     }
     try {
       const run = await api.inboxAgent({ text, selection: ids, mode, provider: p, tools: with_ });
       if (with_ === "mine") {
-        if (run.status === "failed") notify(run.error ?? "Nie udało się otworzyć sesji w Terminalu.");
+        if (run.status === "failed") notify(run.error ?? tr("Nie udało się otworzyć sesji w Terminalu."));
         else {
           setTerminalRun({ id: run.id, provider: p });
-          notify(`Otwarto sesję ${PROVIDER_NAME[p]} w Terminalu. Propozycje wrócą do Skrzynki.`);
+          notify(tr("Otwarto sesję {0} w Terminalu. Propozycje wrócą do Skrzynki.", PROVIDER_NAME[p]));
         }
         return;
       }
@@ -202,7 +203,7 @@ export function InboxView() {
         if (!live || r.status !== "received") return;
         setTerminalRun(null);
         setPasting(false);
-        notify(r.count === 0 ? "Agent odpowiedział bez propozycji zmian." : `Agent przysłał propozycje (${r.count}): zaznacz, co zapisać.`);
+        notify(r.count === 0 ? tr("Agent odpowiedział bez propozycji zmian.") : tr("Agent przysłał propozycje ({0}): zaznacz, co zapisać.", r.count));
       } catch (e) {
         if (!live) return;
         setTerminalRun(null);
@@ -225,7 +226,7 @@ export function InboxView() {
       setTerminalRun(null);
       setPasting(false);
       setPasteText("");
-      notify(r.count === 0 ? "Odpowiedź wczytana: bez propozycji zmian." : `Wczytano propozycje (${r.count}): zaznacz, co zapisać.`);
+      notify(r.count === 0 ? tr("Odpowiedź wczytana: bez propozycji zmian.") : tr("Wczytano propozycje ({0}): zaznacz, co zapisać.", r.count));
     } catch (e) {
       notify(describeError(e));
     }
@@ -273,8 +274,8 @@ export function InboxView() {
     if (tools === "mine" && !terminal) {
       // The in-app session: the conversation and the permission cards in the panel.
       const p = provider();
-      if (!p) notify("Żaden agent nie jest dostępny (Claude Code ani Codex).");
-      else void sessionStore.begin({ scope: "inbox", provider: p, text: plan.text, selection: ids }).catch((e) => notify(describeError(e)));
+      if (!p) notify(tr("Żaden agent nie jest dostępny (Claude Code ani Codex)."));
+      else sessionStore.prepare({ scope: "inbox", provider: p, text: plan.text, selection: ids, origin: window.location.hash });
     } else void askAgent(plan.mode, plan.text, ids, tools);
     // Per request: the user's own tools are off again for the next one.
     setTools("montybrain");
@@ -283,14 +284,14 @@ export function InboxView() {
   async function finished(run: RunInfo, mode: "command" | "proposals") {
     setAgentRun(null);
     if (run.status !== "succeeded") {
-      notify(run.error ?? "Agent nie dokończył pracy.");
+      notify(run.error ?? tr("Agent nie dokończył pracy."));
       return;
     }
     if (mode === "command") {
       try {
         const a = await api.inboxAgentAnswer(run.id);
         if (a.command) {
-          setAgentNote(`Agent: ${a.note}`);
+          setAgentNote(tr("Agent: {0}", a.note));
           field.current?.setText(a.command);
         } else notify(a.note);
       } catch (e) {
@@ -310,7 +311,7 @@ export function InboxView() {
   const onAgent = (ask: AgentAsk) => {
     const ids = [...new Set([...ask.ids, ...agentEntries(selected, focused?.id ?? null)])];
     const single = ask.verb === "free" && ids.length === 1;
-    const text = ask.verb === "rozpisz" ? `Rozpisz te wpisy na konkretne kroki. ${ask.text}`.trim() : ask.verb === "dopasuj" ? `Zaproponuj miejsca dla tych wpisów. ${ask.text}`.trim() : ask.text;
+    const text = ask.verb === "rozpisz" ? tr("Rozpisz te wpisy na konkretne kroki. {0}", ask.text).trim() : ask.verb === "dopasuj" ? tr("Zaproponuj miejsca dla tych wpisów. {0}", ask.text).trim() : ask.text;
     void askAgent(single ? "command" : "proposals", text, ids);
   };
 
@@ -370,7 +371,7 @@ export function InboxView() {
       // Only Skrzynka's own writes (not the quick window's or ⌘K's).
       const r = await api.commandUndo(token, token === null ? "inbox" : null);
       const v = describeUndo(r, token);
-      notify(v.failed ? `${v.text} Naciśnij u albo „Cofnij”, żeby spróbować jeszcze raz.` : v.text);
+      notify(v.failed ? tr("{0} Naciśnij u albo „Cofnij”, żeby spróbować jeszcze raz.", v.text) : v.text);
       setLastWrite(v.failed ? { reading: r.reading, token: v.retry } : null);
     } catch (e) {
       notify(describeError(e));
@@ -385,15 +386,16 @@ export function InboxView() {
   const mockText = mock && mock !== "echo" ? MOCK_COMMAND_TEXT[mock].text : "";
 
   return (
-    <div className="view">
+    <div className="view inbox-view">
       <header className="view-head">
-        <h1 className="view-title">Skrzynka</h1>
+        <h1 className="view-title">{tr("Skrzynka")}</h1>
         <p className="view-sub">
-          Wszystko, co jeszcze nie ma miejsca. Wpisz zadanie albo komendę: <code>&gt; miejsce</code>, <code>/temat</code>, <code>/czeka</code>, <code>/powiaz</code>; agent: przełącznik przy polu, <kbd>{MODE_SHORTCUT}</kbd> albo <code>?</code> na początku.
-        </p>
+          {tr("Zapisz myśl lub zadanie. Kliknij wpis, żeby zobaczyć szczegóły i przypisać go do projektu lub tematu.")}</p>
       </header>
 
-      <section className="ibx-field" aria-label="Nowe zadanie albo komenda">
+      <details className="ibx-help"><summary>{tr("Komendy i pomoc agenta")}</summary><p>{tr("Możesz też użyć komend:")} <code>{tr("> miejsce")}</code>  {tr("przenosi wpis,")} <code>{tr("/temat")}</code>  {tr("tworzy temat,")} <code>{tr("/czeka")}</code>  {tr("ustawia oczekiwanie,")} <code>{tr("/powiaz")}</code>  {tr("dodaje powiązanie. Agenta włączysz przełącznikiem przy polu, skrótem")} <kbd>{MODE_SHORTCUT}</kbd>  {tr("lub znakiem")} <code>?</code>  {tr("na początku.")}</p></details>
+
+      <section className="ibx-field" aria-label={tr("Nowe zadanie albo komenda")}>
         {fieldMode === "agent" ? (
           <AgentField
             ref={agentField}
@@ -430,10 +432,10 @@ export function InboxView() {
           focus={focused?.id ?? null}
           placeholder={
             selected.length
-              ? `Komenda dla zaznaczonych (${selected.length}): > miejsce, /temat Nazwa > projekt, [x]…`
+              ? tr("Komenda dla zaznaczonych ({0}): > miejsce, /temat Nazwa > projekt, [x]…", selected.length)
               : focused
-                ? `Dodaj do skrzynki albo komenda dla „${focused.title}”: /czeka, /powiaz, > miejsce…`
-                : "Dodaj do skrzynki albo wpisz komendę…"
+                ? tr("Dodaj do skrzynki albo komenda dla „{0}”: /czeka, /powiaz, > miejsce…", focused.title)
+                : tr("Dodaj do skrzynki albo wpisz komendę…")
           }
           autoFocus
           initialText={mockText}
@@ -445,15 +447,15 @@ export function InboxView() {
                   undo: 1,
                   applied: {
                     steps: [
-                      { summary: "„Webhook zwrotów zwraca 500 na produkcji”: przeniesie z: Skrzynka do: WhenUBuy / Płatności: Stripe → Przelewy24", ok: true, message: "" },
-                      { summary: "„Opisać instalację serwera MCP w README”: przeniesie z: Skrzynka do: WhenUBuy / Płatności: Stripe → Przelewy24", ok: false, message: "" },
+                      { summary: tr("„Webhook zwrotów zwraca 500 na produkcji”: przeniesie z: Skrzynka do: WhenUBuy / Płatności: Stripe → Przelewy24"), ok: true, message: "" },
+                      { summary: tr("„Opisać instalację serwera MCP w README”: przeniesie z: Skrzynka do: WhenUBuy / Płatności: Stripe → Przelewy24"), ok: false, message: "" },
                     ],
                     echo: [],
-                    error: "Zadanie zmieniło się od podglądu; pominięte.",
+                    error: tr("Zadanie zmieniło się od podglądu; pominięte."),
                     remaining: [],
                     rolled_back: false,
                     left_written: [
-                      "„Webhook zwrotów zwraca 500 na produkcji”: przeniesie z: Skrzynka do: WhenUBuy / Płatności: Stripe → Przelewy24 (Zadanie „Webhook zwrotów zwraca 500 na produkcji” zmieniło się w międzyczasie; zostawione bez zmian.)",
+                      tr("„Webhook zwrotów zwraca 500 na produkcji”: przeniesie z: Skrzynka do: WhenUBuy / Płatności: Stripe → Przelewy24 (Zadanie „Webhook zwrotów zwraca 500 na produkcji” zmieniło się w międzyczasie; zostawione bez zmian.)"),
                     ],
                   },
                 }
@@ -486,35 +488,30 @@ export function InboxView() {
       {terminalRun && (
         <div className="ibx-terminal" role="status">
           <p className="ibx-terminal-text">
-            Sesja {PROVIDER_NAME[terminalRun.provider]} jest otwarta w Terminalu. Gdy agent skończy, zapisze odpowiedź do pliku, a propozycje pojawią się tutaj do zaznaczenia (sprawdzam co kilka sekund). Jeśli agent pokazał odpowiedź, ale nie zapisał pliku, wklej ją.
-          </p>
+            {tr("Sesja")} {PROVIDER_NAME[terminalRun.provider]}  {tr("jest otwarta w Terminalu. Gdy agent skończy, zapisze odpowiedź do pliku, a propozycje pojawią się tutaj do zaznaczenia (sprawdzam co kilka sekund). Jeśli agent pokazał odpowiedź, ale nie zapisał pliku, wklej ją.")}</p>
           {pasting ? (
             <div className="ibx-paste">
               <textarea
                 className="ibx-paste-text"
                 value={pasteText}
                 autoFocus
-                aria-label="Odpowiedź agenta z Terminala"
-                placeholder="Wklej całą odpowiedź agenta, razem z blokiem montybrain-zmiany…"
+                aria-label={tr("Odpowiedź agenta z Terminala")}
+                placeholder={tr("Wklej całą odpowiedź agenta, razem z blokiem montybrain-zmiany…")}
                 onChange={(e) => setPasteText(e.target.value)}
               />
               <div className="ibx-paste-actions">
                 <Button variant="quiet" disabled={!pasteText.trim()} onClick={() => void pasteAnswer()}>
-                  Wczytaj propozycje
-                </Button>
+                  {tr("Wczytaj propozycje")}</Button>
                 <Button variant="quiet" onClick={() => setPasting(false)}>
-                  Anuluj
-                </Button>
+                  {tr("Anuluj")}</Button>
               </div>
             </div>
           ) : (
             <div className="ibx-paste-actions">
               <Button variant="quiet" onClick={() => setPasting(true)}>
-                Wklej odpowiedź…
-              </Button>
+                {tr("Wklej odpowiedź…")}</Button>
               <Button variant="quiet" onClick={() => setTerminalRun(null)}>
-                Przestań czekać
-              </Button>
+                {tr("Przestań czekać")}</Button>
             </div>
           )}
         </div>
@@ -522,49 +519,47 @@ export function InboxView() {
 
       {lastWrite && (
         <p className="ibx-last" role="status">
-          <span className="ibx-last-text">Ostatni zapis: {lastWrite.reading}</span>
+          <span className="ibx-last-text">{tr("Ostatni zapis:")} {message(lastWrite.reading)}</span>
           <button type="button" className="cf-link" onClick={() => void undoLast(lastWrite.token)}>
-            Cofnij <kbd>u</kbd>
+            {tr("Cofnij")} <kbd>u</kbd>
           </button>
         </p>
       )}
 
       {selected.length > 0 && (
-        <div className="ibx-bar" role="toolbar" aria-label="Zaznaczone wpisy">
-          <span className="ibx-bar-count">Zaznaczone: {selected.length}</span>
+        <div className="ibx-bar" role="toolbar" aria-label={tr("Zaznaczone wpisy")}>
+          <span className="ibx-bar-count">{tr("Zaznaczone:")} {selected.length}</span>
           <Button variant="quiet" onClick={() => field.current?.setText("> ")}>
-            Przenieś wszystkie… <kbd>&gt;</kbd>
+            {tr("Przenieś wszystkie…")} <kbd>&gt;</kbd>
           </Button>
           <Button variant="quiet" disabled={selected.length < 2} onClick={() => field.current?.setText("/temat  > ", { caret: 7 })}>
-            Jeden temat z wpisów… <kbd>t</kbd>
+            {tr("Jeden temat z wpisów…")} <kbd>t</kbd>
           </Button>
-          <Button variant="quiet" onClick={() => void askAgent("proposals", "Zaproponuj miejsca dla tych wpisów.", selected)}>
-            Zapytaj agenta
-          </Button>
+          <Button variant="quiet" onClick={() => void askAgent("proposals", tr("Zaproponuj miejsca dla tych wpisów."), selected)}>
+            {tr("Zapytaj agenta")}</Button>
           <Button variant="quiet" onClick={() => setSelected([])}>
-            Odznacz <kbd>esc</kbd>
+            {tr("Odznacz")} <kbd>esc</kbd>
           </Button>
         </div>
       )}
 
       {running && (
         <p className="ibx-agent" role="status">
-          Agent pracuje nad {agentRun?.mode === "command" ? "komendą dla wpisu" : "propozycjami"}… Dostaje tylko wybrane wpisy i ich podpowiedzi.
-        </p>
+          {tr("Agent pracuje nad")} {agentRun?.mode === "command" ? tr("komendą dla wpisu") : tr("propozycjami")}{tr("… Dostaje tylko wybrane wpisy i ich podpowiedzi.")}</p>
       )}
 
       {pendingProposal && (
-        <section className="ibx-review" aria-label="Propozycje agenta">
+        <section className="ibx-review" aria-label={tr("Propozycje agenta")}>
           <Review project={INBOX_KEY} proposal={pendingProposal} autoFocus={false} onApplied={() => {}} onDecided={() => {}} onUndone={() => {}} />
         </section>
       )}
 
-      <section className="group" aria-label="Wpisy w skrzynce">
+      <section className="group" aria-label={tr("Wpisy w skrzynce")}>
         <div className="ibx-list" ref={listRef} onKeyDownCapture={onListKey}>
           {open.length === 0 && (
             <div className="empty compact">
-              <p className="empty-title">Skrzynka pusta.</p>
-              <p className="empty-text">Zapisz tu cokolwiek przyjdzie do głowy — porządek zrobisz później.</p>
+              <p className="empty-title">{tr("Skrzynka pusta.")}</p>
+              <p className="empty-text">{tr("Zapisz tu cokolwiek przyjdzie do głowy — porządek zrobisz później.")}</p>
             </div>
           )}
           {open.map((t) => {
@@ -583,7 +578,7 @@ export function InboxView() {
                   className="ibx-check"
                   role="checkbox"
                   aria-checked={sel}
-                  aria-label={`Zaznacz: ${t.title}`}
+                  aria-label={tr("Zaznacz: {0}", t.title)}
                   disabled={!id}
                   onClick={() => id && toggle(id)}
                 >
@@ -605,16 +600,16 @@ export function InboxView() {
           <div className="done-group">
             <button type="button" className="done-toggle" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>
               <ChevronRight size={12} className="chev" />
-              Zrobione <span className="count">{done.length}</span>
+              {tr("Zrobione")} <span className="count">{done.length}</span>
             </button>
             {showDone && done.map((t) => <TaskRow key={t.id ?? `d:${t.line}`} task={t} />)}
           </div>
         )}
       </section>
-      <p className="ibx-keys" aria-hidden>
+      {open.length > 0 && <details className="ibx-help ibx-shortcuts"><summary>{tr("Skróty klawiaturowe")}</summary><p className="ibx-keys">
         <kbd>↑</kbd>
-        <kbd>↓</kbd> wybór · <kbd>↵</kbd> przyjmij podpowiedź · <kbd>&gt;</kbd> miejsce · <kbd>t</kbd> temat · <kbd>/</kbd> komenda dla wpisu · <kbd>spacja</kbd> zaznacz · <kbd>u</kbd> cofnij · <kbd>?</kbd> agent
-      </p>
+        <kbd>↓</kbd>  {tr("wybór ·")} <kbd>↵</kbd>  {tr("przyjmij podpowiedź ·")} <kbd>&gt;</kbd>  {tr("miejsce ·")} <kbd>t</kbd>  {tr("temat ·")} <kbd>/</kbd>  {tr("komenda dla wpisu ·")} <kbd>{tr("spacja")}</kbd>  {tr("zaznacz ·")} <kbd>u</kbd>  {tr("cofnij ·")} <kbd>?</kbd> agent
+      </p></details>}
     </div>
   );
 }

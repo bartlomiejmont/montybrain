@@ -1,0 +1,14 @@
+.project-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%; color: var(--project-color); font-weight: 500; vertical-align: baseline; }
+.project-name .dot { flex: none; }
+.project-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-nav .nav-label { color: var(--project-color); font-weight: 500; }
+.project-nav.active { background: color-mix(in oklab, var(--project-color) 14%, var(--bg-side)); }
+.project-nav .dot { width: 11px !important; height: 11px !important; }
+.project-view > .view-head { padding-top: 12px; border-top: 3px solid var(--accent); }
+.view-title .project-name { font-size: inherit; font-weight: inherit; }
+.view-title .project-name .dot { width: 12px !important; height: 12px !important; }
+.detail-panel[data-project-color] { border-top: 3px solid var(--accent); }
+.project-view .group-head { flex-wrap: wrap; }
+.project-view .group-hint { flex-basis: 100%; margin-left: 0; font-size: var(--text-xs); }
+.map-project .project-name { font-size: var(--text-md); }
+.card-ctx .project-name { font-size: inherit; }

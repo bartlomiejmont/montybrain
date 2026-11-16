@@ -1,3 +1,4 @@
+import { t as tr, message } from "../i18n";
 // Core errors arrive as English display strings; give them a Polish lead-in.
 
 const PREFIXES: [RegExp, string][] = [
@@ -24,7 +25,7 @@ export function describeError(err: unknown): string {
             }
           })();
   for (const [re, pl] of PREFIXES) {
-    if (re.test(raw)) return raw.replace(re, pl);
+    if (re.test(raw)) return raw.replace(re, tr(pl));
   }
-  return raw || "Nieznany błąd";
+  return message(raw) || tr("Nieznany błąd");
 }

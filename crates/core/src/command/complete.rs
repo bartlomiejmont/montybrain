@@ -395,6 +395,9 @@ fn complete_raw(
     }
     if let Some(rest) = word.strip_prefix('!') {
         let items = [
+            ("!high", "high priority"),
+            ("!low", "low priority"),
+            ("!normal", "normal priority"),
             ("!wysoki", "priorytet wysoki"),
             ("!niski", "priorytet niski"),
             ("!normalny", "priorytet normalny"),
@@ -411,6 +414,7 @@ fn complete_raw(
     }
     if let Some(rest) = word.strip_prefix('@') {
         let words = [
+            "today", "tomorrow", "mon", "tue", "wed", "thu", "fri", "sat", "sun", "+1w",
             "dzis", "jutro", "pojutrze", "pn", "wt", "sr", "cz", "pt", "sb", "nd", "+3d", "+1t",
             "+2t",
         ];
@@ -435,6 +439,9 @@ fn complete_raw(
     }
     if word.starts_with('/') {
         let items = [
+            ("/topic", "new topic"),
+            ("/wait", "add a waiting relation"),
+            ("/link", "add a related link"),
             ("/temat", "nowy temat"),
             ("/czeka", "dopisz „Czeka na:”"),
             ("/powiaz", "dopisz „Powiązane:”"),

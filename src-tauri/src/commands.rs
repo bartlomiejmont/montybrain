@@ -549,7 +549,7 @@ pub async fn agent_session_start<R: Runtime>(
             provider,
             scope,
             &shown,
-            prompt,
+            crate::runs::recipes::prompt_language(prompt, app.state::<crate::native::Native>().settings().language),
             &snapshot.projects,
             state.vault().root(),
             &crate::updates::agent_choice(&app, provider),
@@ -749,16 +749,25 @@ pub async fn list_recipes<R: Runtime>(window: WebviewWindow<R>) -> CmdResult<Vec
 pub async fn list_providers<R: Runtime>(
     app: AppHandle<R>,
     window: WebviewWindow<R>,
+    refresh: Option<bool>,
 ) -> CmdResult<Vec<ProviderInfo>> {
     main_window_only(&window)?;
-    blocking(move || Ok(app.state::<Runs>().0.providers())).await
+    blocking(move || {
+        let runs = app.state::<Runs>();
+        Ok(if refresh.unwrap_or(false) {
+            runs.0.refresh_providers()
+        } else {
+            runs.0.providers()
+        })
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn start_run<R: Runtime>(
     app: AppHandle<R>,
     window: WebviewWindow<R>,
-    request: RunRequest,
+    mut request: RunRequest,
 ) -> CmdResult<RunInfo> {
     main_window_only(&window)?;
     blocking(move || {
@@ -767,13 +776,36 @@ pub async fn start_run<R: Runtime>(
         let runs = app.state::<Runs>().0.clone();
         let projects = snapshot.projects.clone();
         let provider = crate::runs::ProviderId::parse(&request.provider)?;
-        let history = request
-            .params
-            .get("project")
-            .and_then(|p| crate::updates::history_options(&app, p.trim()));
+        let mut journal_refresh = None;
+        if let Some(topic) = request.params.get("topic") {
+            if request.recipe != "zlecenie" || request.mode != "background" {
+                return Err("Odświeżanie tematu działa tylko jako zlecenie w tle.".into());
+            }
+            let project = request.params.get("project").ok_or("Brak projektu.")?;
+            crate::runs::recipes::journal_context(&snapshot, project, topic, &[])?;
+            let views = crate::updates::list(&app);
+            if views.iter().any(|v| &v.project == project && v.pending > 0) {
+                return Err(
+                    "Projekt ma nierozstrzygnięte propozycje. Najpierw przejrzyj zmiany.".into(),
+                );
+            }
+            let previous = views.iter()
+                .find(|v| &v.project == project)
+                .and_then(|v| v.journal_refresh.get(topic));
+            let input = crate::updates::journal::prepare(&snapshot, project, topic, previous)?;
+            request.params.insert("text".into(), "Odśwież temat z dziennika".into());
+            journal_refresh = Some(input);
+        }
+        let history = if request.params.contains_key("topic") {
+            None
+        } else {
+            request.params.get("project")
+                .and_then(|p| crate::updates::history_options(&app, p.trim()))
+        };
         // The vault as the run starts: the base of an `aktualizacja` proposal;
         // the model / effort and the history source come from Settings.
         let extra = StartExtra {
+            journal_refresh,
             base: Some(snapshot),
             agent: crate::updates::agent_choice(&app, provider),
             history,

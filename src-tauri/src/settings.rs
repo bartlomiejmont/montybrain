@@ -35,9 +35,25 @@ pub const SETTINGS_FILE: &str = "settings.json";
 pub const DEFAULT_SHORTCUT: &str = "Ctrl+Alt+Space";
 pub const DEFAULT_DIGEST_HOUR: u8 = 9;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    #[default]
+    En,
+    Pl,
+}
+
+impl Language {
+    pub fn text<'a>(self, en: &'a str, pl: &'a str) -> &'a str {
+        match self { Self::En => en, Self::Pl => pl }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    #[serde(deserialize_with = "lenient_language")]
+    pub language: Language,
     /// Global quick-capture shortcut, e.g. `"Ctrl+Alt+Space"` (modifiers in the
     /// order Ctrl, Alt, Shift, Cmd, then a `KeyboardEvent.code`-style key).
     pub shortcut: String,
@@ -60,6 +76,11 @@ pub struct Settings {
     pub agents: Agents,
     /// Default days between checks of a waiting item (1, 2, 3 or 7).
     pub waiting_days: u8,
+}
+
+fn lenient_language<'de, D: Deserializer<'de>>(d: D) -> Result<Language, D::Error> {
+    let value = serde_json::Value::deserialize(d)?;
+    Ok(serde_json::from_value(value).unwrap_or_default())
 }
 
 fn lenient_sources<'de, D: Deserializer<'de>>(
@@ -115,6 +136,7 @@ fn lenient_auto_update<'de, D: Deserializer<'de>>(
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            language: Language::En,
             shortcut: DEFAULT_SHORTCUT.into(),
             reminders: true,
             digest_hour: DEFAULT_DIGEST_HOUR,
@@ -131,6 +153,7 @@ impl Default for Settings {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct SettingsPatch {
+    pub language: Option<Language>,
     pub reminders: Option<bool>,
     pub digest_hour: Option<u8>,
     pub quick_destination: Option<TaskLocation>,
@@ -143,6 +166,7 @@ impl Settings {
     /// Applies a patch; returns whether anything changed.
     pub fn apply(&mut self, patch: SettingsPatch) -> Result<bool, String> {
         let before = self.clone();
+        if let Some(language) = patch.language { self.language = language; }
         if let Some(h) = patch.digest_hour {
             if h > 23 {
                 return Err(format!("Nieprawidłowa godzina: {h}"));
@@ -303,6 +327,7 @@ mod tests {
         let path = dir.path().join("sub").join(SETTINGS_FILE);
         assert_eq!(Settings::load(&path), Settings::default());
         let s = Settings {
+            language: crate::settings::Language::Pl,
             shortcut: "Cmd+Shift+KeyK".into(),
             reminders: false,
             digest_hour: 7,
@@ -633,5 +658,34 @@ mod tests {
         );
         // Same dir is a no-op.
         assert!(migrate_config(&old, &old).unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::*;
+
+    #[test]
+    fn old_or_unknown_language_settings_keep_other_preferences() {
+        let old: Settings = serde_json::from_str(r#"{"reminders":false,"digest_hour":17}"#).unwrap();
+        assert_eq!(old.language, Language::En);
+        assert!(!old.reminders);
+        let unknown: Settings = serde_json::from_str(r#"{"language":"de","digest_hour":17}"#).unwrap();
+        assert_eq!(unknown.language, Language::En);
+        assert_eq!(unknown.digest_hour, 17);
+    }
+
+    #[test]
+    fn language_round_trip_and_patch_preserve_unrelated_settings() {
+        let mut settings = Settings::default();
+        let before = settings.clone();
+        assert!(settings.apply(serde_json::from_str(r#"{"language":"pl"}"#).unwrap()).unwrap());
+        assert_eq!(settings.language, Language::Pl);
+        assert_eq!(settings.shortcut, before.shortcut);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(SETTINGS_FILE);
+        settings.save(&path).unwrap();
+        assert_eq!(Settings::load(&path), settings);
+        assert!(serde_json::from_str::<SettingsPatch>(r#"{"language":"de"}"#).is_err());
     }
 }

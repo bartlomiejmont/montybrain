@@ -109,11 +109,11 @@ export const MOCK_RECIPES: Recipe[] = [
 export function mockProviders(codex: "ok" | "missing", claude: "ok" | "missing" = "ok"): ProviderInfo[] {
   return [
     claude === "ok"
-      ? { id: "claude", name: "Claude Code", available: true, path: "/usr/local/bin/claude", version: "2.1.0", problem: null }
-      : { id: "claude", name: "Claude Code", available: false, path: null, version: null, problem: "Nie znaleziono polecenia „claude”. Zainstaluj Claude Code i zaloguj się." },
+      ? { id: "claude", name: "Claude Code", available: true, path: "/usr/local/bin/claude", version: "2.1.325", models: ["opus", "fable", "sonnet", "haiku"], limits: { checked_at: Math.floor(Date.now() / 1000), status: null, limits: [{ id: "claude:five_hour", used_percent: 12, window_minutes: 300, resets_at: null, reset_label: "16.11, 01:19 (Europe/Warsaw)" }, { id: "claude:seven_day", used_percent: 67, window_minutes: 10080, resets_at: null, reset_label: "16.11, 02:59 (Europe/Warsaw)" }] }, limits_problem: null, problem: null, auth: { status: "logged_in", method: "Claude.ai", plan: "max", problem: null } }
+      : { id: "claude", name: "Claude Code", available: false, path: null, version: null, auth: { status: "unknown", method: null, plan: null, problem: null }, problem: "Nie znaleziono polecenia „claude”. Zainstaluj Claude Code i zaloguj się." },
     codex === "ok"
-      ? { id: "codex", name: "Codex", available: true, path: "/usr/local/bin/codex", version: "0.58.0", problem: null }
-      : { id: "codex", name: "Codex", available: false, path: null, version: null, problem: "Nie znaleziono polecenia „codex”. Zainstaluj Codex CLI i zaloguj się." },
+      ? { id: "codex", name: "Codex", available: true, path: "/usr/local/bin/codex", version: "0.169.0", models: ["gpt-6.1-sol", "gpt-6-astra", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-luna"], limits: { checked_at: Math.floor(Date.now() / 1000), status: null, limits: [{ id: "codex:primary", used_percent: 24, window_minutes: 300, resets_at: Math.floor(Date.now() / 1000) + 3600 }, { id: "codex:secondary", used_percent: 61, window_minutes: 10080, resets_at: Math.floor(Date.now() / 1000) + 86400 }] }, limits_problem: null, problem: null, auth: { status: "logged_in", method: "ChatGPT", plan: null, problem: null } }
+      : { id: "codex", name: "Codex", available: false, path: null, version: null, auth: { status: "unknown", method: null, plan: null, problem: null }, problem: "Nie znaleziono polecenia „codex”. Zainstaluj Codex CLI i zaloguj się." },
   ];
 }
 
@@ -135,7 +135,7 @@ function script(req: RunRequest, providerName: string): Step[] {
     { kind: "tool", text: `recent_journal {"project":"${project || "whenubuy"}","limit":10}` },
     { kind: "note", text: "Dziennik przeczytany, składam odpowiedź." },
   ];
-  if (req.recipe === "zlecenie") {
+  if (req.recipe === "zlecenie" && !req.params.topic) {
     steps.splice(1, 0, { kind: "note", text: "Zbieram stan repozytoriów (2; tylko odczyt)…" }, { kind: "note", text: "Historia rozmów: Zebrano 6 sesji (Claude Code 4, Codex 2), 14 KB." });
   }
   if (req.recipe === "zadania") {
@@ -224,6 +224,7 @@ export function createMockRuns(opts: MockRunOptions = {}) {
         provider: req.provider,
         mode: req.mode,
         project: req.params.project || null,
+        topic: req.params.topic || null,
         request: recipe.id === "zlecenie" ? req.params.text?.trim() || null : null,
         model: opts.agentFor?.(req.provider).model ?? null,
         effort: opts.agentFor?.(req.provider).effort ?? null,
@@ -271,6 +272,7 @@ export function createMockRuns(opts: MockRunOptions = {}) {
         provider: req.provider,
         mode: "background",
         project: req.params.project || null,
+        topic: req.params.topic || null,
         request: recipe.id === "zlecenie" ? req.params.text?.trim() || null : null,
         model: opts.agentFor?.(req.provider).model ?? null,
         effort: opts.agentFor?.(req.provider).effort ?? null,

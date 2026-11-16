@@ -39,6 +39,13 @@ impl DueWord {
 }
 
 const WEEKDAYS: &[(&str, Weekday)] = &[
+    ("mon", Weekday::Mon), ("monday", Weekday::Mon),
+    ("tue", Weekday::Tue), ("tuesday", Weekday::Tue),
+    ("wed", Weekday::Wed), ("wednesday", Weekday::Wed),
+    ("thu", Weekday::Thu), ("thursday", Weekday::Thu),
+    ("fri", Weekday::Fri), ("friday", Weekday::Fri),
+    ("sat", Weekday::Sat), ("saturday", Weekday::Sat),
+    ("sun", Weekday::Sun), ("sunday", Weekday::Sun),
     ("pn", Weekday::Mon),
     ("pon", Weekday::Mon),
     ("poniedzialek", Weekday::Mon),
@@ -69,9 +76,9 @@ pub fn parse_due_word(word: &str) -> Option<DueWord> {
     }
     let w = fold(word);
     match w.as_str() {
-        "dzis" | "dzisiaj" => return Some(DueWord::Days(0)),
-        "jutro" => return Some(DueWord::Days(1)),
-        "pojutrze" => return Some(DueWord::Days(2)),
+        "dzis" | "dzisiaj" | "today" => return Some(DueWord::Days(0)),
+        "jutro" | "tomorrow" => return Some(DueWord::Days(1)),
+        "pojutrze" | "dayaftertomorrow" => return Some(DueWord::Days(2)),
         _ => {}
     }
     if let Some((_, wd)) = WEEKDAYS.iter().find(|(n, _)| *n == w) {
@@ -82,7 +89,7 @@ pub fn parse_due_word(word: &str) -> Option<DueWord> {
     let n: i64 = num.parse().ok()?;
     let days = match unit {
         "d" => n,
-        "t" | "tyg" => n.checked_mul(7)?,
+        "t" | "tyg" | "w" | "week" | "weeks" => n.checked_mul(7)?,
         _ => return None,
     };
     (days <= MAX_DAYS).then_some(DueWord::Days(days))

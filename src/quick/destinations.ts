@@ -1,3 +1,4 @@
+import { getLocale, t as tr } from "../i18n";
 // Where the quick-capture window can put a task: the inbox, every
 // non-archived project (its projekt.md) and the project's open topics.
 
@@ -24,12 +25,12 @@ export function destinationKey(loc: TaskLocation): string {
   return `t:${loc.project}/${loc.topic}`;
 }
 
-const byText = (a: string, b: string) => a.localeCompare(b, "pl", { sensitivity: "base" });
+const byText = (a: string, b: string) => a.localeCompare(b, getLocale(), { sensitivity: "base" });
 
 export function destinations(snap: Snapshot): Destination[] {
   const inbox: TaskLocation = { kind: "inbox" };
   const out: Destination[] = [
-    { key: "inbox", label: "Skrzynka", full: "Skrzynka", depth: 0, color: null, location: inbox, haystack: "skrzynka inbox" },
+    { key: "inbox", label: tr("Skrzynka"), full: tr("Skrzynka"), depth: 0, color: null, location: inbox, haystack: "skrzynka inbox" },
   ];
   const projects = snap.projects.filter((p) => p.state !== "archived").sort((a, b) => byText(a.name, b.name));
   for (const p of projects) {

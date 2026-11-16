@@ -45,6 +45,7 @@ enum Pending {
     TurnStart,
     TurnSteer,
     Interrupt,
+    RateLimits,
 }
 
 #[derive(Debug, Default)]
@@ -206,6 +207,11 @@ impl Codex {
             return Vec::new();
         };
         if let Some(e) = v.get("error") {
+            // Usage can be unavailable (for example with API-key login).
+            // A failed optional read must never fail the conversation.
+            if what == Pending::RateLimits {
+                return Vec::new();
+            }
             let msg = e.get("message").and_then(Value::as_str).unwrap_or("błąd");
             let fatal = matches!(
                 what,
@@ -260,10 +266,18 @@ impl Codex {
                     ),
                     error: false,
                 }];
+                out.push(Act::Connected(
+                    (!model.is_empty()).then(|| clip(model, 200)),
+                ));
                 let queued = std::mem::take(&mut self.queued);
                 if !queued.is_empty() {
                     out.push(Act::Write(self.turn_start(&thread, &queued.join("\n\n"))));
                 }
+                out.push(Act::Write(self.request(
+                    "account/rateLimits/read",
+                    json!({}),
+                    Pending::RateLimits,
+                )));
                 out
             }
             Pending::TurnStart => {
@@ -273,11 +287,17 @@ impl Codex {
                 Vec::new()
             }
             Pending::TurnSteer | Pending::Interrupt => Vec::new(),
+            Pending::RateLimits => vec![Act::Limits(super::telemetry::codex_limits(&r))],
         }
     }
 
     fn notification(&mut self, m: &str, p: Value) -> Vec<Act> {
         match m {
+            "thread/tokenUsage/updated" => super::telemetry::Usage::codex(&p)
+                .map(Act::Usage)
+                .into_iter()
+                .collect(),
+            "account/rateLimits/updated" => vec![Act::Limits(super::telemetry::codex_limits(&p))],
             "turn/started" => {
                 self.turn = p
                     .pointer("/turn/id")
@@ -746,6 +766,7 @@ mod tests {
         assert!(matches!(&acts[0], Act::Notice { text, .. } if text.contains("gpt-x")));
         let w = writes(&acts);
         assert_eq!(w[0]["method"], "turn/start");
+        assert_eq!(w[1]["method"], "account/rateLimits/read");
         assert_eq!(w[0]["params"]["threadId"], "th1");
         assert_eq!(
             w[0]["params"]["input"][0]["text"],
@@ -761,6 +782,26 @@ mod tests {
         assert_eq!(s["params"]["expectedTurnId"], "tu1");
         let i: Value = serde_json::from_str(&c.interrupt()[0]).unwrap();
         assert_eq!(i["params"], json!({"threadId": "th1", "turnId": "tu1"}));
+    }
+
+    #[test]
+    fn usage_reports_and_optional_limits_do_not_break_the_conversation() {
+        let mut c = Codex::new("/c");
+        let acts = c.on_line(r#"{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":123,"outputTokens":45,"cachedInputTokens":100}}}}"#);
+        assert!(
+            matches!(&acts[0], Act::Usage(u) if u.input_tokens == Some(123) && u.output_tokens == Some(45))
+        );
+        let request: Value = serde_json::from_str(&c.request(
+            "account/rateLimits/read",
+            json!({}),
+            Pending::RateLimits,
+        ))
+        .unwrap();
+        let acts =
+            c.on_line(&json!({"id":request["id"],"error":{"message":"unavailable"}}).to_string());
+        assert!(acts.is_empty());
+        let acts = c.on_line(r#"{"method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":35,"windowDurationMins":300}}}}"#);
+        assert!(matches!(&acts[0], Act::Limits(l) if l.len() == 1 && l[0].used_percent == 35.0));
     }
 
     /// Hand-written from the generated TypeScript schema (ItemStartedNotification,

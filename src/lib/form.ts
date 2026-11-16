@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Explicit-save editors (topic, project): what "Zapisz" sends and when the
 // editor may close. Pure, so the decisions are testable without a DOM.
 //
@@ -101,11 +102,11 @@ export function projectPatch(f: {
   const color = changedValue(f.color);
   const state = changedValue(f.state) as ProjectState | null;
   const description = changedValue(f.description, trim);
-  if (color && !HEX_RE.test(color)) return { error: "Kolor podaj jako #rrggbb, np. #a3e635" };
+  if (color && !HEX_RE.test(color)) return { error: tr("Kolor podaj jako #rrggbb, np. #a3e635") };
   let repos: Repo[] | null = null;
   if (f.repos.edited !== null) {
     repos = cleanRepos(f.repos.edited);
-    if (repos.some((r) => !r.name)) return { error: "Każde repozytorium potrzebuje nazwy." };
+    if (repos.some((r) => !r.name)) return { error: tr("Każde repozytorium potrzebuje nazwy.") };
     if (JSON.stringify(repos) === JSON.stringify(cleanRepos(f.repos.stored))) repos = null;
   }
   return {

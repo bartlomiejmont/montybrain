@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Agents } from "../api/types";
-import { createAgentSaver, modelToSave } from "./agentSave";
+import { CUSTOM_MODEL, createAgentSaver, modelSelection, modelToSave, selectedModel } from "./agentSave";
 
 const empty: Agents = { claude: { model: null, effort: null }, codex: { model: null, effort: null } };
 
@@ -43,5 +43,18 @@ describe("Settings → Agenci saving", () => {
     expect(modelToSave("opus", "opus")).toBeUndefined();
     expect(modelToSave("  ", "opus")).toBeNull();
     expect(modelToSave("", null)).toBeUndefined();
+  });
+});
+
+
+describe("model list mapping", () => {
+  it("preserves default, known and saved custom ids", () => {
+    expect(modelSelection(null, ["opus"])).toBe("");
+    expect(modelSelection("opus", ["opus"])).toBe("opus");
+    expect(modelSelection("private-model", ["opus"])).toBe(CUSTOM_MODEL);
+    expect(modelToSave("private-model", "private-model")).toBeUndefined();
+    expect(selectedModel(CUSTOM_MODEL)).toBeUndefined();
+    expect(selectedModel("")).toBeNull();
+    expect(selectedModel("opus")).toBe("opus");
   });
 });

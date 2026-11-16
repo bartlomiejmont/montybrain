@@ -1,3 +1,4 @@
+import { useLanguage, t as tr, getLanguage, message } from "../i18n";
 // The quick-capture window: the command field of Skrzynka (same reading,
 // confirm step and echo, read by the backend), a compact destination picker
 // for plain capture, Enter saves, Esc closes. The window is created hidden
@@ -21,6 +22,7 @@ function Dot({ color }: { color: string | null }) {
 }
 
 export function QuickCapture() {
+  useLanguage();
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [saved, setSaved] = useState<TaskLocation | null>(null);
   const [picking, setPicking] = useState(false);
@@ -31,7 +33,7 @@ export function QuickCapture() {
   // `?cmd=echo` (browser mock): the saved state with its echo and "Cofnij".
   const [done, setDone] = useState<{ reading: string; echo: LineWritten[]; undo: number | null; undone?: string; failed?: boolean } | null>(
     mock === "echo"
-      ? { reading: "Nowe zadanie „Kupić filtry” w: Skrzynka", echo: [{ file: "skrzynka.md", line: 9, text: "- [ ] Kupić filtry ^m3n4b5" }], undo: 1 }
+      ? { reading: tr("Nowe zadanie „Kupić filtry” w: Skrzynka"), echo: [{ file: "skrzynka.md", line: 9, text: "- [ ] Kupić filtry ^m3n4b5" }], undo: 1 }
       : null,
   );
   const [generation, setGeneration] = useState(0);
@@ -42,7 +44,7 @@ export function QuickCapture() {
   const listRef = useRef<HTMLUListElement>(null);
   const closeTimer = useRef<number | undefined>(undefined);
 
-  const all = useMemo(() => (snap ? destinations(snap) : []), [snap]);
+  const all = useMemo(() => (snap ? destinations(snap) : []), [snap, getLanguage()]);
   const dest = all.length ? resolveDestination(all, saved) : null;
   const shown = useMemo(() => filterDestinations(all, filter), [all, filter]);
 
@@ -170,7 +172,7 @@ export function QuickCapture() {
             </svg>
           </span>
           <span className="qc-done-text">
-            Zapisano <span className="qc-done-where">· {done.reading}</span>
+            {tr("Zapisano")} <span className="qc-done-where">· {message(done.reading)}</span>
           </span>
         </div>
         <div className="qc-echo">
@@ -181,8 +183,7 @@ export function QuickCapture() {
                 <>
                   {" "}
                   <button type="button" className="cf-link" onClick={() => void undoDone(done.undo)}>
-                    Spróbuj cofnąć jeszcze raz
-                  </button>
+                    {tr("Spróbuj cofnąć jeszcze raz")}</button>
                 </>
               )}
             </p>
@@ -200,7 +201,7 @@ export function QuickCapture() {
             variant="quick"
             source="quick"
             location={dest?.location ?? null}
-            placeholder="Nowe zadanie albo komenda…"
+            placeholder={tr("Nowe zadanie albo komenda…")}
             autoFocus
             initialText={mock && mock !== "topic" && mock !== "agent" ? MOCK_COMMAND_TEXT[mock].text : ""}
             startConfirmed={mock === "confirm"}
@@ -217,11 +218,11 @@ export function QuickCapture() {
             className="qc-dest"
             aria-haspopup="listbox"
             aria-expanded={picking}
-            title="Gdzie zapisać (Tab)"
+            title={tr("Gdzie zapisać (Tab)")}
             onClick={() => (picking ? closePicker() : openPicker())}
           >
             {dest && <Dot color={dest.color} />}
-            <span className="qc-dest-label">{dest?.full ?? "Skrzynka"}</span>
+            <span className="qc-dest-label">{dest?.full ?? tr("Skrzynka")}</span>
             <svg className="qc-chev" viewBox="0 0 10 10" width="9" height="9" aria-hidden>
               <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
             </svg>
@@ -233,8 +234,9 @@ export function QuickCapture() {
           ) : (
             <span className="qc-chips" />
           )}
+          <button type="button" className="btn btn-primary qc-save" disabled={!dest} onClick={() => fieldRef.current?.submit()}>{tr("Zapisz")}</button>
           <span className="qc-hints" aria-hidden>
-            <kbd>↵</kbd> zapisz <kbd>⇥</kbd> miejsce <kbd>&gt;</kbd> komenda <kbd>esc</kbd>
+            <kbd>↵</kbd>  {tr("zapisz")} <kbd>⇥</kbd>  {tr("miejsce")} <kbd>&gt;</kbd>  {tr("komenda")} <kbd>esc</kbd>
           </span>
         </div>
       )}
@@ -245,8 +247,8 @@ export function QuickCapture() {
             ref={filterRef}
             className="qc-filter"
             value={filter}
-            placeholder="Szukaj projektu lub tematu"
-            aria-label="Szukaj miejsca"
+            placeholder={tr("Szukaj projektu lub tematu")}
+            aria-label={tr("Szukaj miejsca")}
             aria-controls="qc-list"
             aria-activedescendant={shown[cursor] ? `qc-opt-${cursor}` : undefined}
             spellCheck={false}
@@ -257,7 +259,7 @@ export function QuickCapture() {
             }}
             onKeyDown={onFilterKey}
           />
-          <ul id="qc-list" className="qc-list" role="listbox" aria-label="Miejsce zapisu" ref={listRef}>
+          <ul id="qc-list" className="qc-list" role="listbox" aria-label={tr("Miejsce zapisu")} ref={listRef}>
             {shown.map((d, i) => (
               <li
                 key={d.key}
@@ -274,10 +276,10 @@ export function QuickCapture() {
               >
                 {d.depth === 0 && <Dot color={d.key === "inbox" ? null : d.color} />}
                 <span className="qc-opt-label">{filter && d.depth ? d.full : d.label}</span>
-                {dest?.key === d.key && <span className="qc-opt-current">obecnie</span>}
+                {dest?.key === d.key && <span className="qc-opt-current">{tr("obecnie")}</span>}
               </li>
             ))}
-            {shown.length === 0 && <li className="qc-empty">Nic nie pasuje.</li>}
+            {shown.length === 0 && <li className="qc-empty">{tr("Nic nie pasuje.")}</li>}
           </ul>
         </div>
       )}

@@ -12,6 +12,33 @@ use std::time::{Duration, Instant};
 use super::proc::run_bounded;
 use super::{ProviderId, ProviderInfo};
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthStatus {
+    LoggedIn,
+    LoggedOut,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct AuthInfo {
+    pub status: AuthStatus,
+    pub method: Option<String>,
+    pub plan: Option<String>,
+    pub problem: Option<String>,
+}
+
+impl Default for AuthInfo {
+    fn default() -> Self {
+        Self {
+            status: AuthStatus::Unknown,
+            method: None,
+            plan: None,
+            problem: None,
+        }
+    }
+}
+
 /// System dirs appended to the constructed PATH of child processes.
 pub const SYSTEM_PATH: &str = "/usr/bin:/bin:/usr/sbin:/sbin";
 
@@ -76,6 +103,7 @@ pub struct Resolver {
     /// Environment for `--version` (already scrubbed, with the child PATH).
     env: Vec<(OsString, OsString)>,
     cache: Mutex<Option<(Instant, Vec<ProviderInfo>)>>,
+    limits: Mutex<Vec<(ProviderId, super::session::telemetry::LimitSnapshot)>>,
 }
 
 impl Resolver {
@@ -89,6 +117,7 @@ impl Resolver {
             path_var,
             env,
             cache: Mutex::new(None),
+            limits: Mutex::new(Vec::new()),
         }
     }
 
@@ -96,16 +125,36 @@ impl Resolver {
         find_in(id.binary(), &self.dirs, self.path_var.as_deref()).ok_or_else(|| missing(id))
     }
 
+    pub fn remember_limits(&self, id: ProviderId, snapshot: super::session::telemetry::LimitSnapshot) {
+        let mut limits = crate::lock(&self.limits);
+        if let Some((_, old)) = limits.iter_mut().find(|(p, _)| *p == id) {
+            if snapshot.checked_at >= old.checked_at { *old = snapshot; }
+        } else { limits.push((id, snapshot)); }
+    }
+
+    fn with_limits(&self, mut list: Vec<ProviderInfo>) -> Vec<ProviderInfo> {
+        let limits = crate::lock(&self.limits);
+        for info in &mut list {
+            info.limits = limits.iter().find(|(id, _)| *id == info.id).map(|(_, s)| s.clone());
+        }
+        list
+    }
+
     /// Provider status, cached for a short while.
     pub fn list(&self) -> Vec<ProviderInfo> {
+        self.list_refreshed(false)
+    }
+
+    pub fn list_refreshed(&self, refresh: bool) -> Vec<ProviderInfo> {
         if let Some((at, list)) = crate::lock(&self.cache).as_ref()
+            && !refresh
             && at.elapsed() < CACHE_TTL
         {
-            return list.clone();
+            return self.with_limits(list.clone());
         }
         let list: Vec<ProviderInfo> = ProviderId::ALL.iter().map(|&id| self.info(id)).collect();
         *crate::lock(&self.cache) = Some((Instant::now(), list.clone()));
-        list
+        self.with_limits(list)
     }
 
     fn info(&self, id: ProviderId) -> ProviderInfo {
@@ -116,6 +165,10 @@ impl Resolver {
             path: None,
             version: None,
             problem: None,
+            auth: AuthInfo::default(),
+            models: super::cli_status::fallback(id),
+            limits: None,
+            limits_problem: None,
         };
         match self.resolve(id) {
             Err(problem) => info.problem = Some(problem),
@@ -129,9 +182,122 @@ impl Resolver {
                             Some(format!("`{} --version` nie zadziałało: {e}", id.binary()))
                     }
                 }
+                info.auth = auth(&path, id, &self.env, VERSION_TIMEOUT);
+                if info.problem.is_none() && info.auth.status == AuthStatus::LoggedIn {
+                    match super::cli_status::read(&path, id, &self.env) {
+                        Ok(status) => {
+                            if !status.models.is_empty() { info.models = status.models; }
+                            match status.limits {
+                                Ok(snapshot) => self.remember_limits(id, snapshot),
+                                Err(e) => info.limits_problem = Some(e),
+                            }
+                        }
+                        Err(e) => info.limits_problem = Some(e),
+                    }
+                }
             }
         }
         info
+    }
+}
+
+/// Read-only login checks, with the same environment as agent sessions. Never
+/// forward raw CLI output: `codex login status` may include part of an API key.
+fn auth(path: &Path, id: ProviderId, env: &[(OsString, OsString)], timeout: Duration) -> AuthInfo {
+    let mut cmd = Command::new(path);
+    cmd.args(match id {
+        ProviderId::Claude => vec!["auth", "status", "--json"],
+        ProviderId::Codex => vec!["login", "status"],
+    })
+    .env_clear()
+    .envs(env.iter().map(|(k, v)| (k, v)));
+    let Ok(out) = run_bounded(cmd, timeout, 16 * 1024, 4 * 1024, &|| false) else {
+        return unknown_auth();
+    };
+    if out.timed_out || out.stdout_truncated {
+        return unknown_auth();
+    }
+    parse_auth(id, &out.stdout, &out.stderr, out.success())
+}
+
+fn unknown_auth() -> AuthInfo {
+    AuthInfo {
+        problem: Some(
+            "Nie udało się sprawdzić logowania. Sprawdź CLI w terminalu i odśwież status.".into(),
+        ),
+        ..AuthInfo::default()
+    }
+}
+
+fn parse_auth(id: ProviderId, stdout: &[u8], stderr: &[u8], success: bool) -> AuthInfo {
+    match id {
+        ProviderId::Claude => {
+            let Ok(v) = serde_json::from_slice::<serde_json::Value>(stdout) else {
+                return unknown_auth();
+            };
+            let Some(logged_in) = v.get("loggedIn").and_then(|v| v.as_bool()) else {
+                return unknown_auth();
+            };
+            if logged_in && !success {
+                return unknown_auth();
+            }
+            let method = v
+                .get("authMethod")
+                .and_then(|v| v.as_str())
+                .and_then(|s| match s {
+                    "claude.ai" => Some("Claude.ai"),
+                    "oauth_token" => Some("OAuth"),
+                    "api_key" | "api_key_helper" => Some("Klucz API"),
+                    "third_party" => Some("Zewnętrzny dostawca"),
+                    _ => None,
+                })
+                .map(str::to_string);
+            // Only expose known plan names, never arbitrary credential output.
+            let plan = v
+                .get("subscriptionType")
+                .and_then(|v| v.as_str())
+                .filter(|s| matches!(*s, "free" | "pro" | "max" | "team" | "enterprise"))
+                .map(str::to_string);
+            AuthInfo {
+                status: if logged_in {
+                    AuthStatus::LoggedIn
+                } else {
+                    AuthStatus::LoggedOut
+                },
+                method,
+                plan,
+                problem: None,
+            }
+        }
+        ProviderId::Codex => {
+            let text = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(stdout),
+                String::from_utf8_lossy(stderr)
+            )
+            .to_lowercase();
+            if !success && text.trim() == "not logged in" {
+                return AuthInfo {
+                    status: AuthStatus::LoggedOut,
+                    ..AuthInfo::default()
+                };
+            }
+            let method = if text.contains("logged in using chatgpt") {
+                Some("ChatGPT")
+            } else if text.contains("logged in using an api key") {
+                Some("Klucz API")
+            } else {
+                None
+            };
+            match (success, method) {
+                (true, Some(method)) => AuthInfo {
+                    status: AuthStatus::LoggedIn,
+                    method: Some(method.into()),
+                    ..AuthInfo::default()
+                },
+                _ => unknown_auth(),
+            }
+        }
     }
 }
 
@@ -187,6 +353,85 @@ pub fn version(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retains_last_session_limits_when_probes_fail_and_ignores_older_reports() {
+        let dir = tempfile::tempdir().unwrap();
+        let resolver = Resolver::new(vec![dir.path().into()], None, vec![]);
+        let snapshot = super::super::session::telemetry::LimitSnapshot {
+            limits: vec![], checked_at: 20, status: Some("Limit osiągnięty".into()),
+        };
+        resolver.remember_limits(ProviderId::Claude, snapshot.clone());
+        resolver.remember_limits(ProviderId::Claude, super::super::session::telemetry::LimitSnapshot { checked_at: 10, ..snapshot.clone() });
+        assert_eq!(resolver.list_refreshed(true)[0].limits, Some(snapshot.clone()));
+        assert_eq!(resolver.list()[0].limits, Some(snapshot));
+        assert!(resolver.list()[1].limits.is_none());
+    }
+
+    #[test]
+    fn authentication_is_confirmed_only_by_recognised_status_output() {
+        let auth = parse_auth(ProviderId::Claude, br#"{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"max","email":"private@example.com"}"#, b"", true);
+        assert_eq!(auth.status, AuthStatus::LoggedIn);
+        assert_eq!(auth.plan.as_deref(), Some("max"));
+        assert!(!serde_json::to_string(&auth).unwrap().contains("private@"));
+        assert_eq!(
+            parse_auth(ProviderId::Claude, br#"{"loggedIn":false}"#, b"", false).status,
+            AuthStatus::LoggedOut
+        );
+        assert_eq!(
+            parse_auth(ProviderId::Claude, br#"{"loggedIn":true}"#, b"", false).status,
+            AuthStatus::Unknown
+        );
+        assert_eq!(
+            parse_auth(ProviderId::Codex, b"", b"Logged in using ChatGPT\n", true).status,
+            AuthStatus::LoggedIn
+        );
+        let api = parse_auth(
+            ProviderId::Codex,
+            b"",
+            b"Logged in using an API key - sk-secret",
+            true,
+        );
+        assert_eq!(api.method.as_deref(), Some("Klucz API"));
+        assert!(!serde_json::to_string(&api).unwrap().contains("sk-secret"));
+        assert_eq!(
+            parse_auth(ProviderId::Codex, b"", b"Not logged in\n", false).status,
+            AuthStatus::LoggedOut
+        );
+        assert_eq!(
+            parse_auth(
+                ProviderId::Codex,
+                b"",
+                b"Error: cannot read credentials",
+                false
+            )
+            .status,
+            AuthStatus::Unknown
+        );
+        assert_eq!(
+            parse_auth(ProviderId::Codex, b"wrapper version", b"", true).status,
+            AuthStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn explicit_refresh_bypasses_the_backend_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        script(
+            dir.path(),
+            "codex",
+            "if [ \"$1\" = '--version' ]; then echo 'codex 1'; else echo 'Not logged in' >&2; exit 1; fi",
+        );
+        let r = Resolver::new(vec![dir.path().to_path_buf()], None, vec![]);
+        assert_eq!(r.list()[1].auth.status, AuthStatus::LoggedOut);
+        script(
+            dir.path(),
+            "codex",
+            "if [ \"$1\" = '--version' ]; then echo 'codex 1'; else echo 'Logged in using ChatGPT' >&2; fi",
+        );
+        assert_eq!(r.list()[1].auth.status, AuthStatus::LoggedOut);
+        assert_eq!(r.list_refreshed(true)[1].auth.status, AuthStatus::LoggedIn);
+    }
 
     fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
         let p = dir.join(name);

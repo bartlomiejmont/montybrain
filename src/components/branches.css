@@ -1,0 +1,16 @@
+.branch-help { font-size: var(--text-sm); color: var(--text-3); line-height: 1.6; margin: 0 0 12px; }
+.branch-list { list-style: none; padding: 0; margin: 0; }
+.branch-item { padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+.branch-name { display: block; font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.branch-meta { display: block; margin: 4px 0 10px; font-size: var(--text-xs); color: var(--text-3); }
+.branch-assign { display: flex; gap: 8px; align-items: center; }
+.branch-assign .select { flex: 1; width: 0; min-width: 0; }
+.branch-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 6px; }
+.branch-new { margin-top: 8px; padding: 12px; background: var(--surface-field); border-radius: var(--radius-md); }
+.today-branch-actions { margin: 10px 0 2px; }
+.today-branch-actions > summary { width: fit-content; cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
+.today-branch-actions[open] > summary { margin-bottom: 12px; }
+.detail-topic-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 18px; }
+.detail-panel .editor { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 0; border: 0; }
+.detail-panel .editor .d-label { padding-top: 8px; }
+.detail-panel .editor textarea { min-height: 150px; resize: vertical; }

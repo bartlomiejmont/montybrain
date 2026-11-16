@@ -1,0 +1,52 @@
+.board.board-lanes { display: block; overflow: auto; }
+.board-lanes-content { min-width: var(--board-min-width); min-height: 100%; padding-bottom: 16px; position: relative; isolation: isolate; }
+.board-lane-columns, .board-lane-cells, .board-column-tracks { display: grid; grid-template-columns: var(--board-columns); gap: 12px; }
+.board-column-tracks { position: absolute; inset: 38px 0 0; z-index: -1; pointer-events: none; }
+.board-column-track { border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: color-mix(in oklab, var(--bg-side) 50%, transparent); }
+.board-lane-columns { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-bottom: 8px; }
+.board-lane-columns .col-head { margin: 0; padding: 0 12px; }
+.board-lane-columns .col-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.board-lane { margin: 0 0 14px; }
+.board-lane.grouped { border: 1px solid color-mix(in oklab, var(--text-3) 25%, transparent); border-radius: var(--radius-md); overflow: hidden; }
+.board-lane-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 10px; background: transparent; }
+.board-lane-kind, .board-lane-project, .board-lane-count { font-size: var(--text-xs); color: var(--text-3); }
+.board-lane-title { font-size: var(--text-sm); font-weight: 400; color: var(--text-2); text-align: left; overflow-wrap: anywhere; }
+.board-lane-title:hover { text-decoration: underline; }
+.board-lane-count { margin-left: auto; }
+.board-lane-cell { display: flex; flex-direction: column; gap: 8px; padding: 8px; min-width: 0; min-height: 60px; }
+.board-lane-cell:last-child { border-right: 0; }
+.board-lane-cell[data-col="done"] .card-title { color: var(--text-3); }
+.board-lane-cell.droppable { outline: 1px dashed var(--line); outline-offset: -3px; }
+.board-lane-cell.over { background: var(--bg-hover); outline-color: var(--text-3); }
+.board-lane.ungrouped .board-lane-head { background: transparent; padding-top: 12px; }
+.board-lane-single-title { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--text-3); }
+.board-hidden-done { font-size: var(--text-xs); color: var(--text-3); text-align: left; align-self: flex-start; }
+.board-hidden-done:hover { text-decoration: underline; }
+.board-lane-kind { display: none; }
+.board-lane-head .badge { font-size: var(--text-micro); }
+.board-view { position: relative; }
+.board .card, .board .card-open { cursor: grab; user-select: none; touch-action: none; }
+.col-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.col[data-col="archive"] .card-title { color: var(--text-3); }
+body.dragging-card .col.no-drop, body.dragging-card .col.no-drop * { cursor: not-allowed !important; }
+.archive-hint { white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
+.board, .col-body { overflow-anchor: none; scroll-behavior: auto; }
+.card.drop-target { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card.landed { animation: board-landed 1800ms ease-out; }
+@keyframes board-landed {
+  0%, 55% { outline: 2px solid var(--accent); outline-offset: 2px; background: var(--bg-hover); }
+  100% { outline: 2px solid transparent; outline-offset: 2px; }
+}
+.board-drop-hint { position: absolute; bottom: 12px; left: 24px; right: 24px; width: fit-content; max-width: calc(100% - 48px); z-index: 5; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg-raised); color: var(--text-2); font-size: var(--text-sm); pointer-events: none; overflow-wrap: anywhere; }
+.board-confirm-backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--backdrop); }
+.board-confirm { width: min(480px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; color: var(--text-2); font-size: var(--text-base); overflow-wrap: anywhere; }
+.board-confirm h2 { margin: 0 0 12px; color: var(--text); font-size: var(--text-title); font-weight: 500; }
+.board-confirm p { margin: 12px 0; }
+.board-confirm-places { display: grid; gap: 12px; margin: 20px 0; }
+.board-confirm-places > div { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; }
+.board-confirm-places dt { color: var(--text-3); }
+.board-confirm-places dd { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.board-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .card.landed { animation: none; outline: 2px solid var(--accent); outline-offset: 2px; }
+}

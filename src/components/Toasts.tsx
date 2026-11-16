@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 import { useVault } from "../store/vault";
 
 export function Toasts() {
@@ -20,7 +21,7 @@ export function Toasts() {
               {t.action.label}
             </button>
           )}
-          <button type="button" className="toast-x" aria-label="Zamknij" onClick={() => dismiss(t.id)}>
+          <button type="button" className="toast-x" aria-label={tr("Zamknij")} onClick={() => dismiss(t.id)}>
             ×
           </button>
         </div>

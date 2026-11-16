@@ -1,3 +1,4 @@
+import { setLanguage, type Language, message, t as tr } from "../../i18n";
 // „Ustawienia": global shortcut, reminders, autostart, vault folder, version.
 // Settings live outside the vault (src-tauri/src/settings.rs); every change goes
 // through the typed API and comes back as the new `AppSettings`.
@@ -6,12 +7,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { AGENT_EFFORTS, api, type AgentChoice, type Agents as AgentsT, type AppSettings, type ProviderId } from "../../api";
 import { DEFAULT_SHORTCUT, canonicalShortcut, shortcutFromEvent, shortcutKeys } from "../../api/shortcut";
-import { createAgentSaver, modelToSave, type AgentSaver } from "../../lib/agentSave";
+import { CUSTOM_MODEL, createAgentSaver, modelSelection, modelToSave, selectedModel, type AgentSaver } from "../../lib/agentSave";
 import { describeError } from "../../lib/errors";
 import { PROVIDER_LABEL, autoLabel, formatNext } from "../../lib/updates";
 import { links } from "../../router/router";
-import { updateStore, useUpdates } from "../../store/updates";
+import { updateStore, useProviders, useUpdates } from "../../store/updates";
 import { useView } from "../../store/vault";
+import { ProviderConnections } from "../../components/ProviderConnections";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
@@ -114,8 +116,8 @@ function ShortcutRow({ s, apply }: { s: AppSettings; apply: (call: () => Promise
     <>
       <Row
         id="set-shortcut"
-        label="Szybkie zadanie"
-        hint="Skrót działa w każdej aplikacji i otwiera małe okno do zapisania zadania."
+        label={tr("Szybkie zadanie")}
+        hint={tr("Skrót działa w każdej aplikacji i otwiera małe okno do zapisania zadania.")}
       >
         <button
           ref={boxRef}
@@ -126,25 +128,23 @@ function ShortcutRow({ s, apply }: { s: AppSettings; apply: (call: () => Promise
           onClick={() => (recording ? void stop(null) : void start())}
           onBlur={() => recording && void stop(null)}
         >
-          {recording ? <span className="set-recording">Naciśnij skrót…</span> : <Keys shortcut={s.shortcut} />}
+          {recording ? <span className="set-recording">{tr("Naciśnij skrót…")}</span> : <Keys shortcut={s.shortcut} />}
         </button>
         {!recording && s.shortcut !== DEFAULT_SHORTCUT && (
           <button type="button" className="btn btn-quiet" onClick={() => void stop(DEFAULT_SHORTCUT)}>
-            Domyślny
-          </button>
+            {tr("Domyślny")}</button>
         )}
       </Row>
       {(problem || recording) && (
         <div className={`set-note${problem && !recording ? " danger" : ""}`} role={problem ? "alert" : undefined}>
           {recording ? (
-            "Użyj ⌃, ⌥ lub ⌘ z dowolnym klawiszem. Esc anuluje."
+            tr("Użyj ⌃, ⌥ lub ⌘ z dowolnym klawiszem. Esc anuluje.")
           ) : (
             <>
-              {problem}{" "}
+              {message(problem ?? "")}{" "}
               {s.shortcut_error && isValidShortcut(s.shortcut) && (
                 <button type="button" className="set-link" onClick={() => void apply(() => api.setShortcut(s.shortcut)).then(setError)}>
-                  Spróbuj ponownie
-                </button>
+                  {tr("Spróbuj ponownie")}</button>
               )}
             </>
           )}
@@ -176,67 +176,71 @@ function AutoUpdates({ s, onError }: { s: AppSettings; onError: (msg: string | n
   return (
     <section className="group" aria-labelledby="set-g-auto">
       <h2 className="group-head" id="set-g-auto">
-        Aktualizacja projektów
-      </h2>
+        {tr("Aktualizacja projektów")}</h2>
       {slugs.length === 0 ? (
         <p className="set-empty">
-          Automatyczna aktualizacja i historia rozmów są wyłączone we wszystkich projektach. Włączysz je w widoku projektu, w pasku
-          „Aktualizacja”. Każde sprawdzenie zużywa limit wybranej subskrypcji.
-        </p>
+          {tr("Automatyczna aktualizacja i historia rozmów są wyłączone we wszystkich projektach. Włączysz je w widoku projektu, w pasku „Aktualizacja”. Każde sprawdzenie zużywa limit wybranej subskrypcji.")}</p>
       ) : (
         slugs.map((slug) => {
           const cfg = s.auto_update?.[slug];
           const src = s.update_sources?.[slug];
           const u = updates.byProject[slug];
-          const when = u?.held ? "wstrzymane: czekają propozycje" : u?.next_due ? `następne ${formatNext(u.next_due, new Date())}` : "";
+          const when = u?.held ? tr("wstrzymane: czekają propozycje") : u?.next_due ? tr("następne {0}", formatNext(u.next_due, new Date())) : "";
           const parts: string[] = [];
           if (cfg && autoOn(slug)) {
-            parts.push(`automatycznie ${autoLabel(cfg)}`, PROVIDER_LABEL[cfg.provider], cfg.on_result === "apply" ? "zapisuje bez pytania" : "pokazuje propozycje");
+            parts.push(tr("automatycznie {0}", autoLabel(cfg)), PROVIDER_LABEL[cfg.provider], cfg.on_result === "apply" ? tr("zapisuje bez pytania") : tr("pokazuje propozycje"));
             if (when) parts.push(when);
-          } else parts.push("automatycznie: wyłączona");
-          if (src?.history) parts.push(`historia rozmów: ${src.history_days} dni`);
+          } else parts.push(tr("automatycznie: wyłączona"));
+          if (src?.history) parts.push(tr("historia rozmów: {0} dni", src.history_days));
           return (
             <Row key={slug} label={name(slug)} hint={parts.join(" · ")}>
               {cfg && autoOn(slug) && (
                 <button
                   type="button"
                   className="btn btn-quiet"
-                  aria-label={`Wyłącz automatyczną aktualizację projektu ${name(slug)}`}
+                  aria-label={tr("Wyłącz automatyczną aktualizację projektu {0}", name(slug))}
                   onClick={() => done(api.setAutoUpdate(slug, { ...cfg, schedule: { kind: "off" } }))}
                 >
-                  Wyłącz
-                </button>
+                  {tr("Wyłącz")}</button>
               )}
               {src?.history && (
                 <button
                   type="button"
                   className="btn btn-quiet"
-                  aria-label={`Wyłącz historię rozmów w projekcie ${name(slug)}`}
+                  aria-label={tr("Wyłącz historię rozmów w projekcie {0}", name(slug))}
                   onClick={() => done(api.setUpdateSources(slug, { ...src, history: false }))}
                 >
-                  Wyłącz historię
-                </button>
+                  {tr("Wyłącz historię")}</button>
               )}
-              <a className="btn btn-ghost" href={`${links.project(slug)}?auto=1`} aria-label={`Zmień aktualizację projektu ${name(slug)}`}>
-                Zmień
-              </a>
+              <a className="btn btn-ghost" href={`${links.project(slug)}?auto=1`} aria-label={tr("Zmień aktualizację projektu {0}", name(slug))}>
+                {tr("Zmień")}</a>
             </Row>
           );
         })
       )}
-      <p className="set-hint set-foot">Działa tylko wtedy, gdy MontyBrain jest uruchomiony.</p>
+      <p className="set-hint set-foot">{tr("Działa tylko wtedy, gdy MontyBrain jest uruchomiony.")}</p>
     </section>
   );
 }
 
 const AGENT_HINT = {
-  claude: "Puste pole: model z ustawień Claude Code.",
-  codex: "Puste pole: domyślny model Codexa. MontyBrain nie wczytuje twojej konfiguracji Codexa.",
+  get claude() { return tr("Domyślny model pochodzi z ustawień Claude Code."); },
+  get codex() { return tr("Domyślny model pochodzi z konfiguracji CLI."); },
 } as const;
+
+const AGENT_EFFORT_LABEL: Record<string, string> = {
+  get low() { return tr("niski"); },
+  get medium() { return tr("średni"); },
+  get high() { return tr("wysoki"); },
+  get xhigh() { return tr("bardzo wysoki"); },
+  get max() { return tr("maksymalny"); },
+};
 
 /** Model and effort per agent; empty = the CLI's default. */
 function Agents({ s, apply }: { s: AppSettings; apply: (call: () => Promise<AppSettings>) => Promise<string | null> }) {
   const [drafts, setDrafts] = useState<Record<ProviderId, string>>({ claude: s.agents.claude.model ?? "", codex: s.agents.codex.model ?? "" });
+  const providers = useProviders();
+  const [custom, setCustom] = useState<Partial<Record<ProviderId, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<ProviderId, string>>>({});
   // A quiet "Zapisano" by the row for a moment after a save.
   const [saved, setSaved] = useState<Partial<Record<ProviderId, number>>>({});
@@ -255,7 +259,7 @@ function Agents({ s, apply }: { s: AppSettings; apply: (call: () => Promise<AppS
   saver.current ??= createAgentSaver(async (next: AgentsT) => {
     let out: AppSettings | null = null;
     const err = await apply(async () => (out = await api.updateSettings({ agents: next })));
-    if (err || !out) throw new Error(err ?? "Nie udało się zapisać.");
+    if (err || !out) throw new Error(err ?? tr("Nie udało się zapisać."));
     return (out as AppSettings).agents;
   }, s.agents);
   useEffect(() => saver.current?.sync(s.agents), [s.agents]);
@@ -278,39 +282,46 @@ function Agents({ s, apply }: { s: AppSettings; apply: (call: () => Promise<AppS
   return (
     <section className="group" aria-labelledby="set-g-agents">
       <h2 className="group-head" id="set-g-agents">
-        Agenci
-      </h2>
+        {tr("Agenci")}</h2>
       {(["claude", "codex"] as const).map((p) => {
         const choice = s.agents[p];
+        const models = providers?.find((x) => x.id === p)?.models ?? s.agent_suggestions[p];
         const label = p === "claude" ? "Claude Code" : "Codex";
         return (
           <div key={p}>
             <Row id={`set-agent-${p}`} label={label} hint={AGENT_HINT[p]}>
-              <input
-                className="field set-model"
-                aria-label={`Model ${label}`}
-                placeholder={s.agent_suggestions[p][0] ? `domyślny, np. ${s.agent_suggestions[p][0]}` : "domyślny"}
-                list={`set-models-${p}`}
-                value={drafts[p]}
-                spellCheck={false}
-                autoCapitalize="off"
-                onChange={(e) => setDrafts((d) => ({ ...d, [p]: e.target.value }))}
-                onBlur={() => commitModel(p, false)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    commitModel(p, true);
-                  }
-                }}
-              />
-              <datalist id={`set-models-${p}`}>
-                {s.agent_suggestions[p].map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
+              <div className="set-model-choice">
+                <select className="field select set-model" aria-label={tr("Model {0}", label)}
+                  value={custom[p] || modelSelection(drafts[p], models) === CUSTOM_MODEL ? CUSTOM_MODEL : drafts[p]}
+                  onChange={(e) => {
+                    const value = selectedModel(e.target.value);
+                    setCustom((c) => ({ ...c, [p]: value === undefined }));
+                    if (value !== undefined) {
+                      setDrafts((d) => ({ ...d, [p]: value ?? "" }));
+                      void save(p, { model: value });
+                    }
+                  }}>
+                  <option value="">{tr("Domyślny (z ustawień CLI)")}</option>
+                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                  <option value={CUSTOM_MODEL}>{tr("Inny…")}</option>
+                </select>
+                {(custom[p] || modelSelection(drafts[p], models) === CUSTOM_MODEL) && <input
+                  className="field set-model"
+                  aria-label={tr("Własny model {0}", label)}
+                  placeholder={tr("Identyfikator modelu")}
+                  value={drafts[p]}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  onChange={(e) => setDrafts((d) => ({ ...d, [p]: e.target.value }))}
+                  onBlur={() => commitModel(p, false)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); commitModel(p, true); }
+                  }}
+                />}
+              </div>
               <select
                 className="field select set-select"
-                aria-label={`Wysiłek ${label}`}
+                aria-label={tr("Wysiłek {0}", label)}
                 value={choice.effort ?? ""}
                 onChange={(e) => {
                   // A model typed but not yet saved (no blur happened) goes with it.
@@ -318,15 +329,15 @@ function Agents({ s, apply }: { s: AppSettings; apply: (call: () => Promise<AppS
                   void save(p, { effort: e.target.value || null, ...(model !== undefined ? { model } : {}) });
                 }}
               >
-                <option value="">domyślny</option>
+                <option value="">{tr("domyślny")}</option>
                 {AGENT_EFFORTS[p].map((x) => (
                   <option key={x} value={x}>
-                    {x}
+                    {AGENT_EFFORT_LABEL[x] ?? x}
                   </option>
                 ))}
               </select>
               <span className="set-saved" role="status">
-                {saved[p] ? "Zapisano" : ""}
+                {saved[p] ? tr("Zapisano") : ""}
               </span>
             </Row>
             {errors[p] && (
@@ -337,13 +348,14 @@ function Agents({ s, apply }: { s: AppSettings; apply: (call: () => Promise<AppS
           </div>
         );
       })}
-      <p className="set-hint set-foot">Większy wysiłek może wydłużyć wykonanie i zwiększyć zużycie limitu.</p>
+      <p className="set-hint set-foot">{tr("Większy wysiłek może wydłużyć wykonanie i zwiększyć zużycie limitu.")}</p>
     </section>
   );
 }
 
 export function SettingsView() {
   const [s, setS] = useState<AppSettings | null>(null);
+  const [languageSaving, setLanguageSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
@@ -376,31 +388,47 @@ export function SettingsView() {
   return (
     <div className="view settings">
       <header className="view-head">
-        <h1 className="view-title">Ustawienia</h1>
-        <p className="view-sub">Działanie aplikacji na tym komputerze. Dane zostają w Twoim folderze.</p>
+        <h1 className="view-title">{tr("Ustawienia")}</h1>
+        <p className="view-sub">{tr("Działanie aplikacji na tym komputerze. Dane zostają w Twoim folderze.")}</p>
       </header>
 
       {loadError && <p className="set-note danger">{loadError}</p>}
       {s && (
         <>
+          <section className="group" aria-labelledby="set-g-language">
+            <h2 className="group-head" id="set-g-language">{tr("Język")}</h2>
+            <Row label={tr("Język aplikacji")} hint={tr("Wybór dotyczy całej aplikacji i jest zapamiętywany na tym komputerze.")} id="set-language">
+              <select className="field select set-select" aria-labelledby="set-language" value={s.language} disabled={languageSaving}
+                onChange={(e) => {
+                  const language = e.target.value as Language;
+                  setLanguageSaving(true);
+                  void apply(async () => {
+                    const next = await api.updateSettings({ language });
+                    setLanguage(next.language);
+                    return next;
+                  }).then(setRowError).finally(() => setLanguageSaving(false));
+                }}>
+                <option value="en" lang="en">English</option>
+                <option value="pl" lang="pl">Polski</option>
+              </select>
+            </Row>
+          </section>
           <section className="group" aria-labelledby="set-g-quick">
             <h2 className="group-head" id="set-g-quick">
-              Skrót
-            </h2>
+              {tr("Skrót")}</h2>
             <ShortcutRow s={s} apply={apply} />
           </section>
 
           <section className="group" aria-labelledby="set-g-rem">
             <h2 className="group-head" id="set-g-rem">
-              Przypomnienia
-            </h2>
-            <Row id="set-reminders" label="Powiadomienia o terminach" hint="Zadanie z godziną przypomni się o tej godzinie.">
+              {tr("Przypomnienia")}</h2>
+            <Row id="set-reminders" label={tr("Powiadomienia o terminach")} hint={tr("Zadanie z godziną przypomni się o tej godzinie.")}>
               <Switch on={s.reminders} labelledBy="set-reminders" onChange={(v) => applyRow(() => api.updateSettings({ reminders: v }))} />
             </Row>
             <Row
               id="set-digest"
-              label="Podsumowanie dnia"
-              hint="Jedno powiadomienie z zadaniami na dziś bez godziny i zaległymi."
+              label={tr("Podsumowanie dnia")}
+              hint={tr("Jedno powiadomienie z zadaniami na dziś bez godziny i zaległymi.")}
             >
               <select
                 className="field select set-select"
@@ -418,8 +446,8 @@ export function SettingsView() {
             </Row>
             <Row
               id="set-waiting"
-              label="Przypomnienia o tym, co czeka"
-              hint="Tematy Czeka i Zablokowany oraz zablokowane zadania wracają do „Wymaga uwagi” w Dziś po tylu dniach; jedno powiadomienie o godzinie podsumowania."
+              label={tr("Przypomnienia o tym, co czeka")}
+              hint={tr("Tematy Czeka i Zablokowany oraz zablokowane zadania wracają do „Wymaga uwagi” w Dziś po tylu dniach; jedno powiadomienie o godzinie podsumowania.")}
             >
               <select
                 className="field select set-select"
@@ -429,13 +457,14 @@ export function SettingsView() {
               >
                 {[1, 2, 3, 7].map((d) => (
                   <option key={d} value={d}>
-                    co {d === 1 ? "1 dzień" : `${d} dni`}
+                    {tr("co")} {d === 1 ? tr("1 dzień") : tr("{0} dni", d)}
                   </option>
                 ))}
               </select>
             </Row>
           </section>
 
+          <ProviderConnections />
           <Agents s={s} apply={apply} />
 
           <AutoUpdates s={s} onError={setRowError} />
@@ -444,16 +473,15 @@ export function SettingsView() {
             <h2 className="group-head" id="set-g-sys">
               System
             </h2>
-            <Row id="set-autostart" label="Uruchamiaj przy logowaniu" hint="MontyBrain startuje w tle, ikoną w pasku menu.">
+            <Row id="set-autostart" label={tr("Uruchamiaj przy logowaniu")} hint={tr("MontyBrain startuje w tle, ikoną w pasku menu.")}>
               <Switch on={s.autostart} labelledBy="set-autostart" onChange={(v) => applyRow(() => api.setAutostart(v))} />
             </Row>
-            {s.autostart_error && <div className="set-note danger">{s.autostart_error}</div>}
-            <Row id="set-vault" label="Folder danych" hint={<span className="set-path">{s.vault_path}</span>}>
+            {s.autostart_error && <div className="set-note danger">{message(s.autostart_error)}</div>}
+            <Row id="set-vault" label={tr("Folder danych")} hint={<span className="set-path">{s.vault_path}</span>}>
               <button type="button" className="btn btn-ghost" onClick={() => void api.revealVault().catch((e) => setRowError(describeError(e)))}>
-                Pokaż w Finderze
-              </button>
+                {tr("Pokaż w Finderze")}</button>
             </Row>
-            <Row label="Wersja">
+            <Row label={tr("Wersja")}>
               <span className="set-value">{s.version}</span>
             </Row>
           </section>

@@ -33,11 +33,11 @@ read -r a1; echo "$a1" > "$OUT/a1"
 read -r a2; echo "$a2" > "$OUT/a2"
 read -r a3; echo "$a3" > "$OUT/a3"
 echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"wynik","is_error":false}]}}'
-echo '{"type":"result","subtype":"success","is_error":false,"result":"Gotowe\n```montybrain-zmiany\n{\"changes\":[]}\n```"}'
+echo '{"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":10,"output_tokens":20,"cache_read_input_tokens":5},"total_cost_usd":0.1,"result":"Gotowe\n```montybrain-zmiany\n{\"changes\":[]}\n```"}'
 read -r follow; echo "$follow" > "$OUT/follow"
 echo '{"type":"control_request","request_id":"r4","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"osascript -e y"},"tool_use_id":"t4"}}'
 read -r a4; echo "$a4" > "$OUT/a4"
-echo '{"type":"result","subtype":"success","is_error":false,"result":"ok"}'
+echo '{"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":30,"output_tokens":40,"cache_read_input_tokens":15},"total_cost_usd":0.2,"result":"ok"}'
 sleep 30
 "##;
 
@@ -153,6 +153,21 @@ fn a_session_round_trip_with_cards_denials_follow_ups_and_stop() {
     assert!(!format!("{v:?}").contains("sk-ant-abcdefghij"), "{v:#?}");
 
     let card = pending(&v)[0];
+    // A partial UI response must not consume a multi-question request.
+    {
+        let mut guard = crate::lock(&s.inner);
+        let request = guard.as_mut().unwrap().pending.get_mut(&card).unwrap();
+        request.questions = ["channel", "range"].into_iter().map(|id| Question {
+            id: id.into(), header: String::new(), question: id.into(), options: vec![],
+        }).collect();
+    }
+    assert!(s.answer(card, Answer::Allow, vec![("channel".into(), "general".into())]).unwrap_err().contains("wszystkie pytania"));
+    assert!(s.answer(card, Answer::Allow, vec![("channel".into(), "general".into()), ("range".into(), " ".into())]).is_err());
+    {
+        let mut guard = crate::lock(&s.inner);
+        let request = guard.as_mut().unwrap().pending.get_mut(&card).expect("partial answer keeps request pending");
+        request.questions.clear();
+    }
     s.answer(card, Answer::AllowSession, vec![]).unwrap();
     let a3 = read(&out, "a3");
     assert_eq!(a3["response"]["request_id"], "r1");
@@ -166,6 +181,9 @@ fn a_session_round_trip_with_cards_denials_follow_ups_and_stop() {
     let v = wait_for(&s, "proposal", |v| {
         v.proposal.is_some() && v.status == Status::Idle
     });
+    assert!(v.telemetry.connected);
+    assert_eq!(v.telemetry.model.as_deref(), Some("fake"));
+    assert_eq!(v.telemetry.usage.as_ref().unwrap().input_tokens, Some(15));
     assert_eq!(v.proposal.as_ref().unwrap().count, 2);
     assert!(sink.answers.lock().unwrap()[0].contains("montybrain-zmiany"));
     assert!(v.entries.iter().any(
@@ -194,6 +212,10 @@ fn a_session_round_trip_with_cards_denials_follow_ups_and_stop() {
                 )
             })
     });
+    // Cumulative reports replace previous totals across follow-up turns.
+    assert_eq!(v.telemetry.usage.as_ref().unwrap().input_tokens, Some(45));
+    assert_eq!(v.telemetry.usage.as_ref().unwrap().output_tokens, Some(40));
+    assert_eq!(v.telemetry.usage.as_ref().unwrap().cost_usd, Some(0.2));
     assert_eq!(v.remembered, ["Bash:osascript"]);
 
     s.stop().unwrap();

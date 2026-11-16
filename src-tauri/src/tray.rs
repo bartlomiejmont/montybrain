@@ -14,6 +14,7 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::state::VaultState;
+use crate::settings::Language;
 
 const TRAY_ID: &str = "montybrain";
 /// How many tasks the menu lists.
@@ -32,6 +33,7 @@ pub fn attention(items: &[TodayItem]) -> Vec<&TodayItem> {
 /// What the tray shows; the menu is rebuilt only when this changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrayModel {
+    pub language: Language,
     pub count: usize,
     /// (task id, label)
     pub tasks: Vec<(String, String)>,
@@ -41,6 +43,7 @@ pub struct TrayModel {
 pub fn model(items: &[TodayItem], today: NaiveDate, shortcut: Option<String>) -> TrayModel {
     let att = attention(items);
     TrayModel {
+        language: Language::Pl,
         count: att.len(),
         tasks: att
             .iter()
@@ -137,7 +140,14 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) {
     };
     let today = local_today();
     let items = vault.snapshot().today(today);
-    let next = model(&items, today, crate::native::active_shortcut(app));
+    let mut next = model(&items, today, crate::native::active_shortcut(app));
+    next.language = app.state::<crate::native::Native>().settings().language;
+    if next.language == Language::En {
+        for (_, label) in &mut next.tasks {
+            if let Some(title) = label.strip_suffix("  ·  po terminie") { *label = format!("{title}  ·  overdue"); }
+            else if let Some(title) = label.strip_suffix("  ·  w toku") { *label = format!("{title}  ·  in progress"); }
+        }
+    }
     let mut last = crate::lock(&state.0);
     if last.as_ref() == Some(&next) {
         return;
@@ -158,21 +168,21 @@ fn apply<R: Runtime>(app: &AppHandle<R>, tray: &TrayIcon<R>, m: &TrayModel) -> t
     })?;
     tray.set_tooltip(Some(match m.count {
         0 => "MontyBrain".to_string(),
-        n => format!("MontyBrain — dziś: {}", crate::reminders::count_tasks(n)),
+        n => format!("MontyBrain — {}: {}", m.language.text("today", "dziś"), crate::reminders::count_tasks_in(n, m.language)),
     }))?;
 
     let mut owned: Vec<Box<dyn IsMenuItem<R>>> = vec![
         Box::new(MenuItem::with_id(
             app,
             "open",
-            "Otwórz MontyBrain",
+            m.language.text("Open MontyBrain", "Otwórz MontyBrain"),
             true,
             None::<&str>,
         )?),
         Box::new(MenuItem::with_id(
             app,
             "quick",
-            "Szybkie zadanie…",
+            m.language.text("Quick task…", "Szybkie zadanie…"),
             true,
             m.shortcut.as_deref(),
         )?),
@@ -182,7 +192,7 @@ fn apply<R: Runtime>(app: &AppHandle<R>, tray: &TrayIcon<R>, m: &TrayModel) -> t
         owned.push(Box::new(MenuItem::with_id(
             app,
             "none",
-            "Nic pilnego na dziś",
+            m.language.text("Nothing urgent today", "Nic pilnego na dziś"),
             false,
             None::<&str>,
         )?));
@@ -190,7 +200,7 @@ fn apply<R: Runtime>(app: &AppHandle<R>, tray: &TrayIcon<R>, m: &TrayModel) -> t
         owned.push(Box::new(MenuItem::with_id(
             app,
             "head",
-            format!("Dziś · {}", m.count),
+            format!("{} · {}", m.language.text("Today", "Dziś"), m.count),
             false,
             None::<&str>,
         )?));
@@ -208,14 +218,14 @@ fn apply<R: Runtime>(app: &AppHandle<R>, tray: &TrayIcon<R>, m: &TrayModel) -> t
     owned.push(Box::new(MenuItem::with_id(
         app,
         "settings",
-        "Ustawienia…",
+        m.language.text("Settings…", "Ustawienia…"),
         true,
         None::<&str>,
     )?));
     owned.push(Box::new(MenuItem::with_id(
         app,
         "quit",
-        "Zakończ",
+        m.language.text("Quit", "Zakończ"),
         true,
         None::<&str>,
     )?));

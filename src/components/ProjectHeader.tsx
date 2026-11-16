@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 import { FileText, FolderGit2, X } from "lucide-react";
 import { useState } from "react";
 
@@ -7,7 +8,7 @@ import { closeAfterSave, once, projectPatch, submitAction } from "../lib/form";
 import { dropDrafts, useDraft, useSubmitting } from "../store/drafts";
 import { useVault } from "../store/vault";
 import { useActions } from "./actions";
-import { Button, ConfirmButton, DraftHint, IconButton, ProjectDot, SaveActions, Segmented } from "./ui";
+import { Button, ConfirmButton, DraftHint, IconButton, ProjectName, SaveActions, Segmented } from "./ui";
 
 function ProjectEditor({ project, onDone }: { project: Project; onDone: () => void }) {
   const { run, notify } = useVault();
@@ -84,8 +85,7 @@ function ProjectEditor({ project, onDone }: { project: Project; onDone: () => vo
       onKeyDown={(e) => e.key === "Escape" && cancel()}
     >
       <label className="d-label" htmlFor="pe-name">
-        Nazwa
-      </label>
+        {tr("Nazwa")}</label>
       <input
         id="pe-name"
         className="field"
@@ -95,10 +95,10 @@ function ProjectEditor({ project, onDone }: { project: Project; onDone: () => vo
         onFocus={nameD.onFocus}
         onBlur={nameD.onBlur}
       />
-      <DraftHint draft={nameD} what="Nazwa" />
+      <DraftHint draft={nameD} what={tr("Nazwa")} />
 
-      <span className="d-label">Kolor</span>
-      <div className="swatches" role="radiogroup" aria-label="Kolor projektu">
+      <span className="d-label">{tr("Kolor")}</span>
+      <div className="swatches" role="radiogroup" aria-label={tr("Kolor projektu")}>
         {PROJECT_COLORS.map((c) => (
           <button
             key={c}
@@ -115,14 +115,14 @@ function ProjectEditor({ project, onDone }: { project: Project; onDone: () => vo
           type="button"
           role="radio"
           aria-checked={!color}
-          aria-label="Bez koloru"
-          title="Bez koloru"
+          aria-label={tr("Bez koloru")}
+          title={tr("Bez koloru")}
           className="swatch none"
           onClick={() => colorD.setDraft("")}
         />
         <input
           className="field field-hex"
-          aria-label="Własny kolor (#rrggbb)"
+          aria-label={tr("Własny kolor (#rrggbb)")}
           placeholder="#rrggbb"
           value={color}
           onChange={(e) => colorD.setDraft(e.target.value.trim())}
@@ -130,60 +130,58 @@ function ProjectEditor({ project, onDone }: { project: Project; onDone: () => vo
           onBlur={colorD.onBlur}
         />
       </div>
-      <DraftHint draft={colorD} what="Kolor" />
+      <DraftHint draft={colorD} what={tr("Kolor")} />
 
-      <span className="d-label">Stan</span>
+      <span className="d-label">{tr("Stan")}</span>
       <Segmented<ProjectState>
-        label="Stan projektu"
+        label={tr("Stan projektu")}
         value={state}
         onChange={(s) => stateD.setDraft(s)}
         options={PROJECT_STATES.map((s) => ({ value: s, label: PROJECT_STATE_LABEL[s] }))}
       />
-      <DraftHint draft={stateD} what="Stan" />
+      <DraftHint draft={stateD} what={tr("Stan")} />
 
       <label className="d-label" htmlFor="pe-desc">
-        Opis
-      </label>
+        {tr("Opis")}</label>
       <textarea
         id="pe-desc"
         className="field"
         rows={3}
         value={description}
-        placeholder="Po co jest ten projekt?"
+        placeholder={tr("Po co jest ten projekt?")}
         onChange={(e) => descD.setDraft(e.target.value)}
         onFocus={descD.onFocus}
         onBlur={descD.onBlur}
       />
-      <DraftHint draft={descD} what="Opis" />
+      <DraftHint draft={descD} what={tr("Opis")} />
 
-      <span className="d-label">Repozytoria</span>
+      <span className="d-label">{tr("Repozytoria")}</span>
       <div className="repo-list" onFocus={reposD.onFocus} onBlur={reposD.onBlur}>
         {repos.map((r, i) => (
           <div className="repo-row" key={i}>
             <input
               className="field"
-              placeholder="nazwa"
-              aria-label="Nazwa repozytorium"
+              placeholder={tr("nazwa")}
+              aria-label={tr("Nazwa repozytorium")}
               value={r.name}
               onChange={(e) => setRepos(repos.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
             />
             <input
               className="field"
-              placeholder="/ścieżka/do/repo"
-              aria-label="Ścieżka repozytorium"
+              placeholder={tr("/ścieżka/do/repo")}
+              aria-label={tr("Ścieżka repozytorium")}
               value={r.path}
               onChange={(e) => setRepos(repos.map((x, j) => (j === i ? { ...x, path: e.target.value } : x)))}
             />
-            <IconButton label="Usuń repozytorium" onClick={() => setRepos(repos.filter((_, j) => j !== i))}>
+            <IconButton label={tr("Usuń repozytorium")} onClick={() => setRepos(repos.filter((_, j) => j !== i))}>
               <X size={13} />
             </IconButton>
           </div>
         ))}
         <Button variant="quiet" className="add-repo" onClick={() => setRepos([...repos, { name: "", path: "" }])}>
-          + Dodaj repozytorium
-        </Button>
+          {tr("+ Dodaj repozytorium")}</Button>
       </div>
-      <DraftHint draft={reposD} what="Repozytoria" />
+      <DraftHint draft={reposD} what={tr("Repozytoria")} />
 
       <SaveActions busy={submitting.busy} onCancel={cancel} />
     </form>
@@ -199,8 +197,7 @@ export function ProjectHeader({ project }: { project: Project }) {
     return (
       <header className="view-head">
         <h1 className="view-title">
-          <ProjectDot color={project.color} size={10} />
-          {project.name}
+          <ProjectName name={project.name} color={project.color} />
         </h1>
         <ProjectEditor project={project} onDone={() => setEditing(false)} />
       </header>
@@ -210,13 +207,12 @@ export function ProjectHeader({ project }: { project: Project }) {
   return (
     <header className="view-head">
       <h1 className="view-title">
-        <ProjectDot color={project.color} size={10} />
-        <span className="title-text">{project.name}</span>
+        <ProjectName name={project.name} color={project.color} className="title-text" />
         {project.state !== "active" && <span className={`state-tag state-${project.state}`}>{PROJECT_STATE_LABEL[project.state]}</span>}
       </h1>
       {project.description && <p className="view-desc">{project.description}</p>}
       {project.repos.length > 0 && (
-        <ul className="repos" aria-label="Repozytoria">
+        <ul className="repos" aria-label={tr("Repozytoria")}>
           {project.repos.map((r) => (
             <li key={r.name} title={r.path}>
               <FolderGit2 size={12} />
@@ -227,23 +223,19 @@ export function ProjectHeader({ project }: { project: Project }) {
       )}
       <div className="head-actions">
         <Button variant="quiet" onClick={() => setEditing(true)}>
-          Edytuj projekt
-        </Button>
+          {tr("Edytuj projekt")}</Button>
         <Button variant="quiet" onClick={() => void reveal(project.path)}>
-          <FileText size={13} /> Pokaż plik
-        </Button>
+          <FileText size={13} />  {tr("Pokaż plik")}</Button>
         {project.state !== "archived" ? (
           <ConfirmButton
-            question="Przenieść projekt do archiwum?"
-            confirmLabel="Archiwizuj"
+            question={tr("Przenieść projekt do archiwum?")}
+            confirmLabel={tr("Archiwizuj")}
             onConfirm={() => void run((a) => a.archiveProject(project.slug))}
           >
-            Archiwizuj
-          </ConfirmButton>
+            {tr("Archiwizuj")}</ConfirmButton>
         ) : (
           <Button variant="quiet" onClick={() => void run((a) => a.updateProject(project.slug, { state: "active" }))}>
-            Przywróć z archiwum
-          </Button>
+            {tr("Przywróć z archiwum")}</Button>
         )}
       </div>
     </header>

@@ -1,3 +1,4 @@
+import { getLocale, t as tr } from "../i18n";
 // Pure helpers that slice the snapshot for the views. No React here, so they are
 // easy to test and reuse in later views (kanban, map).
 
@@ -111,7 +112,7 @@ export function sortTopics(topics: Topic[]): Topic[] {
     (a, b) =>
       TOPIC_ORDER[a.status] - TOPIC_ORDER[b.status] ||
       (b.updated ?? b.created ?? "").localeCompare(a.updated ?? a.created ?? "") ||
-      a.title.localeCompare(b.title, "pl"),
+      a.title.localeCompare(b.title, getLocale()),
   );
 }
 
@@ -130,7 +131,7 @@ export function groupToday(items: TodayItem[]): TodaySection[] {
 
 /** Visible projects for the sidebar: non-archived sorted by name, archived separately. */
 export function partitionProjects(projects: Project[]): { visible: Project[]; archived: Project[] } {
-  const byName = (a: Project, b: Project) => a.name.localeCompare(b.name, "pl");
+  const byName = (a: Project, b: Project) => a.name.localeCompare(b.name, getLocale());
   return {
     visible: projects.filter((p) => p.state !== "archived").sort(byName),
     archived: projects.filter((p) => p.state === "archived").sort(byName),
@@ -146,13 +147,13 @@ export interface MoveTarget {
 
 /** Every place a task can be moved to (archived projects and done topics excluded unless current). */
 export function moveTargets(snap: Snapshot, current?: TaskLocation): MoveTarget[] {
-  const out: MoveTarget[] = [{ key: "inbox", label: "Skrzynka", group: "", location: { kind: "inbox" } }];
+  const out: MoveTarget[] = [{ key: "inbox", label: tr("Skrzynka"), group: "", location: { kind: "inbox" } }];
   const currentProject = current && current.kind !== "inbox" ? current.project : null;
   for (const p of partitionProjects(snap.projects).visible.concat(
     snap.projects.filter((p) => p.state === "archived" && p.slug === currentProject),
   )) {
     const projectLoc: TaskLocation = { kind: "project", project: p.slug };
-    out.push({ key: locationKey(projectLoc), label: `${p.name} — ogólne`, group: p.name, location: projectLoc });
+    out.push({ key: locationKey(projectLoc), label: tr("{0} — ogólne", p.name), group: p.name, location: projectLoc });
     const topics = snap.topics.filter(
       (t) =>
         t.project === p.slug &&

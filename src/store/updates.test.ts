@@ -7,6 +7,22 @@ import { createUpdateStore } from "./updates";
 const runReq = { recipe: "aktualizacja", provider: "codex" as const, mode: "background" as const, params: { project: "whenubuy" } };
 
 describe("project updates with the mock backend", () => {
+  it("forces a new CLI check even when a cached check is already in flight", async () => {
+    const api = createMockApi();
+    const providers = await api.listProviders();
+    let resolve!: (value: typeof providers) => void;
+    const first = new Promise<typeof providers>((done) => { resolve = done; });
+    const listProviders = vi.fn().mockReturnValueOnce(first).mockResolvedValue(providers);
+    const store = createUpdateStore({ ...api, listProviders });
+    const loading = store.loadProviders();
+    const refreshing = store.loadProviders(true);
+    resolve(providers);
+    await Promise.all([loading, refreshing]);
+    expect(listProviders.mock.calls).toEqual([[false], [true]]);
+    await store.loadProviders();
+    expect(listProviders).toHaveBeenCalledTimes(2);
+  });
+
   it("a finished run becomes a proposal; applying writes once and skips stale changes", async () => {
     vi.useFakeTimers();
     const api = createMockApi({ runs: { stepMs: 5 } });

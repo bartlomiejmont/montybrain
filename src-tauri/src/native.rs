@@ -88,6 +88,7 @@ impl Native {
 /// What the Settings view shows (`get_settings` and friends).
 #[derive(Debug, Clone, Serialize)]
 pub struct SettingsView {
+    pub language: settings::Language,
     pub shortcut: String,
     /// Set when the saved shortcut could not be registered.
     pub shortcut_error: Option<String>,
@@ -121,6 +122,7 @@ pub fn settings_view<R: Runtime>(app: &AppHandle<R>) -> SettingsView {
         Err(e) => (false, Some(e.to_string())),
     };
     SettingsView {
+        language: s.language,
         shortcut: s.shortcut,
         shortcut_error: sc.view_error(),
         reminders: s.reminders,
@@ -150,49 +152,20 @@ pub struct AgentSuggestions {
     pub codex: Vec<String>,
 }
 
-/// Claude Code aliases from `claude --help`; Codex models listed in the
-/// CLI's own catalog (`~/.codex/models_cache.json`, visible ones), best effort.
+/// Live CLI catalogs (read-only handshakes), with confirmed static fallbacks.
 fn agent_suggestions<R: Runtime>(app: &AppHandle<R>) -> AgentSuggestions {
-    let home = app.path().home_dir().ok();
-    let codex = home
-        .map(|h| codex_models(&h.join(".codex/models_cache.json")))
-        .unwrap_or_default();
+    let providers = app.try_state::<crate::runs::Runs>().map(|runs| runs.0.providers()).unwrap_or_default();
     AgentSuggestions {
-        claude: ["opus", "sonnet", "fable"].map(String::from).to_vec(),
-        codex,
+        claude: providers.iter().find(|p| p.id == crate::runs::ProviderId::Claude).map(|p| p.models.clone()).unwrap_or_else(|| crate::runs::cli_status::fallback(crate::runs::ProviderId::Claude)),
+        codex: providers.iter().find(|p| p.id == crate::runs::ProviderId::Codex).map(|p| p.models.clone()).unwrap_or_else(|| crate::runs::cli_status::fallback(crate::runs::ProviderId::Codex)),
     }
-}
-
-/// The visible model slugs of Codex's model catalog (only names that pass
-/// the model-name check).
-pub fn codex_models(path: &std::path::Path) -> Vec<String> {
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else {
-        return Vec::new();
-    };
-    v.get("models")
-        .and_then(|m| m.as_array())
-        .map(|ms| {
-            ms.iter()
-                .filter(|m| m.get("visibility").and_then(|x| x.as_str()) != Some("hide"))
-                .filter_map(|m| m.get("slug").and_then(|x| x.as_str()))
-                .filter_map(|s| {
-                    crate::runs::agent::check_model(crate::runs::ProviderId::Codex, s)
-                        .ok()
-                        .flatten()
-                })
-                .take(12)
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 /// Current reminder settings, for the scheduler.
 pub fn reminder_config<R: Runtime>(app: &AppHandle<R>) -> reminders::Config {
     let s = app.state::<Native>().settings();
     reminders::Config {
+        language: s.language,
         enabled: s.reminders,
         digest_hour: s.digest_hour,
     }
@@ -237,6 +210,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     crate::log(&format!("config: {}", config_dir.display()));
     let s = Settings::load(&config_dir.join(settings::SETTINGS_FILE));
     let shortcut = s.shortcut.clone();
+    app.state::<crate::runs::Runs>().0.set_language(s.language);
     app.manage(Native {
         config_dir: config_dir.clone(),
         settings: Mutex::new(s),
@@ -372,7 +346,7 @@ fn encode(s: &str) -> String {
 
 fn create_quick_window<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {
     let builder = WebviewWindowBuilder::new(app, QUICK, WebviewUrl::App("quick.html".into()))
-        .title("Szybkie zadanie")
+        .title(app.state::<Native>().settings().language.text("Quick task", "Szybkie zadanie"))
         .inner_size(QUICK_WIDTH, QUICK_MIN_HEIGHT)
         .resizable(false)
         .maximizable(false)
@@ -935,6 +909,10 @@ fn carry_over_autostart<R: Runtime>(app: &AppHandle<R>) {
 
 /// Settings changed: tell the UI, refresh the tray, re-check reminders.
 fn changed<R: Runtime>(app: &AppHandle<R>) {
+    app.state::<crate::runs::Runs>().0.set_language(app.state::<Native>().settings().language);
+    if let Some(window) = app.get_webview_window(QUICK) {
+        let _ = window.set_title(app.state::<Native>().settings().language.text("Quick task", "Szybkie zadanie"));
+    }
     let _ = app.emit(SETTINGS_CHANGED, settings_view(app));
     vault_changed(app);
 }

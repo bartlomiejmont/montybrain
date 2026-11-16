@@ -38,8 +38,8 @@ pub use query::{SearchHit, Snapshot, TaskFilter, TodayItem, TodayReason};
 pub use slug::{fold, slugify, unique_slug};
 pub use vault::{
     DEFAULT_DIR_NAME, ENV_VAR, INBOX_FILE, LEGACY_DIR_NAME, LEGACY_ENV_VAR, LEGACY_META_DIR,
-    LEGACY_TMP_SUFFIX, LOCK_FILE, LineWritten, META_DIR, PROJECT_FILE, TMP_SUFFIX, TOPICS_DIR,
-    TopicFromTasks, Vault, meta_dir,
+    LEGACY_TMP_SUFFIX, LOCK_FILE, LineWritten, META_DIR, PROJECT_FILE, RemovedTask, TMP_SUFFIX,
+    TOPICS_DIR, TopicFromTasks, Vault, meta_dir,
 };
 #[cfg(feature = "watch")]
 pub use watch::{DEFAULT_DEBOUNCE, VaultWatcher, is_ignored};

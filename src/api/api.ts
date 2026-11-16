@@ -139,7 +139,7 @@ export interface MontyBrainApi {
 
   // --- agent actions („Akcje") ---
   listRecipes(): Promise<Recipe[]>;
-  listProviders(): Promise<ProviderInfo[]>;
+  listProviders(refresh?: boolean): Promise<ProviderInfo[]>;
   /** Background: rejects while another background run is running. Terminal: resolves at once ("opened"). */
   startRun(request: RunRequest): Promise<RunInfo>;
   cancelRun(runId: string): Promise<RunInfo>;

@@ -137,6 +137,9 @@ pub struct StoredProposal {
     /// The user's request when the run was a `zlecenie`, not a check.
     #[serde(default)]
     pub request: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
 }
 
 impl StoredProposal {
@@ -167,7 +170,19 @@ impl StoredProposal {
             problem: p.problem,
             history_note: None,
             request: None,
+            topic: None,
         }
+    }
+
+    /// Destructive changes always require a manual checkbox decision.
+    pub fn automatic_indices(&self) -> Vec<usize> {
+        self.changes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| {
+                (c.outcome.is_none() && !matches!(c.change, Change::RemoveTask { .. })).then_some(i)
+            })
+            .collect()
     }
 
     /// Changes not applied (nor tried) yet.
@@ -183,6 +198,7 @@ impl StoredProposal {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProjectUpdate {
+    pub journal_refresh: BTreeMap<String, super::journal::JournalRefreshMarker>,
     /// The schedule clock: start of the last check (manual or automatic run,
     /// or a skipped automatic check).
     #[serde(with = "opt_minute")]
@@ -467,6 +483,7 @@ pub fn record_start_failure(
 /// What the window gets per project (`list_updates`, `updates-changed`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProjectUpdateView {
+    pub journal_refresh: BTreeMap<String, super::journal::JournalRefreshMarker>,
     pub project: String,
     pub auto: AutoUpdate,
     /// Where the update looks (repositories always; history when on).
@@ -515,6 +532,7 @@ pub fn views(
                 _ => (None, false),
             };
             ProjectUpdateView {
+                journal_refresh: st.journal_refresh,
                 project: slug.clone(),
                 auto: cfg,
                 sources: sources.get(slug).copied().unwrap_or_default(),

@@ -1,3 +1,4 @@
+import { t as tr, message as translateMessage } from "../i18n";
 // The command field: one input for Skrzynka, the quick-capture window and the
 // "Nowe…" row of ⌘K. The text is read by the backend (montybrain_core::command:
 // `commandPreview`); nothing here parses it. Under the field: one fixed-height
@@ -29,6 +30,8 @@ export interface CommandFieldHandle {
   /** Replaces the text (caret at `caret` or the end); `submit` acts as Enter once the reading arrives. */
   setText(text: string, opts?: { caret?: number; submit?: boolean; focus?: boolean }): void;
   focus(): void;
+  /** Same state-machine action as Enter, including command confirmation. */
+  submit(): void;
   text(): string;
 }
 
@@ -52,25 +55,24 @@ export function Partial({ applied, onUndo }: { applied: CommandApplied; total: n
   const left = applied.left_written ?? [];
   return (
     <div className="cf-partial" role="alert">
-      <p className="cf-partial-head">Zapis się nie udał: {applied.error}</p>
+      <p className="cf-partial-head">{tr("Zapis się nie udał:")} {translateMessage(applied.error ?? "")}</p>
       {left.length > 0 ? (
         <>
-          <p className="cf-partial-foot">Nie wszystko dało się cofnąć. Zostało zapisane:</p>
-          <ul className="cf-partial-list done" aria-label="Zostało zapisane">
+          <p className="cf-partial-foot">{tr("Nie wszystko dało się cofnąć. Zostało zapisane:")}</p>
+          <ul className="cf-partial-list done" aria-label={tr("Zostało zapisane")}>
             {left.map((x, i) => (
               <li key={i}>✓ {x}</li>
             ))}
           </ul>
         </>
       ) : (
-        <p className="cf-partial-foot">Nic nie zostało zapisane.</p>
+        <p className="cf-partial-foot">{tr("Nic nie zostało zapisane.")}</p>
       )}
       {onUndo && left.length > 0 && (
         <button type="button" className="cf-link" onClick={onUndo}>
-          Cofnij to, co zostało
-        </button>
+          {tr("Cofnij to, co zostało")}</button>
       )}
-      <p className="cf-partial-foot">Tekst został w polu.</p>
+      <p className="cf-partial-foot">{tr("Tekst został w polu.")}</p>
     </div>
   );
 }
@@ -83,16 +85,16 @@ function Lines({ lines, muted }: { lines: string[]; muted?: boolean }) {
 export function PlanView({ plan, compact }: { plan: CommandPlan; compact?: boolean }) {
   const steps = compact ? plan.steps.slice(0, 3) : plan.steps;
   return (
-    <ol className="cf-plan" aria-label="Plan zapisu">
+    <ol className="cf-plan" aria-label={tr("Plan zapisu")}>
       {steps.map((s, i) => (
         <li key={i} className="cf-step">
-          <p className="cf-step-summary">{s.summary}</p>
+          <p className="cf-step-summary">{translateMessage(s.summary)}</p>
           <p className="cf-file">{s.file}</p>
           {s.before && s.before.length > 0 && <Lines lines={s.before} muted />}
           <Lines lines={s.lines} />
         </li>
       ))}
-      {compact && plan.steps.length > steps.length && <li className="cf-more">… i jeszcze {plan.steps.length - steps.length}</li>}
+      {compact && plan.steps.length > steps.length && <li className="cf-more">{tr("… i jeszcze")} {plan.steps.length - steps.length}</li>}
     </ol>
   );
 }
@@ -103,7 +105,7 @@ export function Echo({ echo, onUndo }: { echo: LineWritten[]; onUndo?: () => voi
   return (
     <div className="cf-echo" role="status">
       <p className="cf-echo-head">
-        Zapisano w {files.map((f, i) => (
+        {tr("Zapisano w")} {files.map((f, i) => (
           <span key={f}>
             {i > 0 && ", "}
             <span className="cf-file-inline">{f}</span>
@@ -113,8 +115,7 @@ export function Echo({ echo, onUndo }: { echo: LineWritten[]; onUndo?: () => voi
       <Lines lines={echo.map((e) => e.text)} />
       {onUndo && (
         <button type="button" className="cf-link cf-echo-undo" onClick={onUndo}>
-          Cofnij
-        </button>
+          {tr("Cofnij")}</button>
       )}
     </div>
   );
@@ -141,10 +142,10 @@ export function Marked({ text, marks }: { text: string; marks?: Span[] }) {
   return <>{out}</>;
 }
 
-const KIND_TAG: Record<string, string> = { topic: "temat", task: "zadanie", project: "projekt", inbox: "skrzynka" };
+const KIND_TAG: Record<string, string> = { get topic() { return tr("temat"); }, get task() { return tr("zadanie"); }, get project() { return tr("projekt"); }, get inbox() { return tr("skrzynka"); } };
 
 function ListRow({ item, index, active, id, onHover, onPick }: { item: ListItem; index: number; active: boolean; id: string; onHover: (i: number) => void; onPick: (i: number) => void }) {
-  const tag = item.typo ? "literówka" : KIND_TAG[item.kind];
+  const tag = item.typo ? tr("literówka") : KIND_TAG[item.kind];
   return (
     <li
       id={id}
@@ -165,7 +166,7 @@ function ListRow({ item, index, active, id, onHover, onPick }: { item: ListItem;
       </span>
       {item.detail && (
         <span className="cf-opt-detail">
-          <Marked text={item.detail} marks={item.detailMarks} />
+          <Marked text={translateMessage(item.detail)} marks={item.detailMarks} />
         </span>
       )}
     </li>
@@ -217,7 +218,7 @@ export const CommandField = forwardRef<
     location = null,
     selection = [],
     focus = null,
-    placeholder = "Dodaj zadanie albo wpisz komendę…",
+    placeholder = tr("Dodaj zadanie albo wpisz komendę…"),
     autoFocus,
     initialText = "",
     autoSubmit,
@@ -281,7 +282,7 @@ export const CommandField = forwardRef<
           break;
         case "agent":
           if (ctx.current.onAgent) ctx.current.onAgent(ef.ask, ef.text);
-          else setMessage("Prośby do agenta działają w Skrzynce.");
+          else setMessage(tr("Prośby do agenta działają w Skrzynce."));
           break;
         case "problem":
           setMessage(ef.message);
@@ -356,6 +357,7 @@ export const CommandField = forwardRef<
         }
       },
       focus: () => inputRef.current?.focus(),
+      submit: () => dispatch({ type: "enter" }),
       text: () => fsRef.current.text,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -375,14 +377,14 @@ export const CommandField = forwardRef<
           setPartial({ applied: r.applied, total: plan.steps.length, undo: token });
           setEcho(null);
           dispatch({ type: "failed" });
-          notify(`Zapis się nie udał i nie wszystko dało się cofnąć`, token !== null ? { label: "Cofnij", run: () => void undoWrite(token) } : undefined);
+          notify(tr("Zapis się nie udał i nie wszystko dało się cofnąć"), token !== null ? { label: tr("Cofnij"), run: () => void undoWrite(token) } : undefined);
           return;
         }
         setEcho(r.applied.echo);
         window.clearTimeout(echoTimer.current);
         echoTimer.current = window.setTimeout(() => setEcho(null), ECHO_MS);
         dispatch({ type: "written" });
-        notify(`Zapisano: ${r.reading}`, token !== null ? { label: "Cofnij", run: () => void undoWrite(token) } : undefined);
+        notify(tr("Zapisano: {0}", translateMessage(r.reading)), token !== null ? { label: tr("Cofnij"), run: () => void undoWrite(token) } : undefined);
         c.onWritten?.({ reading: r.reading, echo: r.applied.echo, undo: token });
       } else if (r.kind === "stale") {
         dispatch({ type: "stale", preview: r.preview });
@@ -402,7 +404,7 @@ export const CommandField = forwardRef<
     try {
       const r = await api.commandUndo(token, null);
       const { text, retry } = describeUndo(r, token);
-      notify(text, retry !== null ? { label: "Spróbuj cofnąć jeszcze raz", run: () => void undoWrite(retry) } : undefined);
+      notify(text, retry !== null ? { label: tr("Spróbuj cofnąć jeszcze raz"), run: () => void undoWrite(retry) } : undefined);
       setUndoState({ text, retry });
       setEcho(null);
       if (retry === null) setPartial(null);
@@ -467,29 +469,29 @@ export const CommandField = forwardRef<
   const stale = shownR?.stale ?? false;
   const plan = shown?.plan ?? null;
   const hint = (() => {
-    if (fs.busy) return "Zapisuję…";
-    if (fs.waiting) return "Czytam…";
-    if (fs.phase === "confirm") return "↵ zapisz · esc wróć do edycji";
-    if (interactive && active !== null) return "↵ wstaw · ↑↓ wybór · esc zamknij";
-    if (interactive) return "Tab wstawia · ↑↓ wybór";
+    if (fs.busy) return tr("Zapisuję…");
+    if (fs.waiting) return tr("Czytam…");
+    if (fs.phase === "confirm") return tr("↵ zapisz · esc wróć do edycji");
+    if (interactive && active !== null) return tr("↵ wstaw · ↑↓ wybór · esc zamknij");
+    if (interactive) return tr("Tab wstawia · ↑↓ wybór");
     switch (shown?.state) {
       case "capture":
-        return "↵ zapisz";
+        return tr("↵ zapisz");
       case "confirm":
-        return "↵ pokaż plan";
+        return tr("↵ pokaż plan");
       case "agent":
-        return onAgent ? "↵ zapytaj agenta" : null;
+        return onAgent ? tr("↵ zapytaj agenta") : null;
       default:
         return null;
     }
   })();
   const readingText = (() => {
     if (fs.phase === "confirm" && plan)
-      return `Plan zapisu: ${plan.steps.length === 1 ? "1 zmiana" : `${plan.steps.length} ${plan.steps.length < 5 ? "zmiany" : "zmian"}`}${shown?.typo ? " (z poprawioną literówką)" : ""}. Sprawdź i potwierdź.`;
+      return tr("Plan zapisu: {0}{1}. Sprawdź i potwierdź.", plan.steps.length === 1 ? tr("1 zmiana") : `${plan.steps.length} ${plan.steps.length < 5 ? tr("zmiany") : tr("zmian")}`, shown?.typo ? tr(" (z poprawioną literówką)") : "");
     if (!shown || shown.state === "empty" || !fs.text.trim()) return null;
-    return shown.reading;
+    return translateMessage(shown.reading);
   })();
-  const idle = variant === "quick" ? "↵ zapisz · > miejsce · @termin · !priorytet" : "↵ zapisz · > miejsce · / komendy · @termin · !priorytet";
+  const idle = variant === "quick" ? tr("↵ zapisz · > miejsce · @termin · !priorytet") : tr("↵ zapisz · > miejsce · / komendy · @termin · !priorytet");
   const extraProblems = shown && shown.state === "invalid" && !stale ? shown.problems.slice(1) : [];
   const warnings = shown && fs.text.trim() ? shown.warnings : [];
   const similar = shown && fs.phase === "edit" && fs.text.trim() && shown.state !== "invalid" && shown.state !== "typing" ? shown.similar[0] : undefined;
@@ -516,7 +518,7 @@ export const CommandField = forwardRef<
           className="cf-input"
           value={fs.text}
           placeholder={placeholder}
-          aria-label="Nowe zadanie albo komenda"
+          aria-label={tr("Nowe zadanie albo komenda")}
           aria-describedby={readingId}
           role="combobox"
           aria-expanded={!!list}
@@ -541,8 +543,8 @@ export const CommandField = forwardRef<
           aria-live="polite"
           role={message ? "alert" : undefined}
         >
-          <span className="cf-reading-text" title={message ?? readingText ?? undefined}>
-            {message ?? readingText ?? idle}
+          <span className="cf-reading-text" title={message ? translateMessage(message) : readingText ?? undefined}>
+            {message ? translateMessage(message) : readingText ?? idle}
           </span>
           {hint && !message && <span className="cf-hint">{hint}</span>}
         </p>
@@ -555,7 +557,7 @@ export const CommandField = forwardRef<
                 id={listId}
                 className={`cf-complete${list.stale ? " stale" : ""}`}
                 role="listbox"
-                aria-label={list.source === "choices" ? (shown?.typo ? "Literówka: poprawka" : "Wybierz jedno") : "Podpowiedzi"}
+                aria-label={list.source === "choices" ? (shown?.typo ? tr("Literówka: poprawka") : tr("Wybierz jedno")) : tr("Podpowiedzi")}
               >
                 {list.items.map((it, i) => (
                   <ListRow
@@ -569,30 +571,28 @@ export const CommandField = forwardRef<
                   />
                 ))}
                 <li className="cf-opt-hint" aria-hidden>
-                  ↑↓ wybór · Tab albo ↵ wstawia · esc zamyka
-                </li>
+                  {tr("↑↓ wybór · Tab albo ↵ wstawia · esc zamyka")}</li>
               </ul>
             )}
             {extraProblems.length > 0 && (
-              <ul className="cf-problems" aria-label="Problemy">
+              <ul className="cf-problems" aria-label={tr("Problemy")}>
                 {extraProblems.map((p, i) => (
-                  <li key={i}>{p}</li>
+                  <li key={i}>{translateMessage(p)}</li>
                 ))}
               </ul>
             )}
             {warnings.length > 0 && (
               <ul className={`cf-warnings${stale ? " stale" : ""}`}>
                 {warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
+                  <li key={i}>{translateMessage(w)}</li>
                 ))}
               </ul>
             )}
             {similar && (
               <p className={`cf-similar${stale ? " stale" : ""}`}>
-                Podobne do <span className="cf-ref">^{similar.id}</span> „{similar.title}” ({similar.place.label}) —{" "}
+                {tr("Podobne do")} <span className="cf-ref">^{similar.id}</span> „{similar.title}” ({similar.place.label}) —{" "}
                 <button type="button" className="cf-link" onMouseDown={(e) => e.preventDefault()} onClick={() => linkSimilar(similar.id)}>
-                  powiązać?
-                </button>
+                  {tr("powiązać?")}</button>
               </p>
             )}
           </div>
@@ -613,8 +613,7 @@ export const CommandField = forwardRef<
             <>
               {" "}
               <button type="button" className="cf-link" onClick={() => void undoWrite(undoState.retry)}>
-                Spróbuj cofnąć jeszcze raz
-              </button>
+                {tr("Spróbuj cofnąć jeszcze raz")}</button>
             </>
           )}
         </p>

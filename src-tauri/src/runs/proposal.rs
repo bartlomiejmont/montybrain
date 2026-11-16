@@ -68,6 +68,13 @@ pub const STALE: &str = "zmienione w międzyczasie";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Change {
+    RemoveTask {
+        task: String,
+        title: String,
+        reason: String,
+        /// Full base: do not remove a task that was edited or moved.
+        base: Task,
+    },
     TaskStatus {
         task: String,
         /// For display.
@@ -253,7 +260,7 @@ impl Change {
                 project: project.into(),
                 topic: slug.clone(),
             },
-            Change::TaskStatus { .. } => TaskLocation::Project {
+            Change::TaskStatus { .. } | Change::RemoveTask { .. } => TaskLocation::Project {
                 project: project.into(),
             },
         }
@@ -286,6 +293,56 @@ pub struct Proposal {
     /// Set when there is no usable proposal (block missing, duplicated,
     /// malformed…); `changes` is empty then.
     pub problem: Option<String>,
+}
+
+pub fn same_task(a: &Task, b: &Task) -> bool {
+    let mut a = a.clone();
+    let mut b = b.clone();
+    a.line = 0;
+    b.line = 0;
+    a == b
+}
+
+/// Journal refresh proposals cannot escape the topic.
+/// Cross-project changes remain forbidden by the shared parser.
+pub fn parse_journal(
+    answer: &str,
+    snap: &Snapshot,
+    project: &str,
+    topic: &str,
+    note: &str,
+) -> Proposal {
+    parse_scoped(answer, snap, project, Some((topic, note)))
+}
+
+fn journal_change(
+    change: Change,
+    snap: &Snapshot,
+    _project: &str,
+    topic: &str,
+    note: &str,
+) -> Result<Change, String> {
+    let target = match &change {
+        Change::TaskStatus { task, .. } | Change::RemoveTask { task, .. } => {
+            snap.task(task).and_then(|t| match &t.location {
+                TaskLocation::Topic { topic, .. } => Some(topic.as_str()),
+                _ => None,
+            })
+        }
+        Change::TopicLog { topic, .. } => Some(topic.as_str()),
+        Change::NewTask { topic, .. } => topic.as_deref(),
+        _ => None,
+    };
+    if matches!(&change, Change::TopicLog { text, status, summary, .. } if (status.is_none() && summary.is_none()) || text.trim() == note.trim())
+    {
+        return Err("Wpis jest już zapisany; agent ma proponować zmiany statusu lub opisu bez powtarzania notatki.".into());
+    }
+    if !target.is_some_and(|t| t == topic) {
+        return Err(
+            "Odświeżenie dotyczy wyłącznie tego tematu; pominięto zmianę poza zakresem.".into(),
+        );
+    }
+    Ok(change)
 }
 
 // --- extraction -----------------------------------------------------------------
@@ -547,6 +604,13 @@ fn clip_label(s: &str, max: usize) -> String {
 fn label_of(v: &Value, snap: &Snapshot, project: &str) -> String {
     let get = |k: &str| v.get(k).and_then(Value::as_str);
     match get("kind") {
+        Some("remove_task") => get("task")
+            .and_then(|id| snap.task(id.trim().trim_start_matches('^')))
+            .filter(|t| task_in_project(t, project))
+            .map_or_else(
+                || "Usunięcie zadania".into(),
+                |t| format!("Usunięcie zadania „{}”", clip_label(&t.title, 60)),
+            ),
         Some("task_status") => get("task")
             .map(|t| t.trim().trim_start_matches('^'))
             .and_then(|id| snap.task(id))
@@ -711,6 +775,27 @@ fn validate_item_as(
         _ => {}
     }
     match kind {
+        "remove_task" => {
+            if inbox {
+                return Err("Usuwanie zadań jest dostępne tylko w projekcie.".into());
+            }
+            let id = f.str("task")?.trim().trim_start_matches('^');
+            if !is_valid_id(id) {
+                return Err("Nieprawidłowy identyfikator zadania.".into());
+            }
+            let task = snap
+                .task(id)
+                .ok_or("Nie ma już takiego zadania w projekcie.")?;
+            if !task_in_project(task, project) {
+                return Err("Zadanie nie należy do tego projektu.".into());
+            }
+            Ok(Change::RemoveTask {
+                task: id.into(),
+                title: task.title.clone(),
+                reason: reason_of(&f),
+                base: task.clone(),
+            })
+        }
         "move_task" => {
             f.only(&["kind", "task", "to", "reason"])?;
             let t = inbox_entry(snap, f.str("task")?)?;
@@ -1026,7 +1111,7 @@ fn target_key(c: &Change) -> String {
         Change::MoveTask { task, .. } => format!("task:{task}"),
         Change::TopicFromTasks { project, slug, .. } => format!("topic:{project}/{slug}"),
         Change::NewTopic { slug, .. } => format!("topic:{slug}"),
-        Change::TaskStatus { task, .. } => format!("task:{task}"),
+        Change::TaskStatus { task, .. } | Change::RemoveTask { task, .. } => format!("task:{task}"),
         Change::TopicLog { topic, .. } => format!("log:{topic}"),
         Change::NewTask { title, topic, .. } => {
             format!("new:{}:{}", topic.as_deref().unwrap_or(""), fold(title))
@@ -1045,6 +1130,15 @@ fn no_proposal(report: String, problem: impl Into<String>) -> Proposal {
 /// Parses and validates the final answer of an `aktualizacja` run for
 /// `project`, against `snap` (the vault as the run started).
 pub fn parse(answer: &str, snap: &Snapshot, project: &str) -> Proposal {
+    parse_scoped(answer, snap, project, None)
+}
+
+fn parse_scoped(
+    answer: &str,
+    snap: &Snapshot,
+    project: &str,
+    scope: Option<(&str, &str)>,
+) -> Proposal {
     let Split {
         report,
         blocks,
@@ -1139,7 +1233,10 @@ pub fn parse(answer: &str, snap: &Snapshot, project: &str) -> Proposal {
             );
             continue;
         }
-        match validate_item(item, snap, project) {
+        match validate_item(item, snap, project).and_then(|c| match scope {
+            Some((topic, note)) => journal_change(c, snap, project, topic, note),
+            None => Ok(c),
+        }) {
             Ok(change) => {
                 let key = target_key(&change);
                 // An entry may be named by one change only.
@@ -1405,6 +1502,10 @@ pub fn check_current(change: &Change, snap: &Snapshot, project: &str) -> Result<
         TaskLocation::Topic { project, topic } => topic_of(snap, project, topic).is_some(),
     };
     match change {
+        Change::RemoveTask { task, base, .. } => match snap.task(task) {
+            Some(t) if same_task(t, base) && task_in_project(t, project) => Ok(()),
+            _ => stale("zadanie zmieniono, przeniesiono lub usunięto"),
+        },
         Change::MoveTask { task, from, to, .. } => match snap.task(task) {
             None => stale("wpisu już nie ma"),
             Some(t) if t.location != *from => stale("wpis przeniesiono"),
@@ -2524,5 +2625,57 @@ pub(crate) mod tests {
                 .unwrap_err()
                 .contains("repozytorium")
         );
+    }
+    #[test]
+    fn journal_removals_validate_ids_project_scope_duplicates_and_staleness() {
+        let s = snap();
+        let json = r#"{"changes":[
+          {"kind":"remove_task","task":"aaaaa1","reason":"Nieaktualne."},
+          {"kind":"remove_task","task":"zzzzzz","reason":"Nieznane."},
+          {"kind":"remove_task","task":"bbbbb1","reason":"Inny projekt."},
+          {"kind":"task_status","task":"aaaaa1","status":"done","reason":"Powtórka."},
+          {"kind":"remove_task","task":"aaaaa3","reason":"Poza tematem."}
+        ]}"#;
+        let p = parse_journal(
+            &answer(json),
+            &s,
+            "beeking",
+            "platnosci",
+            "Usuń nieaktualne zadania.",
+        );
+        assert_eq!(p.changes.len(), 1);
+        assert_eq!(p.dropped.len(), 4);
+        assert!(p.dropped.iter().any(|d| d.reason.contains("Nie ma już")));
+        assert!(p.dropped.iter().any(|d| d.reason.contains("nie należy")));
+        assert!(p.dropped.iter().any(|d| d.reason.contains("zakresem")));
+        let mut later = s.clone();
+        later.tasks[0].line = 99;
+        assert!(check_current(&p.changes[0], &later, "beeking").is_ok());
+        later.tasks[0].notes = "Ręczna zmiana".into();
+        assert!(check_current(&p.changes[0], &later, "beeking").is_err());
+    }
+
+    #[test]
+    fn journal_scope_stays_in_topic_even_when_entries_name_another_topic() {
+        let mut s = snap();
+        let mut other = s.topics[0].clone();
+        other.slug = "inne".into();
+        other.title = "Inny temat".into();
+        s.topics.push(other);
+        let json = r#"{"changes":[{"kind":"new_task","topic":"inne","title":"Krok","reason":"r"},
+          {"kind":"topic_log","topic":"platnosci","text":"Już zapisano","status":"waiting"},
+          {"kind":"topic_log","topic":"inne","text":"Sam wpis"}] }"#;
+        let p = parse_journal(&answer(json), &s, "beeking", "platnosci", "Już zapisano");
+        assert!(p.changes.is_empty());
+        assert_eq!(p.dropped.len(), 3);
+        let p = parse_journal(
+            &answer(json),
+            &s,
+            "beeking",
+            "platnosci",
+            "Inny temat wymaga kroku",
+        );
+        assert_eq!(p.changes.len(), 1);
+        assert!(matches!(&p.changes[0], Change::TopicLog { topic, .. } if topic == "platnosci"));
     }
 }

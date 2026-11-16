@@ -6,16 +6,25 @@
 
 .act-layout {
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
-  gap: 44px;
+  grid-template-columns: minmax(250px, 290px) minmax(0, 1fr);
+  grid-template-areas: "recipes main" "history main";
+  gap: 28px 36px;
   align-items: start;
 }
+.act-catalog { grid-area: recipes; }
+.act-history { grid-area: history; }
+.act-main { grid-area: main; min-width: 0; }
+.act-picker { display: none; }
 
-@media (max-width: 1000px) {
+@container content (max-width: 860px) {
   .act-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
+    grid-template-areas: "picker" "main" "history";
+    gap: 24px;
   }
+  .act-catalog { display: none; }
+  .act-picker { display: block; grid-area: picker; }
+  .act-picker select { width: 100%; }
 }
 
 /* ---- left column ---- */
@@ -51,7 +60,7 @@
 
 .act-recipe-desc {
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-base);
   line-height: 1.4;
 }
 
@@ -64,7 +73,7 @@
 
 .act-badge {
   padding: 0 7px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 17px;
   color: var(--text-3);
   border: 1px solid var(--line);
@@ -125,13 +134,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .act-run-time {
   flex: none;
   color: var(--text-4);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .act-dot {
@@ -175,7 +184,7 @@
 .act-hint {
   margin: 8px 0 0;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-base);
   line-height: 1.45;
 }
 
@@ -183,7 +192,7 @@
   margin-top: 12px;
   padding-left: 10px;
   color: var(--text-4);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .act-warn {
@@ -193,7 +202,7 @@
 .act-error {
   margin: 8px 0 0;
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 /* ---- form ---- */
@@ -211,7 +220,7 @@
 
 .act-form-title {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--text-title);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -231,7 +240,7 @@
 .act-label {
   margin-bottom: 6px;
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .act-opt {
@@ -248,6 +257,7 @@
   resize: none;
 }
 
+.act-select[aria-invalid],
 .act-textarea[aria-invalid] {
   border-color: oklch(0.7 0.13 25 / 0.6);
 }
@@ -278,15 +288,16 @@
 
 .run-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px 16px;
   margin-bottom: 14px;
 }
 
 .run-title {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 
@@ -295,7 +306,7 @@
   flex-wrap: wrap;
   gap: 0 7px;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-base);
   font-variant-numeric: tabular-nums;
 }
 
@@ -315,12 +326,9 @@
 .run-log {
   max-height: 340px;
   overflow-y: auto;
-  padding: 8px 4px 8px 12px;
-  background: var(--bg-side);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
   user-select: text;
   -webkit-user-select: text;
+
 }
 
 .run-log:not(.live) {
@@ -342,7 +350,7 @@
 .log-time {
   flex: none;
   color: var(--text-4);
-  font-size: 11.5px;
+  font-size: var(--text-sm);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   line-height: 1.75;
 }
@@ -364,7 +372,7 @@
 .log-tool .log-text {
   color: var(--text-4);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -422,7 +430,7 @@
   padding: 14px 18px 18px;
   background: var(--bg-raised);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .run-answer-head {
@@ -434,7 +442,7 @@
 
 .run-answer-title {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -458,6 +466,15 @@
 .md-heading {
   margin-top: 16px;
   font-weight: 600;
+}
+
+.md-h1 {
+  font-size: var(--text-lg);
+}
+
+.md-h2 {
+  font-size: var(--text-md);
+  color: var(--text-2);
 }
 
 .md > :first-child {
@@ -489,9 +506,9 @@
 .md-code {
   padding: 1px 5px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   background: var(--bg-active);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .md-pre {
@@ -499,7 +516,7 @@
   padding: 10px 12px;
   overflow-x: auto;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.55;
   background: var(--bg-side);
   border: 1px solid var(--line-soft);
@@ -520,7 +537,7 @@
   padding: 8px 12px;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .act-session .ags-dot.st-working,
@@ -548,4 +565,25 @@
 .act-session-status {
   flex: none;
   color: var(--text-2);
+}
+
+.act-recipe:not(.on) .act-recipe-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.act-recipe:not(.on) .act-badges {
+  display: none;
+}
+.act-recipes {
+  max-height: min(440px, 56vh);
+  overflow-y: auto;
+  padding: 2px;
+}
+@container content (min-width: 861px) {
+  .act-main {
+    position: sticky;
+    top: 12px;
+  }
 }

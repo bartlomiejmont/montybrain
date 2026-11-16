@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // The command field's decisions, pure (no React, no timers, no backend):
 // what Enter, Tab, the arrows, Esc and the mouse do, given the text on screen
 // and the readings that came back for it. CommandField runs the effects.
@@ -227,7 +228,7 @@ function decide(s: FieldState, p: CommandPreview): { state: FieldState; effects:
       return { state: s, effects: [{ kind: "problem", message: p.problems[0] ?? p.reading }] };
     }
     case "invalid":
-      return { state: s, effects: [{ kind: "problem", message: p.problems[0] ?? "Tego nie da się zapisać." }] };
+      return { state: s, effects: [{ kind: "problem", message: p.problems[0] ?? tr("Tego nie da się zapisać.") }] };
   }
 }
 

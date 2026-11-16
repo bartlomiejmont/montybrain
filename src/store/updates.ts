@@ -20,6 +20,7 @@ export function createUpdateStore(api: Pick<MontyBrainApi, "listUpdates" | "onUp
   const subs = new Set<() => void>();
   let started: Promise<void> | null = null;
   let loadingProviders: Promise<void> | null = null;
+  let loadingProvidersForced = false;
   const emit = () => subs.forEach((f) => f());
 
   function set(list: ProjectUpdateView[]) {
@@ -48,10 +49,17 @@ export function createUpdateStore(api: Pick<MontyBrainApi, "listUpdates" | "onUp
     /** A newer list from a command's response. */
     set,
     /** Loads the providers when unknown, older than a minute, or `force`d (re-probe). */
-    loadProviders(force = false): Promise<void> {
+    loadProviders: function loadProviders(force = false): Promise<void> {
+      if (loadingProviders) {
+        if (force && !loadingProvidersForced) {
+          return loadingProviders.catch(() => {}).then(() => loadProviders(true));
+        }
+        return loadingProviders;
+      }
       if (!force && providers && Date.now() - providersAt < 60_000) return Promise.resolve();
+      loadingProvidersForced = force;
       loadingProviders ??= api
-        .listProviders()
+        .listProviders(force)
         .then((p) => {
           providers = p;
           providersAt = Date.now();

@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 import { FileText, FolderInput } from "lucide-react";
 import { useRef, type FocusEvent } from "react";
 
@@ -11,7 +12,7 @@ import { focusStaysWith, useDraft } from "../store/drafts";
 import { useVault, useView } from "../store/vault";
 import { useActions } from "./actions";
 import { LinkChip } from "./TaskRow";
-import { Button, ConfirmButton, DraftHint, Segmented, SubmitInput } from "./ui";
+import { Button, ConfirmButton, DraftHint, ProjectName, Segmented, SubmitInput } from "./ui";
 
 const URL_RE = /^[a-z][a-z0-9+.-]*:\/\/\S+$/i;
 
@@ -47,7 +48,6 @@ export function TaskDetail({
   const { date: dueDate, time: dueTime } = deadlineParts(dueD.draft);
   const disabled = !task.id;
   const ctx = taskContext(view.snapshot, task.location);
-  const where = ctx.project ? (ctx.topic ? `${ctx.project.name} · ${ctx.topic.title}` : `${ctx.project.name} · ogólne`) : "Skrzynka";
   const ids = { title: `title-${task.id}`, notes: `notes-${task.id}`, date: `due-date-${task.id}`, time: `due-time-${task.id}` };
 
   // No shortcut against `task.title` & co.: the snapshot may still show the
@@ -89,8 +89,7 @@ export function TaskDetail({
   return (
     <div className="detail" onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}>
       <label className="d-label" htmlFor={ids.title}>
-        Tytuł
-      </label>
+        {tr("Tytuł")}</label>
       <input
         id={ids.title}
         className="field"
@@ -101,34 +100,34 @@ export function TaskDetail({
         onBlur={(e) => !focusStaysWith(e, titleD) && saveTitle()}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />
-      <DraftHint draft={titleD} what="Tytuł" onLeave={saveTitle} fields={[ids.title]} />
+      <DraftHint draft={titleD} what={tr("Tytuł")} onLeave={saveTitle} fields={[ids.title]} />
 
       <span className="d-label">Status</span>
       <Segmented<TaskStatus>
         label="Status"
         value={task.status}
         disabled={disabled}
-        options={TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABEL[s], hint: `Skrót: ${TASK_STATUS_KEY[s]}` }))}
+        options={TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABEL[s], hint: tr("Skrót: {0}", TASK_STATUS_KEY[s]) }))}
         onChange={(s) => void actions.setStatus(task, s)}
       />
 
-      <span className="d-label">Priorytet</span>
+      <span className="d-label">{tr("Priorytet")}</span>
       <Segmented<Priority>
-        label="Priorytet"
+        label={tr("Priorytet")}
         value={task.priority}
         disabled={disabled}
         options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABEL[p] }))}
         onChange={(p) => void actions.updateTask(task, { priority: p })}
       />
 
-      <span className="d-label">Termin</span>
+      <span className="d-label">{tr("Termin")}</span>
       <div className="d-row">
         <input
           ref={dateRef}
           id={ids.date}
           type="date"
           className="field field-date"
-          aria-label="Data"
+          aria-label={tr("Data")}
           value={dueDate}
           disabled={disabled}
           onChange={(e) => dueD.setDraft(withDate(dueD.draft, e.target.value))}
@@ -141,7 +140,7 @@ export function TaskDetail({
           id={ids.time}
           type="time"
           className="field field-time"
-          aria-label="Godzina (opcjonalnie)"
+          aria-label={tr("Godzina (opcjonalnie)")}
           value={dueTime}
           disabled={disabled || !dueDate}
           onChange={(e) => dueD.setDraft(withTime(dueD.draft, e.target.value))}
@@ -150,20 +149,17 @@ export function TaskDetail({
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
         />
         <Button variant="quiet" disabled={disabled} onMouseDown={keepFocus} onClick={() => setDeadline(withDate(dueD.draft, view.today))}>
-          Dziś
-        </Button>
+          {tr("Dziś")}</Button>
         <Button variant="quiet" disabled={disabled} onMouseDown={keepFocus} onClick={() => setDeadline(withDate(dueD.draft, addDays(view.today, 1)))}>
-          Jutro
-        </Button>
+          {tr("Jutro")}</Button>
         {task.due && (
           <Button variant="quiet" disabled={disabled} onMouseDown={keepFocus} onClick={() => setDeadline("")}>
-            Bez terminu
-          </Button>
+            {tr("Bez terminu")}</Button>
         )}
       </div>
-      <DraftHint draft={dueD} what="Termin" onLeave={leaveDeadline} fields={[ids.date, ids.time]} />
+      <DraftHint draft={dueD} what={tr("Termin")} onLeave={leaveDeadline} fields={[ids.date, ids.time]} />
 
-      <span className="d-label">Linki</span>
+      <span className="d-label">{tr("Linki")}</span>
       <div className="d-links">
         {task.links.map((l) => (
           <LinkChip key={l} url={l} onRemove={disabled ? undefined : () => void actions.updateTask(task, { remove_links: [l] })} />
@@ -171,12 +167,12 @@ export function TaskDetail({
         <SubmitInput
           draftKey={`${dk}link`}
           className="field-inline"
-          placeholder="Wklej link i naciśnij Enter"
-          aria-label="Dodaj link"
+          placeholder={tr("Wklej link i naciśnij Enter")}
+          aria-label={tr("Dodaj link")}
           disabled={disabled}
           onSubmit={async (v) => {
             if (!URL_RE.test(v)) {
-              notify("To nie wygląda na link — wklej pełny adres, np. https://…");
+              notify(tr("To nie wygląda na link — wklej pełny adres, np. https://…"));
               return false;
             }
             return (await actions.updateTask(task, { add_links: [v] })) !== undefined;
@@ -185,13 +181,12 @@ export function TaskDetail({
       </div>
 
       <label className="d-label" htmlFor={ids.notes}>
-        Notatki
-      </label>
+        {tr("Notatki")}</label>
       <textarea
         id={ids.notes}
         className="field notes"
         rows={Math.min(8, Math.max(2, notes.split("\n").length + 1))}
-        placeholder="Szczegóły, kontekst, kroki…"
+        placeholder={tr("Szczegóły, kontekst, kroki…")}
         value={notes}
         disabled={disabled}
         onChange={(e) => notesD.setDraft(e.target.value)}
@@ -199,33 +194,31 @@ export function TaskDetail({
         onBlur={(e) => !focusStaysWith(e, notesD) && saveNotes()}
         onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === "Enter" && e.currentTarget.blur()}
       />
-      <DraftHint draft={notesD} what="Notatki" onLeave={saveNotes} fields={[ids.notes]} />
+      <DraftHint draft={notesD} what={tr("Notatki")} onLeave={saveNotes} fields={[ids.notes]} />
 
-      <span className="d-label">Miejsce</span>
+      <span className="d-label">{tr("Miejsce")}</span>
       <div className="d-row">
         <Button variant="ghost" disabled={disabled} onClick={(e) => onMove(e.currentTarget)}>
-          <FolderInput size={13} /> {where}
+          <FolderInput size={13} /> {ctx.project ? <><ProjectName name={ctx.project.name} color={ctx.project.color} /><span> · {ctx.topic?.title ?? tr("ogólne")}</span></> : tr("Skrzynka")}
         </Button>
       </div>
 
       <div className="d-footer">
-        <span className="task-id" title="Identyfikator zadania w pliku">
-          {task.id ? `^${task.id}` : "bez identyfikatora"}
+        <span className="task-id" title={tr("Identyfikator zadania w pliku")}>
+          {task.id ? `^${task.id}` : tr("bez identyfikatora")}
         </span>
         <Button variant="quiet" onClick={() => void actions.reveal(locationPath(task.location))}>
-          <FileText size={13} /> Pokaż plik
-        </Button>
+          <FileText size={13} />  {tr("Pokaż plik")}</Button>
         <span className="spacer" />
         {!disabled && (
           <ConfirmButton
-            question="Usunąć to zadanie?"
-            confirmLabel="Usuń"
+            question={tr("Usunąć to zadanie?")}
+            confirmLabel={tr("Usuń")}
             autoOpen={askDelete}
             onCancel={onAskDeleteDone}
             onConfirm={() => void actions.deleteTask(task)}
           >
-            Usuń zadanie
-          </ConfirmButton>
+            {tr("Usuń zadanie")}</ConfirmButton>
         )}
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Result model of the ⌘K palette: search hits grouped for display plus
 // navigation targets. Pure, so ordering and limits are testable.
 
@@ -9,11 +10,11 @@ import { fold } from "./text";
 export type PaletteGroup = "nav" | "task" | "topic" | "journal" | "new";
 
 export const GROUP_LABEL: Record<PaletteGroup, string> = {
-  nav: "Przejdź do",
-  task: "Zadania",
-  topic: "Tematy",
-  journal: "Dziennik",
-  new: "Nowe",
+  get nav() { return tr("Przejdź do"); },
+  get task() { return tr("Zadania"); },
+  get topic() { return tr("Tematy"); },
+  get journal() { return tr("Dziennik"); },
+  get new() { return tr("Nowe"); },
 };
 
 export type PaletteItem =
@@ -28,9 +29,12 @@ export const GROUP_LIMIT: Record<PaletteGroup, number> = { nav: 5, task: 8, topi
 
 export function navTargets(snap: Snapshot): PaletteItem[] {
   const items: PaletteItem[] = [
-    { group: "nav", key: "nav:dzis", label: "Dziś", to: href("dzis"), color: null },
-    { group: "nav", key: "nav:skrzynka", label: "Skrzynka", to: href("skrzynka"), color: null },
-    { group: "nav", key: "nav:tablica", label: "Tablica", to: href("tablica"), color: null },
+    { group: "nav", key: "nav:dzis", label: tr("Dziś"), to: href("dzis"), color: null },
+    { group: "nav", key: "nav:skrzynka", label: tr("Skrzynka"), to: href("skrzynka"), color: null },
+    { group: "nav", key: "nav:tablica", label: tr("Tablica"), to: href("tablica"), color: null },
+    { group: "nav", key: "nav:mapa", label: tr("Mapa"), to: href("mapa"), color: null },
+    { group: "nav", key: "nav:akcje", label: tr("Akcje"), to: href("akcje"), color: null },
+    { group: "nav", key: "nav:ustawienia", label: tr("Ustawienia"), to: href("ustawienia"), color: null },
   ];
   for (const p of partitionProjects(snap.projects).visible) {
     items.push({

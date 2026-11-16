@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Task, Topic } from "../api/types";
 import { buildTopicContext } from "./context";
-import { COL_GAP, ISLAND_W, MARGIN, MAX_TASKS, ROW_GAP, TASK_H, TOPIC_H, layoutMap, overlaps, type LayoutInput, type LayoutRow } from "./mapLayout";
-import { appendRefLine, buildGraph, counts, neighbours, parseRefs, removeRefLine, taskKey, topicKey, waitChain } from "./refs";
+import { COL_GAP, ISLAND_W, MARGIN, MAX_TASKS, ROW_GAP, TASK_H, TOPIC_H, layoutMap, overlaps, routeCurve, type LayoutInput, type LayoutRow } from "./mapLayout";
+import { appendRefLine, buildGraph, counts, neighbours, parseRefs, referenceProse, removeRefLine, taskKey, topicKey, waitChain } from "./refs";
 
 const topic = (project: string, slug: string, summary = "", created: string | null = "2026-11-01"): Topic => ({
   project,
@@ -208,5 +208,47 @@ describe("Kopiuj kontekst with neighbours", () => {
       ],
     });
     expect(text).toContain("## Połączone tematy\n\n- Czeka na: B / Płatności — Integracja gotowa.\n- Powiązane: A / Mapa\n");
+  });
+});
+
+describe("routeCurve", () => {
+  const nums = (d: string) => [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+
+  it("anchors endpoints on island borders and routes right-column edges inside the middle gutter", () => {
+    const l = layoutMap(input(4, 16, 1));
+    const [p0, p1, , p3] = l.islands;
+    const t0 = l.rows.find((r) => r.project === "p0" && r.kind === "topic")!;
+    const t1 = l.rows.find((r) => r.project === "p1" && r.kind === "topic")!;
+    const t3 = l.rows.find((r) => r.project === "p3" && r.kind === "topic")!;
+
+    // Cross-column: left island right edge (508) -> right island left edge (628), never inside text or spine.
+    const cross = routeCurve(t0.rect, t1.rect, p0!.rect, p1!.rect, 0);
+    expect(cross).toMatch(/^M 508 /);
+    expect(cross).toMatch(/ H 628$/);
+
+    // Same right column: exits/enters on island left edge (628) through middle gutter, staying inside layout.width.
+    const sameRight = routeCurve(t1.rect, t3.rect, p1!.rect, p3!.rect, 2);
+    expect(sameRight).toMatch(/^M 628 /);
+    expect(sameRight).toMatch(/ H 628$/);
+    const xs: number[] = [];
+    for (const [, cmd, raw] of sameRight.matchAll(/([MHQV])\s+([^MHQV]+)/g)) {
+      const n = nums(raw!);
+      if (cmd === "M" || cmd === "H") xs.push(n[0]!);
+      else if (cmd === "Q") xs.push(n[0]!, n[2]!);
+    }
+    expect(xs.length).toBeGreaterThan(0);
+    for (const x of xs) {
+      expect(x).toBeGreaterThanOrEqual(p0!.rect.x + p0!.rect.w);
+      expect(x).toBeLessThanOrEqual(l.width);
+    }
+  });
+});
+
+
+describe("relation prose in the map inspector", () => {
+  it("keeps explanatory prose and code while removing only standalone relation lines", () => {
+    const text = ["Stan wdrożenia.", "Czeka na: [[firma/krs]]", "Zależy też od [[api]] po zatwierdzeniu.", "Powiązane: ^abc123", "```", "Czeka na: [[przyklad]]", "```"].join("\n");
+    expect(referenceProse(text, "sklep")).toBe(["Stan wdrożenia.", "Zależy też od [[api]] po zatwierdzeniu.", "```", "Czeka na: [[przyklad]]", "```"].join("\n"));
+    expect(referenceProse("Czeka na: [[krs]]", "firma")).toBe("");
   });
 });

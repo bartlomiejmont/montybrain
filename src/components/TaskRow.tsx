@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 import { AlignLeft, ArrowDown, FolderInput } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
@@ -9,13 +10,15 @@ import { TASK_STATUSES, TASK_STATUS_KEY, TASK_STATUS_LABEL } from "../lib/labels
 import { linkLabel } from "../lib/text";
 import { links as routes } from "../router/router";
 import { useDraft } from "../store/drafts";
+import { useOpenDetail } from "../store/details";
+import { taskTarget, topicTarget } from "../lib/details";
 import { takeReveal, useReveal, useTaskFlag } from "../store/ui";
 import { useView } from "../store/vault";
 import { useActions } from "./actions";
 import { Menu, type MenuAnchor, type MenuItem } from "./Menu";
 import { StatusToggle } from "./StatusToggle";
 import { TaskDetail } from "./TaskDetail";
-import { IconButton, ProjectDot } from "./ui";
+import { IconButton, ProjectName } from "./ui";
 
 const KEY_TO_STATUS: Record<string, TaskStatus> = Object.fromEntries(
   TASK_STATUSES.map((s) => [TASK_STATUS_KEY[s], s]),
@@ -43,7 +46,7 @@ export function LinkChip({ url, onRemove }: { url: string; onRemove?: () => void
         {linkLabel(url)}
       </button>
       {onRemove && (
-        <button type="button" className="chip-x" aria-label={`Usuń link ${url}`} onClick={onRemove}>
+        <button type="button" className="chip-x" aria-label={tr("Usuń link {0}", url)} onClick={onRemove}>
           ×
         </button>
       )}
@@ -64,7 +67,7 @@ export function useMoveItems(task: Task): MenuItem[] {
     }
     items.push({
       key: t.key,
-      label: t.group ? (t.location.kind === "project" ? "Ogólne zadania projektu" : t.label) : t.label,
+      label: t.group ? (t.location.kind === "project" ? tr("Ogólne zadania projektu") : t.label) : t.label,
       indent: !!t.group,
       checked: sameLocation(t.location, task.location),
       onSelect: () => void moveTask(task, t.location),
@@ -74,6 +77,7 @@ export function useMoveItems(task: Task): MenuItem[] {
 }
 
 export function TaskRow({ task, showContext = false }: { task: Task; showContext?: boolean }) {
+  const openDetail = useOpenDetail();
   const view = useView();
   const actions = useActions();
   // Keyed by task id in a module store, so the detail stays open when the task
@@ -127,9 +131,11 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
   }));
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
+    const titleFocused = (e.target as HTMLElement).closest("button.task-title") !== null;
+    if ((e.target !== e.currentTarget && !titleFocused) || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key;
-    if (k === "Enter") setExpanded((x) => !x);
+    if (titleFocused && (k === "Enter" || k === " ")) return;
+    if (k === "Enter") openDetail ? openDetail(taskTarget(task)) : setExpanded((x) => !x);
     else if (k === " " || k === "x") actions.toggleDone(task);
     else if (KEY_TO_STATUS[k]) actions.setStatus(task, KEY_TO_STATUS[k]!);
     else if (k === "e" || k === "F2") setEditing(true);
@@ -170,7 +176,7 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
     ? ctx.topic
       ? `${ctx.project.name} · ${ctx.topic.title}`
       : ctx.project.name
-    : "Skrzynka";
+    : tr("Skrzynka");
 
   return (
     <div
@@ -183,10 +189,11 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
         className="task-row"
         tabIndex={0}
         data-task-row
-        aria-expanded={expanded}
+        role="group"
         aria-label={task.title}
+        title={tr("Enter — szczegóły · s — status · m — przenieś")}
         onKeyDown={onKeyDown}
-        onClick={() => !editing && setExpanded((x) => !x)}
+        onClick={() => !editing && (openDetail ? openDetail(taskTarget(task)) : setExpanded((x) => !x))}
         onContextMenu={(e) => {
           e.preventDefault();
           setMenu({ kind: "status", anchor: { x: e.clientX, y: e.clientY } });
@@ -198,18 +205,13 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
           onToggle={() => void actions.toggleDone(task)}
           onMenu={(anchor) => setMenu({ kind: "status", anchor })}
         />
-        {task.priority === "high" && (
-          <span className="prio-high" title="Wysoki priorytet" aria-label="Wysoki priorytet">
-            !
-          </span>
-        )}
         {editing ? (
           <input
             className="title-edit"
             autoFocus
             value={titleDraft.draft}
-            aria-label="Tytuł zadania"
-            title={titleDraft.elsewhere ? "Ten tytuł zmienił się poza aplikacją — zapis zastosuje Twoją wersję." : undefined}
+            aria-label={tr("Tytuł zadania")}
+            title={titleDraft.elsewhere ? tr("Ten tytuł zmienił się poza aplikacją — zapis zastosuje Twoją wersję.") : undefined}
             onChange={(e) => titleDraft.setDraft(e.target.value)}
             onFocus={titleDraft.onFocus}
             onClick={(e) => e.stopPropagation()}
@@ -226,8 +228,11 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
             }}
           />
         ) : (
-          <span
+          <button
+            type="button"
             className="task-title"
+            aria-expanded={openDetail ? undefined : expanded}
+            onClick={(e) => { e.stopPropagation(); openDetail ? openDetail(taskTarget(task)) : setExpanded((x) => !x); }}
             title={task.title}
             onDoubleClick={(e) => {
               e.stopPropagation();
@@ -235,44 +240,50 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
             }}
           >
             {task.title}
-          </span>
+          </button>
         )}
         <span className="task-meta">
-          {task.notes && !expanded && <AlignLeft size={13} className="meta-icon" aria-label="Ma notatki" />}
-          {!expanded && task.links.slice(0, 2).map((l) => <LinkChip key={l} url={l} />)}
-          {!expanded && task.links.length > 2 && <span className="meta-more">+{task.links.length - 2}</span>}
+          {task.priority === "high" && <span className="priority-label">{tr("Wysoki")}</span>}
+          {task.notes && <AlignLeft size={13} className="meta-icon" aria-label={tr("Ma notatki")} />}
+          {task.links.slice(0, 2).map((l) => <LinkChip key={l} url={l} />)}
+          {task.links.length > 2 && <span className="meta-more">+{task.links.length - 2}</span>}
           {showContext && (
             <a
               className="ctx"
               href={ctx.project ? routes.project(ctx.project.slug, ctx.topic?.slug) : routes.inbox()}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (openDetail && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                  e.preventDefault();
+                  openDetail(ctx.topic ? topicTarget(ctx.topic) : ctx.project ? { kind: "project", project: ctx.project.slug } : taskTarget(task));
+                }
+              }}
               title={contextLabel}
             >
-              {ctx.project && <ProjectDot color={ctx.project.color} size={6} />}
-              <span className="ctx-text">{contextLabel}</span>
+              {ctx.project ? <><ProjectName name={ctx.project.name} color={ctx.project.color} />{ctx.topic && <span className="ctx-text"> · {ctx.topic.title}</span>}</> : <span className="ctx-text">{tr("Skrzynka")}</span>}
             </a>
           )}
           {task.due && (
-            <span className={`due${overdue ? " overdue" : ""}`} title={`Termin: ${task.due.replace("T", " ")}`}>
-              {formatDue(task.due, view.today)}
+            <span className={`due${overdue ? " overdue" : task.status !== "done" && task.due.slice(0, 10) === view.today ? " due-today" : ""}`} title={tr("Termin: {0}{1}", task.due.replace("T", " "), overdue ? tr(" — po terminie") : "")}>
+              {overdue ? tr("Po terminie · ") : ""}{formatDue(task.due, view.today)}
             </span>
           )}
-          {task.priority === "low" && <ArrowDown size={12} className="meta-icon" aria-label="Niski priorytet" />}
+          {task.priority === "low" && <ArrowDown size={12} className="meta-icon" aria-label={tr("Niski priorytet")} />}
         </span>
-        <span className="row-actions">
+        <span className={`row-actions${task.location.kind === "inbox" ? " inbox-actions" : ""}`}>
           <IconButton
-            label="Przenieś do…"
+            label={tr("Przenieś do…")}
             disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
               setMenu({ kind: "move", anchor: e.currentTarget });
             }}
           >
-            <FolderInput size={14} />
+            <FolderInput size={14} />{task.location.kind === "inbox" && <span>{tr("Przenieś")}</span>}
           </IconButton>
         </span>
       </div>
-      {expanded && (
+      {expanded && (!openDetail || askDelete) && (
         <TaskDetail
           task={task}
           askDelete={askDelete}
@@ -283,7 +294,7 @@ export function TaskRow({ task, showContext = false }: { task: Task; showContext
       {menu && (
         <Menu
           anchor={menu.anchor}
-          label={menu.kind === "status" ? "Status zadania" : "Przenieś do"}
+          label={menu.kind === "status" ? tr("Status zadania") : tr("Przenieś do")}
           items={menu.kind === "status" ? statusItems : moveItems}
           onClose={closeMenu}
           minWidth={menu.kind === "move" ? 260 : 200}

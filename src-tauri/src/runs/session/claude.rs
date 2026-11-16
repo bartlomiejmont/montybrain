@@ -113,6 +113,13 @@ impl Claude {
         };
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("");
         match s("type") {
+            "rate_limit_event" => {
+                let (limits, status) = super::telemetry::claude_limits(&v);
+                let mut out = Vec::new();
+                if !limits.is_empty() { out.push(Act::Limits(limits)); }
+                if let Some(status) = status { out.push(Act::LimitStatus(status)); }
+                out
+            }
             "system" if s("subtype") == "init" => {
                 let model = s("model");
                 let failed: Vec<&str> = v
@@ -143,7 +150,10 @@ impl Claude {
                         failed.join(", ")
                     ));
                 }
-                vec![Act::Notice { text, error: false }]
+                vec![
+                    Act::Notice { text, error: false },
+                    Act::Connected((!model.is_empty()).then(|| clip(model, 200))),
+                ]
             }
             "assistant" => {
                 let mut out = Vec::new();
@@ -222,10 +232,14 @@ impl Claude {
                         .unwrap_or_else(|| "Agent zakończył z błędem.".into()),
                     sub => format!("Agent zakończył z błędem ({sub})."),
                 });
-                vec![Act::TurnDone {
+                let mut out = vec![Act::TurnDone {
                     text: if is_error { None } else { text },
                     error,
-                }]
+                }];
+                if let Some(usage) = super::telemetry::Usage::claude(&v) {
+                    out.push(Act::Usage(usage));
+                }
+                out
             }
             "control_request" => {
                 let id = v.get("request_id").cloned().unwrap_or(Value::Null);
@@ -382,6 +396,14 @@ nie-json"##;
         let acts: Vec<Act> = FIXTURE
             .lines()
             .flat_map(|l| c.on_line(l, &mut tools))
+            .collect();
+        assert!(
+            acts.iter()
+                .any(|a| matches!(a, Act::Connected(Some(m)) if m == "claude-x"))
+        );
+        let acts: Vec<_> = acts
+            .into_iter()
+            .filter(|a| !matches!(a, Act::Connected(_)))
             .collect();
         assert!(
             matches!(&acts[0], Act::Notice { text, .. } if text.contains("claude-x") && text.contains("slack"))

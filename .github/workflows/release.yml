@@ -1,0 +1,93 @@
+name: Prepare macOS release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Standard runners are free for public repositories. Require a public repo
+    # before starting these macOS jobs to avoid accidental private-repo spend.
+    if: github.event.repository.private == false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install build tools
+        run: |
+          npm install --global pnpm@10.33.0
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check version consistency
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const version = JSON.parse(fs.readFileSync('package.json')).version;
+          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).version;
+          const cargo = fs.readFileSync('Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1];
+          if (!/^\d+\.\d+\.\d+$/.test(version) || version !== tauri || version !== cargo) {
+            throw new Error('package.json, tauri.conf.json, and workspace Cargo.toml must share a stable version');
+          }
+          JS
+      - name: Configure repository links
+        run: node scripts/configure-project.mjs "$GITHUB_REPOSITORY"
+      - run: pnpm install --frozen-lockfile
+      - name: Check and build
+        run: |
+          pnpm test
+          cargo test --workspace --locked
+          pnpm tauri build --ci --bundles app -- --locked
+          cargo build --release --locked -p montybrain-mcp
+      - name: Package native build
+        run: scripts/package-release.sh "${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node -p 'JSON.parse(require("fs").readFileSync("package.json")).version')"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Bump the version before preparing another release." >&2
+            exit 1
+          fi
+          gh release create "$TAG" release/* \
+            --target "$GITHUB_SHA" --draft \
+            --title "MontyBrain $TAG" \
+            --notes-file .github/release-notes.md

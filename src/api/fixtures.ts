@@ -108,6 +108,7 @@ export function buildFixtures(today: string, now: string): Snapshot {
       at(-9, "10:00"),
     ),
     topic("whenubuy", "onboarding", "Onboarding nowych użytkowników", "done", "Wdrożone w wersji 2.4.", at(-20, "18:30")),
+    topic("whenubuy", "wydanie-2-5", "Wydanie 2.5", "done", "Opublikowane wczoraj. Monitoring działa.", at(-1, "12:00")),
     topic(
       "montybrain",
       "aplikacja-desktopowa",

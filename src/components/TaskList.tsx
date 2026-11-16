@@ -1,4 +1,5 @@
-import { ChevronRight } from "lucide-react";
+import { t as tr } from "../i18n";
+import { ChevronRight, Plus } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 
 import type { Task, TaskLocation } from "../api";
@@ -16,7 +17,7 @@ export function TaskList({
   listId,
   tasks,
   addTo,
-  addPlaceholder = "Dodaj zadanie",
+  addPlaceholder = tr("Dodaj zadanie"),
   showContext = false,
   empty,
   autoFocusAdd = false,
@@ -44,12 +45,12 @@ export function TaskList({
   const addRow = addTo && (
         <div className="add-row">
           <span className="add-plus" aria-hidden>
-            +
+            <Plus size={14} strokeWidth={2} />
           </span>
           <SubmitInput
             className="field-inline"
             placeholder={`${addPlaceholder}…`}
-            title="Enter dodaje. Na końcu możesz dopisać !wysoki, !niski, @dziś, @jutro, @pt, @+3d albo @2026-11-20"
+            title={tr("Enter dodaje. Na końcu możesz dopisać !wysoki, !niski, @dziś, @jutro, @pt, @+3d albo @2026-11-20")}
             aria-label={addPlaceholder}
             draftKey={`add:${listId}`}
             autoFocus={autoFocusAdd}
@@ -63,7 +64,7 @@ export function TaskList({
   return (
     <div className="task-list">
       {addFirst && addRow}
-      {open.length === 0 && empty}
+      {tasks.length === 0 && empty}
       {open.map((t) => (
         <TaskRow key={t.id ?? `${t.location.kind}:${t.line}`} task={t} showContext={showContext} />
       ))}
@@ -72,7 +73,7 @@ export function TaskList({
         <div className="done-group">
           <button type="button" className="done-toggle" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>
             <ChevronRight size={12} className="chev" />
-            Zrobione <span className="count">{done.length}</span>
+            {tr("Zrobione")} <span className="count">{done.length}</span>
           </button>
           {showDone &&
             done.map((t) => <TaskRow key={t.id ?? `${t.location.kind}:${t.line}`} task={t} showContext={showContext} />)}

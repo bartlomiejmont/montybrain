@@ -1,3 +1,4 @@
+import { t as tr } from "../../i18n";
 // The panel of one run: header, live log, final answer / error.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -43,14 +44,14 @@ function Log({ events, running }: { events: RunEvent[]; running: boolean }) {
       ref={ref}
       className={`run-log${running ? " live" : ""}`}
       role="log"
-      aria-label="Przebieg pracy agenta"
+      aria-label={tr("Przebieg pracy agenta")}
       tabIndex={0}
       onScroll={(e) => {
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
     >
-      {events.length === 0 && <p className="run-log-empty">{running ? "Czekam na pierwsze komunikaty agenta…" : "Brak zapisanego przebiegu."}</p>}
+      {events.length === 0 && <p className="run-log-empty">{running ? tr("Czekam na pierwsze komunikaty agenta…") : tr("Brak zapisanego przebiegu.")}</p>}
       {events.map((e) => (
         <div key={e.seq} className={`log-line log-${e.kind}`}>
           <time className="log-time">{clock(e.at)}</time>
@@ -77,11 +78,11 @@ function CopyButton({ text }: { text: string }) {
           await navigator.clipboard.writeText(text);
           setDone(true);
         } catch {
-          notify("Nie udało się skopiować do schowka.");
+          notify(tr("Nie udało się skopiować do schowka."));
         }
       }}
     >
-      {done ? "Skopiowano" : "Kopiuj"}
+      {done ? tr("Skopiowano") : tr("Kopiuj")}
     </Button>
   );
 }
@@ -113,23 +114,23 @@ export function RunPanel({ run, recipe }: { run: RunInfo; recipe: Recipe | null 
   }
 
   return (
-    <section ref={rootRef} className="run-panel" aria-label="Uruchomienie">
+    <section ref={rootRef} className="run-panel" aria-label={tr("Uruchomienie")}>
       <header className="run-head">
         <div className="run-head-main">
-          <h2 className="run-title">{run.recipe_title}</h2>
+          <h2 className="run-title">{tr(run.recipe_title)}</h2>
           <div className="run-meta">
             <span>{PROVIDER_NAME[run.provider]}</span>
             {agentMeta(run) && (
               <>
                 <span aria-hidden>·</span>
-                <span title="Model i wysiłek z Ustawień">{agentMeta(run)}</span>
+                <span title={tr("Model i wysiłek z Ustawień")}>{agentMeta(run)}</span>
               </>
             )}
             <span aria-hidden>·</span>
             <span>{MODE_LABEL[run.mode]}</span>
             <span aria-hidden>·</span>
             <span className={`run-status st-${run.status}`}>
-              {terminal ? "Otwarto w Terminalu" : STATUS_LABEL[run.status]}
+              {terminal ? tr("Otwarto w Terminalu") : STATUS_LABEL[run.status]}
               {running && <> · {elapsed}</>}
             </span>
           </div>
@@ -139,7 +140,7 @@ export function RunPanel({ run, recipe }: { run: RunInfo; recipe: Recipe | null 
               <>
                 <span aria-hidden>·</span>
                 <span>
-                  Koniec {formatRunTime(run.finished_at)} (czas {elapsed})
+                  {tr("Koniec")} {formatRunTime(run.finished_at)}  {tr("(czas")} {elapsed})
                 </span>
               </>
             )}
@@ -147,41 +148,41 @@ export function RunPanel({ run, recipe }: { run: RunInfo; recipe: Recipe | null 
         </div>
         {running && (
           <Button variant="danger" onClick={cancel} disabled={cancelling}>
-            {cancelling ? "Przerywam…" : "Przerwij"}
+            {cancelling ? tr("Przerywam…") : tr("Przerwij")}
           </Button>
         )}
       </header>
 
       {terminal ? (
         <div className="run-note">
-          <p className="run-note-title">Otwarto w Terminalu</p>
-          <p className="run-note-text">Sesja toczy się tam dalej. Jej efekty pojawią się w MontyBrain same, gdy agent zapisze zadania lub wpisy.</p>
+          <p className="run-note-title">{tr("Otwarto w Terminalu")}</p>
+          <p className="run-note-text">{tr("Sesja toczy się tam dalej. Jej efekty pojawią się w MontyBrain same, gdy agent zapisze zadania lub wpisy.")}</p>
         </div>
       ) : (
         <>
           <Log events={run.events} running={running} />
           {run.status === "failed" && (
             <div className="run-error" role="alert">
-              <p className="run-error-title">Uruchomienie nie powiodło się</p>
-              <p className="run-error-text">{run.error ?? "Agent zakończył pracę błędem, ale nie podał powodu."}</p>
+              <p className="run-error-title">{tr("Uruchomienie nie powiodło się")}</p>
+              <p className="run-error-text">{run.error ?? tr("Agent zakończył pracę błędem, ale nie podał powodu.")}</p>
             </div>
           )}
           {run.status === "cancelled" && (
             <p className="run-cancelled">
-              {recipe?.background_writes ? "Uruchomienie przerwane. Agent mógł zdążyć coś zapisać w MontyBrain." : "Uruchomienie przerwane. Nic nie zostało zapisane w MontyBrain."}
+              {recipe?.background_writes ? tr("Uruchomienie przerwane. Agent mógł zdążyć coś zapisać w MontyBrain.") : tr("Uruchomienie przerwane. Nic nie zostało zapisane w MontyBrain.")}
             </p>
           )}
           {run.status === "succeeded" && (
             <div className="run-answer">
               <div className="run-answer-head">
-                <span className="run-answer-title">Odpowiedź agenta</span>
+                <span className="run-answer-title">{tr("Odpowiedź agenta")}</span>
                 {answer && <CopyButton text={answer} />}
               </div>
-              {answer ? <Markdown text={answer} /> : <p className="run-log-empty">Agent nie zwrócił odpowiedzi.</p>}
-              {recipe?.proposes && run.project && (
+              {answer ? <Markdown text={answer} /> : <p className="run-log-empty">{tr("Agent nie zwrócił odpowiedzi.")}</p>}
+              {(run.project || recipe?.background_writes) && (
                 <p className="run-next">
-                  <button type="button" className="btn btn-ghost" onClick={() => navigate(links.project(run.project!))}>
-                    Przejdź do propozycji w projekcie
+                  <button type="button" className="btn btn-ghost" onClick={() => navigate(run.project ? links.project(run.project) : links.inbox())}>
+                    {recipe?.proposes && run.project ? tr("Przejdź do propozycji w projekcie") : run.project ? tr("Otwórz projekt i jego dzienniki") : tr("Przejrzyj zadania w Skrzynce")}
                   </button>
                 </p>
               )}

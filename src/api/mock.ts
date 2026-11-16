@@ -1,8 +1,10 @@
+import { getLanguage } from "../i18n";
 // In-memory stand-in for the Tauri backend, used when the page runs in a plain
 // browser (`pnpm dev`) and in unit tests. It follows core's semantics where the
 // UI can observe them: slugs, ids, done stamps, `today`, journal order, search.
 
 import type { MontyBrainApi } from "./api";
+import { journalRefreshRequest } from "../lib/journalAgent";
 import { buildFixtures } from "./fixtures";
 import { createMockRuns, type MockRunOptions } from "./mock-runs";
 import { addMapDemo, buildLargeFixture } from "./mock-map";
@@ -139,6 +141,7 @@ function locationOrder(loc: TaskLocation): string {
 const clone = <T>(v: T): T => structuredClone(v);
 
 export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapshotForTests(): Snapshot } {
+  let nextJournalLine = 100_000;
   const now = opts.now ?? (() => new Date());
   const latency = opts.latencyMs ?? 0;
   const db: Snapshot = clone(opts.snapshot ?? (opts.map === "large" ? buildLargeFixture(toIsoDate(now())) : buildFixtures(toIsoDate(now()), toIsoMinute(now()))));
@@ -150,6 +153,7 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
   const settingsListeners = new Set<(s: AppSettings) => void>();
   const quickShowListeners = new Set<() => void>();
   let settings: AppSettings = {
+    language: getLanguage(),
     shortcut: DEFAULT_SHORTCUT,
     shortcut_error: null,
     reminders: true,
@@ -252,6 +256,12 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
         const t = db.tasks.find((x) => x.id === id);
         if (!t || t.status !== expected) return false;
         await api.updateTask(id, { status });
+        return true;
+      },
+      async restoreTask(task, position) {
+        if (db.tasks.some((t) => t.id === task.id)) return false;
+        db.tasks.splice(position, 0, clone(task));
+        changed([]);
         return true;
       },
       async deleteTaskIf(id, guard) {
@@ -494,7 +504,7 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
       const text = entry.text.trim();
       if (!text) throw invalid("journal text must not be empty");
       const author = oneLine((entry.author ?? "").replace(/·/g, " ")) || "ja";
-      const e: JournalEntry = { project: projectSlug, topic: slug, at: stamp(), author, text, line: 0 };
+      const e: JournalEntry = { project: projectSlug, topic: slug, at: stamp(), author, text, line: nextJournalLine-- };
       db.journal.unshift(e);
       if (entry.status) t.status = entry.status;
       if (entry.summary != null) t.summary = entry.summary.trim();
@@ -586,6 +596,7 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
     },
 
     async updateSettings(patch) {
+      if (patch.language !== undefined && patch.language !== "en" && patch.language !== "pl") throw new Error("Nieprawidłowa wartość języka.");
       await wait();
       if (patch.digest_hour !== undefined && !(Number.isInteger(patch.digest_hour) && patch.digest_hour >= 0 && patch.digest_hour <= 23)) {
         throw new Error(`Nieprawidłowa godzina: ${patch.digest_hour}`);
@@ -606,6 +617,7 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
       }
       settings = {
         ...settings,
+        ...(patch.language !== undefined && { language: patch.language }),
         ...(patch.reminders !== undefined && { reminders: patch.reminders }),
         ...(patch.digest_hour !== undefined && { digest_hour: patch.digest_hour }),
         ...(patch.quick_destination && { quick_destination: clone(patch.quick_destination) }),
@@ -685,7 +697,18 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
 
     listRecipes: runsMock.listRecipes,
     listProviders: runsMock.listProviders,
-    startRun: runsMock.startRun,
+    async startRun(request) {
+      if (request.params.topic) {
+        if (!(await updatesMock.listUpdates()).every((v) => v.project !== request.params.project || v.pending === 0)) throw new Error("Projekt ma nierozstrzygnięte propozycje. Najpierw przejrzyj zmiany.");
+        if (request.recipe !== "zlecenie" || request.mode !== "background") throw new Error("Odświeżanie tematu działa tylko jako zlecenie w tle.");
+        topic(request.params.project!, request.params.topic);
+        const input = updatesMock.prepareJournalRefresh(request.params.project!, request.params.topic);
+        const run = await runsMock.startRun({ ...request, params: { ...request.params, text: journalRefreshRequest(input.entries) } });
+        updatesMock.trackJournalRefresh(run.id, input);
+        return run;
+      }
+      return runsMock.startRun(request);
+    },
     cancelRun: runsMock.cancelRun,
     listRuns: runsMock.listRuns,
     onRunEvent: runsMock.onRunEvent,
@@ -734,7 +757,7 @@ export function createMockApi(opts: MockOptions = {}): MontyBrainApi & { snapsho
   if (opts.inboxProposal) {
     const at = toIsoMinute(now());
     updatesMock.seedProposal("", {
-      run_id: "mock-inbox-proposal",
+      run_id: opts.session === "idle" || opts.session === "finished" ? "sesja-mock" : "mock-inbox-proposal",
       provider: "claude",
       trigger: "manual",
       created_at: at,

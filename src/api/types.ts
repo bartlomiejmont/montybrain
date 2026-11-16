@@ -181,6 +181,7 @@ export interface TaskPatch {
 
 /** `get_settings` result and `settings-changed` payload. */
 export interface AppSettings {
+  language: "en" | "pl";
   /** Global quick-capture shortcut, e.g. "Ctrl+Alt+Space" (see api/shortcut.ts). */
   shortcut: string;
   /** Why the saved shortcut is not active (taken by another app, …). */
@@ -214,6 +215,7 @@ export interface AppSettings {
 
 /** Absent key = keep. */
 export interface SettingsPatch {
+  language?: "en" | "pl";
   reminders?: boolean;
   digest_hour?: number;
   quick_destination?: TaskLocation;
@@ -259,6 +261,10 @@ export interface ProviderInfo {
   path: string | null;
   version: string | null;
   problem: string | null;
+  models?: string[];
+  limits?: LimitSnapshot | null;
+  limits_problem?: string | null;
+  auth: { status: "logged_in" | "logged_out" | "unknown"; method: string | null; plan: string | null; problem: string | null };
 }
 
 export interface RecipeParam {
@@ -321,6 +327,8 @@ export interface RunInfo {
   result: string | null;
   error: string | null;
   events: RunEvent[];
+  /** Journal analysis scope (same project proposal store). */
+  topic?: string | null;
 }
 
 // --- project updates („Aktualizacja"; src-tauri/src/updates/, runs/proposal.rs) ---
@@ -337,6 +345,7 @@ export interface AutoUpdate {
 
 /** One validated change; `from` / `base_*` record the state it was based on. */
 export type ProposedChange =
+  | { kind: "remove_task"; task: string; title: string; reason: string; base: Task }
   | { kind: "task_status"; task: string; title: string; from: TaskStatus; to: TaskStatus; reason: string }
   | {
       kind: "topic_log";
@@ -491,6 +500,8 @@ export interface StoredProposal {
   history_note?: string | null;
   /** The user's request when the run was a `zlecenie`, not a check. */
   request?: string | null;
+  /** Journal analysis scope (same project proposal store). */
+  topic?: string | null;
 }
 
 export type UpdateOutcome =
@@ -514,8 +525,15 @@ export interface UpdateResult {
   request?: string | null;
 }
 
+/** App state only; seen identities include multiplicity, never Markdown line positions. */
+export interface JournalRefreshMarker {
+  at: IsoMinute;
+  seen: Record<string, number>;
+}
+
 /** `list_updates` item and `updates-changed` payload item. */
 export interface ProjectUpdateView {
+  journal_refresh?: Record<string, JournalRefreshMarker>;
   project: string;
   auto: AutoUpdate;
   sources: UpdateSources;
@@ -780,6 +798,28 @@ export type SessionEntry =
   | { kind: "permission"; id: number; title: string; detail: string; tool: string; state: SessionPermState; can_session: boolean; note: string; questions: SessionQuestion[] }
   | { kind: "notice"; id: number; text: string; error: boolean };
 
+export interface AgentLimit {
+  id: string;
+  used_percent: number;
+  reported_at?: number;
+  reset_label?: string | null;
+  window_minutes: number | null;
+  resets_at: number | null;
+}
+export interface LimitSnapshot {
+  limits: AgentLimit[];
+  checked_at: number;
+  status: string | null;
+}
+export interface SessionTelemetry {
+  connected: boolean;
+  model: string | null;
+  usage: { input_tokens: number | null; output_tokens: number | null; cached_input_tokens: number | null; cache_write_tokens: number | null; cost_usd: number | null } | null;
+  limits: AgentLimit[];
+  limits_at?: number | null;
+  limit_status?: string | null;
+}
+
 export interface SessionView {
   id: string;
   provider: ProviderId;
@@ -792,6 +832,7 @@ export interface SessionView {
   proposal: { count: number; at: string } | null;
   error: string | null;
   remembered: string[];
+  telemetry: SessionTelemetry;
 }
 
 export interface SessionStartRequest {

@@ -102,3 +102,13 @@ describe("palette results after an external change", () => {
     expect(buildItems(snap, "", []).some((i) => i.group === "new")).toBe(false);
   });
 });
+
+
+describe("main view navigation", () => {
+  it("finds every main view by name without backend search hits", () => {
+    for (const [label, route] of [["Dziś", "dzis"], ["Skrzynka", "skrzynka"], ["Tablica", "tablica"], ["Mapa", "mapa"], ["Akcje", "akcje"], ["Ustawienia", "ustawienia"]]) {
+      const items = buildItems(before, label!, []);
+      expect(items.some((item) => item.group === "nav" && item.to === `#/${route}`)).toBe(true);
+    }
+  });
+});

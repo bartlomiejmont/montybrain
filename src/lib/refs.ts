@@ -70,6 +70,12 @@ export function parseRefs(text: string, project: string | null): Ref[] {
   return out;
 }
 
+/** Prose for display beside a dedicated relations section; Markdown on disk is unchanged. */
+export function referenceProse(text: string, project: string | null): string {
+  const relationLines = new Set(parseRefs(text, project).filter((r) => r.standalone).map((r) => r.line));
+  return text.split("\n").filter((_, i) => !relationLines.has(i)).join("\n").trim();
+}
+
 // --- the graph -----------------------------------------------------------------------
 
 export type NodeKey = string;

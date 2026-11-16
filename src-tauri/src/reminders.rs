@@ -40,6 +40,7 @@ const FIRST_CHECK: Duration = Duration::from_secs(4);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Config {
+    pub language: crate::settings::Language,
     pub enabled: bool,
     pub digest_hour: u8,
 }
@@ -159,15 +160,15 @@ pub fn plan(snap: &Snapshot, now: NaiveDateTime, fired: &Fired, cfg: Config) -> 
         let titles: Vec<&str> = timed.iter().map(|(_, t, _)| t.title.as_str()).collect();
         out.notes.push(Note {
             kind: NoteKind::DueBatch,
-            title: format!("{} – termin minął", count_tasks(timed.len())),
-            body: list_titles(&titles),
+            title: format!("{} – {}", count_tasks_in(timed.len(), cfg.language), cfg.language.text("overdue", "termin minął")),
+            body: list_titles(&titles, cfg.language),
             keys: timed.into_iter().map(|(_, _, k)| k).collect(),
         });
     } else {
         for (at, t, key) in timed {
-            let mut body = context(snap, &t.location);
+            let mut body = if t.location == TaskLocation::Inbox { cfg.language.text("Inbox", "Skrzynka").to_string() } else { context(snap, &t.location) };
             if now - at > TimeDelta::minutes(10) {
-                body.push_str(&format!(" · termin {}", at.format("%H:%M")));
+                body.push_str(&format!(" · {} {}", cfg.language.text("due", "termin"), at.format("%H:%M")));
             }
             out.notes.push(Note {
                 kind: NoteKind::Due,
@@ -198,9 +199,9 @@ pub fn plan(snap: &Snapshot, now: NaiveDateTime, fired: &Fired, cfg: Config) -> 
             overdue.sort_by_key(|t| (t.due, priority_rank(t)));
             due_today.sort_by_key(|t| priority_rank(t));
             let title = match (overdue.len(), due_today.len()) {
-                (0, n) => format!("Na dziś: {}", count_tasks(n)),
-                (o, 0) => format!("Po terminie: {}", count_tasks(o)),
-                (o, n) => format!("Na dziś: {} · po terminie: {o}", count_tasks(n)),
+                (0, n) => format!("{}: {}", cfg.language.text("Due today", "Na dziś"), count_tasks_in(n, cfg.language)),
+                (o, 0) => format!("{}: {}", cfg.language.text("Overdue", "Po terminie"), count_tasks_in(o, cfg.language)),
+                (o, n) => format!("{}: {} · {}: {o}", cfg.language.text("Due today", "Na dziś"), count_tasks_in(n, cfg.language), cfg.language.text("overdue", "po terminie")),
             };
             let titles: Vec<&str> = overdue
                 .iter()
@@ -210,7 +211,7 @@ pub fn plan(snap: &Snapshot, now: NaiveDateTime, fired: &Fired, cfg: Config) -> 
             out.notes.push(Note {
                 kind: NoteKind::Digest,
                 title,
-                body: list_titles(&titles),
+                body: list_titles(&titles, cfg.language),
                 keys: vec![key],
             });
         }
@@ -264,7 +265,12 @@ pub fn count_tasks(n: usize) -> String {
     format!("{n} {word}")
 }
 
-fn list_titles(titles: &[&str]) -> String {
+pub fn count_tasks_in(n: usize, language: crate::settings::Language) -> String {
+    if language == crate::settings::Language::Pl { count_tasks(n) }
+    else { format!("{n} {}", if n == 1 { "task" } else { "tasks" }) }
+}
+
+fn list_titles(titles: &[&str], language: crate::settings::Language) -> String {
     let mut body = titles
         .iter()
         .take(BODY_TITLES)
@@ -272,7 +278,7 @@ fn list_titles(titles: &[&str]) -> String {
         .collect::<Vec<_>>()
         .join(" · ");
     if titles.len() > BODY_TITLES {
-        body.push_str(&format!(" · i {} więcej", titles.len() - BODY_TITLES));
+        body.push_str(&format!(" · {} {} {}", language.text("and", "i"), titles.len() - BODY_TITLES, language.text("more", "więcej")));
     }
     body
 }
@@ -550,6 +556,7 @@ mod tests {
     }
 
     const ON: Config = Config {
+        language: crate::settings::Language::Pl,
         enabled: true,
         digest_hour: 9,
     };
@@ -750,6 +757,7 @@ mod tests {
         assert_eq!(p.silent, vec!["digest:2026-11-13".to_string()]);
 
         let custom = Config {
+            language: crate::settings::Language::Pl,
             enabled: true,
             digest_hour: 18,
         };
@@ -934,5 +942,20 @@ mod tests {
         let mut t2 = Tracker::new(Fired::load(&path));
         tick(&mut t2, "2026-11-13T14:05", disk_ok);
         assert_eq!(shown, 1);
+    }
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::*;
+    use crate::settings::Language;
+
+    #[test]
+    fn notification_labels_follow_language_and_preserve_task_titles() {
+        assert_eq!(count_tasks_in(1, Language::En), "1 task");
+        assert_eq!(count_tasks_in(22, Language::En), "22 tasks");
+        assert_eq!(count_tasks_in(22, Language::Pl), "22 zadania");
+        let titles = ["Żółty projekt · remains unchanged", "Second", "Third", "Fourth"];
+        assert_eq!(list_titles(&titles, Language::En), "Żółty projekt · remains unchanged · Second · Third · and 1 more");
     }
 }

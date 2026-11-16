@@ -15,6 +15,10 @@ function Inlines({ nodes }: { nodes: Inline[] }) {
           <strong key={i}>
             <Inlines nodes={n.children} />
           </strong>
+        ) : n.t === "italic" ? (
+          <em key={i}>
+            <Inlines nodes={n.children} />
+          </em>
         ) : (
           <code key={i} className="md-code">
             {n.text}
@@ -47,12 +51,14 @@ function BlockView({ block }: { block: Block }) {
           <Inlines nodes={block.inline} />
         </p>
       );
-    case "heading":
+    case "heading": {
+      const Tag = block.level <= 2 ? "h3" : "h4";
       return (
-        <p className="md-heading">
+        <Tag className={`md-heading md-h${block.level <= 2 ? 1 : 2}`}>
           <Inlines nodes={block.inline} />
-        </p>
+        </Tag>
       );
+    }
     case "code":
       return <pre className="md-pre">{block.text}</pre>;
     case "list":

@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // "Dziś" as an overview of topics: which topics need attention, which are in
 // progress, which wait, and the few tasks outside topics that are urgent.
 // Pure: the snapshot, the waiting schedule, the drift signals and the
@@ -82,7 +83,7 @@ export function firstSentence(text: string): string {
   return s.length > 140 ? `${s.slice(0, 139).trimEnd()}…` : s;
 }
 
-const taskCount = (n: number) => `${n} ${plural(n, "zadanie", "zadania", "zadań")}`;
+const taskCount = (n: number) => `${n} ${plural(n, tr("zadanie"), tr("zadania"), tr("zadań"))}`;
 
 function dueDate(t: Task): string | null {
   return t.due ? t.due.slice(0, 10) : null;
@@ -90,17 +91,17 @@ function dueDate(t: Task): string | null {
 
 /** "Czeka na: weryfikacja konta · sprawdzimy 16 lis" / "Zablokowany · sprawdzimy jutro". */
 export function waitText(w: WaitView, today: string): string {
-  const head = w.reason ? `${w.status === "blocked" ? "Blokuje" : "Czeka na"}: ${w.reason}` : w.status === "blocked" ? "Zablokowany" : "Czeka";
+  const head = w.reason ? `${w.status === "blocked" ? tr("Blokuje") : tr("Czeka na")}: ${w.reason}` : w.status === "blocked" ? tr("Zablokowany") : tr("Czeka");
   const diff = daysBetween(today, w.next);
-  const when = diff <= 0 ? "do sprawdzenia" : diff === 1 ? "sprawdzimy jutro" : `sprawdzimy ${shortDate(w.next, today)}`;
+  const when = diff <= 0 ? tr("do sprawdzenia") : diff === 1 ? tr("sprawdzimy jutro") : tr("sprawdzimy {0}", shortDate(w.next, today));
   return `${head} · ${when}`;
 }
 
 /** "Czeka od 3 dni — czy coś się ruszyło?" */
 function dueText(w: WaitView, today: string): string {
   const days = Math.max(0, daysBetween(w.since.slice(0, 10), today));
-  const since = days <= 0 ? "od dziś" : days === 1 ? "od wczoraj" : `od ${days} dni`;
-  return `${w.status === "blocked" ? "Zablokowany" : "Czeka"} ${since}${w.reason ? ` (${w.reason})` : ""} — czy coś się ruszyło?`;
+  const since = days <= 0 ? tr("od dziś") : days === 1 ? tr("od wczoraj") : tr("od {0} dni", days);
+  return tr("{0} {1}{2} — czy coś się ruszyło?", w.status === "blocked" ? tr("Zablokowany") : tr("Czeka"), since, w.reason ? ` (${w.reason})` : "");
 }
 
 export function buildToday({ snapshot: snap, today, waiting, drift, updates }: TodayInput): TodaySections {
@@ -117,10 +118,10 @@ export function buildToday({ snapshot: snap, today, waiting, drift, updates }: T
   for (const p of snap.projects.filter((x) => active.has(x.slug))) {
     const reasons: Reason[] = [];
     const pending = updates.find((u) => u.project === p.slug)?.pending ?? 0;
-    if (pending > 0) reasons.push({ kind: "proposals", text: `${pending} ${plural(pending, "propozycja czeka", "propozycje czekają", "propozycji czeka")}` });
+    if (pending > 0) reasons.push({ kind: "proposals", text: `${pending} ${plural(pending, tr("propozycja czeka"), tr("propozycje czekają"), tr("propozycji czeka"))}` });
     const d = driftOf.get(p.slug);
-    if (d && d.unknown.length > 0) reasons.push({ kind: "unknown_branches", text: `${d.unknown.length} ${plural(d.unknown.length, "gałąź", "gałęzie", "gałęzi")} bez tematu` });
-    if (reasons.length && d && (d.new_commits ?? 0) >= COMMITS_HINT) reasons.push({ kind: "commits", text: `${d.new_commits} nowych commitów od sprawdzenia` });
+    if (d && d.unknown.length > 0) reasons.push({ kind: "unknown_branches", text: tr("{0} {1} bez tematu", d.unknown.length, plural(d.unknown.length, tr("gałąź"), tr("gałęzie"), tr("gałęzi"))) });
+    if (reasons.length && d && (d.new_commits ?? 0) >= COMMITS_HINT) reasons.push({ kind: "commits", text: tr("{0} nowych commitów od sprawdzenia", d.new_commits) });
     if (reasons.length) attention.push({ kind: "project", key: `project:${p.slug}`, project: p.slug, projectName: p.name, reasons, pending, drift: !!d && d.unknown.length > 0 });
   }
 
@@ -153,24 +154,24 @@ export function buildToday({ snapshot: snap, today, waiting, drift, updates }: T
     if (WAITING.includes(topic.status) && wait?.due) reasons.push({ kind: "check_due", text: dueText(wait, today) });
     if (topic.status === "in_progress") {
       const since = last ? daysBetween(last.at.slice(0, 10), today) : null;
-      if (since === null || since >= STALE_DAYS) reasons.push({ kind: "stale", text: since === null ? "Bez wpisu w dzienniku" : `Bez wpisu od ${since} dni` });
+      if (since === null || since >= STALE_DAYS) reasons.push({ kind: "stale", text: since === null ? tr("Bez wpisu w dzienniku") : tr("Bez wpisu od {0} dni", since) });
     }
     const overdue = tasks.filter((t) => (dueDate(t) ?? "9999") < today).length;
     const dueToday = tasks.filter((t) => dueDate(t) === today).length;
-    if (overdue) reasons.push({ kind: "overdue", text: `${taskCount(overdue)} po terminie` });
-    if (dueToday) reasons.push({ kind: "due_today", text: `${taskCount(dueToday)} na dziś` });
+    if (overdue) reasons.push({ kind: "overdue", text: tr("{0} po terminie", taskCount(overdue)) });
+    if (dueToday) reasons.push({ kind: "due_today", text: tr("{0} na dziś", taskCount(dueToday)) });
     for (const t of tasks) {
       const w = t.id ? waitOf.get(`task:${t.id}`) : undefined;
-      if (w?.due) reasons.push({ kind: "task_check", text: `Zadanie „${t.title}” zablokowane — czy coś się ruszyło?` });
+      if (w?.due) reasons.push({ kind: "task_check", text: tr("Zadanie „{0}” zablokowane — czy coś się ruszyło?", t.title) });
     }
     const d = driftOf.get(topic.project);
     const spread = d?.spread.find((s) => s.topic === topic.slug);
     if (spread) {
-      const repos = spread.repos > 1 ? ` w ${spread.repos} repozytoriach` : "";
-      reasons.push({ kind: "spread", text: `${spread.branches} ${plural(spread.branches, "gałąź", "gałęzie", "gałęzi")}${repos}` });
+      const repos = spread.repos > 1 ? tr(" w {0} repozytoriach", spread.repos) : "";
+      reasons.push({ kind: "spread", text: `${spread.branches} ${plural(spread.branches, tr("gałąź"), tr("gałęzie"), tr("gałęzi"))}${repos}` });
     }
     const moved = d?.moved.find((m) => m.topic === topic.slug);
-    if (moved) reasons.push({ kind: "moved", text: `Repozytorium ruszyło (${moved.branch}, ${formatAge(moved.last_commit, today)}), dziennik nie` });
+    if (moved) reasons.push({ kind: "moved", text: tr("Repozytorium ruszyło ({0}, {1}), dziennik nie", moved.branch, formatAge(moved.last_commit, today)) });
 
     const row: TopicRow = {
       kind: "topic",
@@ -187,10 +188,10 @@ export function buildToday({ snapshot: snap, today, waiting, drift, updates }: T
     if (reasons.length) {
       attention.push(row);
     } else if (topic.status === "in_progress") {
-      row.reasons = [{ kind: "active", text: last ? `Ostatni wpis ${formatAge(last.at, today)}` : "W toku" }];
+      row.reasons = [{ kind: "active", text: last ? tr("Ostatni wpis {0}", formatAge(last.at, today)) : tr("W toku") }];
       activeRows.push(row);
     } else if (WAITING.includes(topic.status)) {
-      row.reasons = [{ kind: "waiting", text: wait ? waitText(wait, today) : topic.status === "blocked" ? "Zablokowany" : "Czeka" }];
+      row.reasons = [{ kind: "waiting", text: wait ? waitText(wait, today) : topic.status === "blocked" ? tr("Zablokowany") : tr("Czeka") }];
       waitingRows.push(row);
     }
   }
@@ -207,7 +208,7 @@ export function buildToday({ snapshot: snap, today, waiting, drift, updates }: T
         row.reasons = [{ kind: "task_check", text: dueText(w, today) }];
         attention.push(row);
       } else {
-        row.reasons = [{ kind: "waiting", text: w ? waitText(w, today) : "Zablokowane" }];
+        row.reasons = [{ kind: "waiting", text: w ? waitText(w, today) : tr("Zablokowane") }];
         waitingRows.push(row);
       }
       continue;

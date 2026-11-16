@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // The round status control at the start of a task row.
 
 import { forwardRef } from "react";
@@ -14,7 +15,7 @@ export const StatusToggle = forwardRef<
     disabled?: boolean;
   }
 >(function StatusToggle({ status, onToggle, onMenu, disabled }, ref) {
-  const label = `${TASK_STATUS_LABEL[status]} — kliknij, aby ${status === "done" ? "przywrócić" : "oznaczyć jako zrobione"}; prawy przycisk: inne statusy`;
+  const label = tr("{0} — kliknij, aby {1}; prawy przycisk: inne statusy", TASK_STATUS_LABEL[status], status === "done" ? tr("przywrócić") : tr("oznaczyć jako zrobione"));
   return (
     <button
       ref={ref}

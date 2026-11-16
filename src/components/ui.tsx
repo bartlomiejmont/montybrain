@@ -1,13 +1,16 @@
+import { t as tr } from "../i18n";
 // Small shared building blocks.
 
 import {
   forwardRef,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 
 import { clearAfterSubmit } from "../lib/form";
@@ -22,6 +25,11 @@ export function ProjectDot({ color, size = 8, title }: { color: string | null | 
       style={{ width: size, height: size, background: color ?? "var(--text-4)" }}
     />
   );
+}
+
+/** A project's colour travels with its name, in every workspace. */
+export function ProjectName({ name, color, className = "" }: { name: string; color?: string | null; className?: string }) {
+  return <span className={`project-name ${className}`} title={name} style={{ "--project-color": color ?? "var(--text-2)" } as CSSProperties}><ProjectDot color={color} size={9} /><span className="project-name-text">{name}</span></span>;
 }
 
 /**
@@ -48,9 +56,7 @@ export function DraftHint({
   if (!draft.elsewhere) return null;
   return (
     <p className="draft-hint" role="status">
-      {what ? `Wartość pola „${what}” zmieniła się` : "Wartość tego pola zmieniła się"} poza aplikacją. Zapis zastosuje
-      Twoją wersję.
-      <button
+      {what ? tr("Wartość pola „{0}” zmieniła się", what) : tr("Wartość tego pola zmieniła się")}  {tr("poza aplikacją. Zapis zastosuje Twoją wersję.")}<button
         type="button"
         className="draft-hint-use"
         {...{ [ADOPT_ATTR]: draft.key }}
@@ -62,8 +68,7 @@ export function DraftHint({
           onLeave?.();
         }}
       >
-        Użyj wersji z pliku
-      </button>
+        {tr("Użyj wersji z pliku")}</button>
     </p>
   );
 }
@@ -88,11 +93,10 @@ export function SaveActions({ busy, onCancel }: { busy: boolean; onCancel: () =>
   return (
     <div className="editor-actions">
       <Button type="submit" variant="primary" disabled={busy} aria-busy={busy || undefined}>
-        {busy ? "Zapisywanie…" : "Zapisz"}
+        {busy ? tr("Zapisywanie…") : tr("Zapisz")}
       </Button>
       <Button variant="quiet" disabled={busy} onClick={onCancel}>
-        Anuluj
-      </Button>
+        {tr("Anuluj")}</Button>
     </div>
   );
 }
@@ -121,7 +125,7 @@ export function ConfirmButton({
   useEffect(() => setAsking(autoOpen), [autoOpen]);
   if (!asking) {
     return (
-      <Button variant="quiet" onClick={() => setAsking(true)}>
+      <Button variant="danger" onClick={() => setAsking(true)}>
         {children}
       </Button>
     );
@@ -140,8 +144,7 @@ export function ConfirmButton({
         }}
         onKeyDown={(e) => e.key === "Escape" && setAsking(false)}
       >
-        Anuluj
-      </Button>
+        {tr("Anuluj")}</Button>
     </span>
   );
 }
@@ -220,18 +223,41 @@ export function Segmented<T extends string>({
   label: string;
   disabled?: boolean;
 }) {
+  const firstEnabled = options.findIndex((o) => !(disabled || o.disabled));
+  const selectedIndex = options.findIndex((o) => o.value === value && !(disabled || o.disabled));
+  const focusableIndex = selectedIndex >= 0 ? selectedIndex : firstEnabled;
+
+  const move = (from: number, dir: 1 | -1, buttons: HTMLButtonElement[]) => {
+    for (let step = 1; step <= options.length; step++) {
+      const idx = (from + dir * step + options.length) % options.length;
+      const opt = options[idx]!;
+      if (!(disabled || opt.disabled)) {
+        if (opt.value !== value) onChange(opt.value);
+        buttons[idx]?.focus();
+        return;
+      }
+    }
+  };
+
   return (
     <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
+      {options.map((o, idx) => (
         <button
           key={o.value}
           type="button"
           role="radio"
+          tabIndex={idx === focusableIndex ? 0 : -1}
           aria-checked={o.value === value}
           title={o.hint}
           disabled={disabled || o.disabled}
           className={o.value === value ? "on" : undefined}
           onClick={() => o.value !== value && onChange(o.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowRight" && e.key !== "ArrowDown" && e.key !== "ArrowLeft" && e.key !== "ArrowUp") return;
+            e.preventDefault();
+            const buttons = Array.from(e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role="radio"]') ?? []);
+            move(idx, e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1, buttons);
+          }}
         >
           {o.label}
         </button>
@@ -241,16 +267,16 @@ export function Segmented<T extends string>({
 }
 
 /** Calls `fn` on pointerdown outside `ref` and on Escape. */
-export function useDismiss(ref: React.RefObject<HTMLElement | null>, open: boolean, fn: () => void) {
+export function useDismiss(ref: React.RefObject<HTMLElement | null>, open: boolean, fn: (fromEscape?: boolean) => void) {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) fn();
+      if (ref.current && !ref.current.contains(e.target as Node)) fn(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        fn();
+        fn(true);
       }
     };
     document.addEventListener("pointerdown", onDown, true);
@@ -281,4 +307,16 @@ export function useStoredFlag(key: string, initial: boolean): [boolean, (v: bool
     }
   };
   return [v, set];
+}
+
+/** Size chat inputs to their contents; CSS supplies the maximum height. */
+export function useAutosizeTextarea(value: string, active = true) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = ref.current;
+    if (!input || !active) return;
+    input.style.height = "auto";
+    input.style.height = `${input.scrollHeight}px`;
+  }, [value, active]);
+  return ref;
 }

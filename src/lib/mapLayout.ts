@@ -147,20 +147,20 @@ export function overlaps(a: Rect, b: Rect): boolean {
 }
 
 /**
- * A curve from row `a` to row `b` through the gutters: out of the row's side
- * facing the gutter, along the gutter, into the other row; never across rows.
- * The left column uses the gutter between the columns, the right column its
- * outer gutter (or the middle one when the other end is in the left column).
+ * A curve from row `a` to row `b` through the gutters: out of the island's side
+ * facing the gutter, along the gutter, into the other island; never across rows.
+ * Both columns use the middle gutter between columns so edges stay within the
+ * layout bounds and never cross the spine or row text.
  */
 export function routeCurve(a: Rect, b: Rect, aIsland: Rect, bIsland: Rect, lane: number): string {
   const mid = (aIsland.x < bIsland.x ? aIsland.x + aIsland.w : bIsland.x + bIsland.w) + COL_GAP / 2;
   const sameCol = aIsland.x === bIsland.x;
   const leftCol = aIsland.x === MARGIN;
-  const gx = sameCol ? (leftCol ? aIsland.x + aIsland.w + 16 + lane * 8 : aIsland.x + aIsland.w + 16 + lane * 8) : mid + (lane - 3.5) * 8;
+  const gx = sameCol ? (leftCol ? aIsland.x + aIsland.w + 16 + lane * 8 : aIsland.x - 16 - lane * 8) : mid + (lane - 3.5) * 8;
   const ay = a.y + a.h / 2;
   const by = b.y + b.h / 2;
-  const ax = aIsland.x + aIsland.w <= gx ? a.x + a.w : a.x;
-  const bx = bIsland.x + bIsland.w <= gx ? b.x + b.w : b.x;
+  const ax = aIsland.x + aIsland.w <= gx ? aIsland.x + aIsland.w : aIsland.x;
+  const bx = bIsland.x + bIsland.w <= gx ? bIsland.x + bIsland.w : bIsland.x;
   const r = Math.min(10, Math.abs(by - ay) / 2);
   const dir = by >= ay ? 1 : -1;
   const sa = gx >= ax ? 1 : -1;

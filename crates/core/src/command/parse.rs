@@ -63,9 +63,9 @@ pub struct Token {
 
 pub fn priority_word(w: &str) -> Option<Priority> {
     match fold(w).as_str() {
-        "wysoki" | "w" | "pilne" | "pilny" => Some(Priority::High),
-        "niski" | "n" => Some(Priority::Low),
-        "normalny" => Some(Priority::Normal),
+        "wysoki" | "w" | "pilne" | "pilny" | "high" | "urgent" => Some(Priority::High),
+        "niski" | "n" | "low" => Some(Priority::Low),
+        "normalny" | "normal" => Some(Priority::Normal),
         _ => None,
     }
 }
@@ -82,9 +82,9 @@ fn status_word(w: &str) -> Option<TaskStatus> {
 
 fn cmd_word(w: &str) -> Option<Cmd> {
     match fold(w).as_str() {
-        "/temat" => Some(Cmd::Temat),
-        "/czeka" => Some(Cmd::Czeka),
-        "/powiaz" | "/powiazane" => Some(Cmd::Powiaz),
+        "/temat" | "/topic" => Some(Cmd::Temat),
+        "/czeka" | "/wait" => Some(Cmd::Czeka),
+        "/powiaz" | "/powiazane" | "/link" | "/related" => Some(Cmd::Powiaz),
         _ => None,
     }
 }

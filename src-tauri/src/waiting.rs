@@ -300,14 +300,13 @@ pub fn note(due_titles: &[String], now: NaiveDateTime, fired: &Fired, cfg: Confi
         .collect::<Vec<_>>()
         .join(" · ");
     if due_titles.len() > 3 {
-        body.push_str(&format!(" · i {} więcej", due_titles.len() - 3));
+        body.push_str(&format!(" · {} {} {}", cfg.language.text("and", "i"), due_titles.len() - 3, cfg.language.text("more", "więcej")));
     }
     Some(Note {
         kind: NoteKind::Waiting,
-        title: format!(
-            "{}. Sprawdź, czy coś się ruszyło.",
-            count_things(due_titles.len())
-        ),
+        title: if cfg.language == crate::settings::Language::En {
+            format!("{} {} waiting. Check for progress.", due_titles.len(), if due_titles.len() == 1 { "item is" } else { "items are" })
+        } else { format!("{}. Sprawdź, czy coś się ruszyło.", count_things(due_titles.len())) },
         body,
         keys: vec![key],
     })
@@ -502,6 +501,7 @@ mod tests {
     #[test]
     fn one_notification_for_all_due_checks_at_the_digest_hour() {
         let cfg = Config {
+            language: crate::settings::Language::Pl,
             enabled: true,
             digest_hour: 9,
         };
@@ -535,6 +535,7 @@ mod tests {
                 at("2026-11-15T09:30"),
                 &fired,
                 Config {
+            language: crate::settings::Language::Pl,
                     enabled: false,
                     digest_hour: 9
                 }

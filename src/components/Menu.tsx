@@ -28,12 +28,15 @@ export function Menu({
   onClose,
   label,
   minWidth = 200,
+  portalRoot = document.body,
 }: {
   anchor: MenuAnchor;
   items: MenuItem[];
   onClose: () => void;
   label: string;
   minWidth?: number;
+  /** Keep a menu within its owning dialog for modal focus handling. */
+  portalRoot?: HTMLElement;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -112,6 +115,6 @@ export function Menu({
         ),
       )}
     </div>,
-    document.body,
+    portalRoot,
   );
 }

@@ -24,6 +24,14 @@ use crate::query::Snapshot;
 use crate::slug::{is_safe_component, slugify, unique_slug};
 use crate::task::{TaskBlock, TaskLine, parse_task_line, rewrite_continuation};
 
+/// A guarded task deletion receipt. Internal application bookkeeping, not vault format.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RemovedTask {
+    pub task: Task,
+    before: String,
+    after: String,
+}
+
 mod lines;
 use crate::validate::{Multi, link, multiline, one_line, strict_line, topic_title_line};
 use crate::verify::{Expect, check};
@@ -1823,6 +1831,76 @@ impl Vault {
         txn.write(pd)?;
         txn.write(ps)?;
         Ok(Some(task))
+    }
+
+    /// Remove a task while preserving its exact file for guarded undo.
+    pub fn remove_task_if(
+        &self,
+        id: &str,
+        guard: impl Fn(&Task) -> bool,
+    ) -> Result<Option<RemovedTask>> {
+        let txn = self.txn()?;
+        let Found {
+            rel,
+            kind,
+            loc,
+            mut doc,
+            original,
+            block,
+        } = txn.find_task(id)?;
+        let task = block.to_task(loc);
+        if !guard(&task) {
+            return Ok(None);
+        }
+        doc.remove(block.range());
+        txn.commit(
+            &rel,
+            kind,
+            &original,
+            &mut doc,
+            true,
+            &Expect {
+                remove_task: Some(id),
+                ..Default::default()
+            },
+        )?;
+        Ok(Some(RemovedTask {
+            task,
+            before: original,
+            after: doc.render(),
+        }))
+    }
+
+    /// Restore a removal in its original place, only while the file is untouched
+    /// and the id has not appeared elsewhere. Checks and write share the vault lock.
+    pub fn restore_removed_task(&self, removed: &RemovedTask) -> Result<bool> {
+        let txn = self.txn()?;
+        let id = removed
+            .task
+            .id
+            .as_deref()
+            .ok_or_else(|| Error::invalid("missing task id"))?;
+        match txn.find_task(id) {
+            Ok(_) => return Ok(false),
+            Err(Error::TaskNotFound(_)) => {}
+            Err(e) => return Err(e),
+        }
+        let (_, current) = txn.read_location(&removed.task.location)?;
+        if current != removed.after {
+            return Ok(false);
+        }
+        let mut doc = Doc::parse(&removed.before);
+        txn.commit(
+            &location_path(&removed.task.location),
+            location_kind(&removed.task.location),
+            &current,
+            &mut doc,
+            false,
+            &Expect {
+                add_task: Some(id),
+                ..Default::default()
+            },
+        )
     }
 
     /// Delete a task (with its links/notes). Returns the task as it was.

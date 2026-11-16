@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub mod agent;
+pub mod cli_status;
 pub mod command;
 pub mod git;
 pub mod history;
@@ -126,7 +127,7 @@ pub enum EventKind {
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ProviderInfo {
     pub id: ProviderId,
     pub name: String,
@@ -134,6 +135,10 @@ pub struct ProviderInfo {
     pub path: Option<String>,
     pub version: Option<String>,
     pub problem: Option<String>,
+    pub auth: providers::AuthInfo,
+    pub models: Vec<String>,
+    pub limits: Option<session::telemetry::LimitSnapshot>,
+    pub limits_problem: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -215,6 +220,8 @@ pub struct RunInfo {
     pub project: Option<String>,
     /// The request of a `zlecenie` run (its `text` parameter).
     pub request: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
     /// The model / effort requested in Settings (`None` = the CLI's default).
     pub model: Option<String>,
     pub effort: Option<String>,
@@ -287,6 +294,16 @@ struct TauriSessionSink<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> session::SessionSink for TauriSessionSink<R> {
     fn changed(&self, v: &session::SessionView) {
+        if let Some(at) = v.telemetry.limits_at {
+            self.0.state::<Runs>().0.remember_limits(
+                v.provider,
+                session::telemetry::LimitSnapshot {
+                    limits: v.telemetry.limits.clone(),
+                    checked_at: at,
+                    status: v.telemetry.limit_status.clone(),
+                },
+            );
+        }
         if let Err(err) = self.0.emit(session::SESSION_UPDATED, v) {
             crate::log(&format!("emit {} failed: {err}", session::SESSION_UPDATED));
         }
@@ -364,6 +381,7 @@ mod tests {
             mode: RunMode::Background,
             project: None,
             request: None,
+            topic: None,
             model: None,
             effort: None,
             status: RunStatus::Cancelled,

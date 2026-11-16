@@ -103,8 +103,8 @@ const last = (outcome: UpdateResult["outcome"], over: Partial<UpdateResult> = {}
 });
 
 const prov = (claude: boolean, codex: boolean): ProviderInfo[] => [
-  { id: "claude", name: "Claude Code", available: claude, path: null, version: null, problem: null },
-  { id: "codex", name: "Codex", available: codex, path: null, version: null, problem: null },
+  { id: "claude", name: "Claude Code", available: claude, path: null, version: null, problem: null, auth: { status: "unknown", method: null, plan: null, problem: null } },
+  { id: "codex", name: "Codex", available: codex, path: null, version: null, problem: null, auth: { status: "unknown", method: null, plan: null, problem: null } },
 ];
 
 describe("update strip state", () => {

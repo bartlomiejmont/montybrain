@@ -1,3 +1,4 @@
+import { LanguageSync } from "../i18n/LanguageSync";
 // Entry of the quick-capture window (quick.html → src-tauri native.rs `QUICK`).
 
 import { StrictMode } from "react";
@@ -9,6 +10,7 @@ import { QuickCapture } from "./QuickCapture";
 
 createRoot(document.getElementById("quick-root")!).render(
   <StrictMode>
+    <LanguageSync />
     <QuickCapture />
   </StrictMode>,
 );

@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // "Kopiuj kontekst": a Markdown block for starting an agent session on one
 // topic. Deterministic (same input, same text) so it can be tested.
 
@@ -22,48 +23,48 @@ const one = (s: string) => s.replace(/\s+/g, " ").trim();
 export function buildTopicContext({ project, topic, journal, tasks, branches, neighbours = [] }: ContextInput): string {
   const out: string[] = [];
   out.push(`# ${project.name} / ${topic.title}`, "");
-  out.push(`- Projekt: ${project.name} (\`${project.slug}\`)`);
-  out.push(`- Temat: ${topic.title} (\`${topic.slug}\`)`);
-  out.push(`- Status: ${TOPIC_STATUS_LABEL[topic.status]}`);
-  if (topic.repo) out.push(`- Główne repozytorium: ${topic.repo}`);
-  out.push("", "## Stan obecny", "", topic.summary.trim() || "(brak opisu stanu)");
+  out.push(tr("- Projekt: {0} (`{1}`)", project.name, project.slug));
+  out.push(tr("- Temat: {0} (`{1}`)", topic.title, topic.slug));
+  out.push(tr("- Status: {0}", TOPIC_STATUS_LABEL[topic.status]));
+  if (topic.repo) out.push(tr("- Główne repozytorium: {0}", topic.repo));
+  out.push("", tr("## Stan obecny"), "", topic.summary.trim() || tr("(brak opisu stanu)"));
 
-  out.push("", "## Ostatnie wpisy w dzienniku", "");
+  out.push("", tr("## Ostatnie wpisy w dzienniku"), "");
   const entries = journal.slice(0, 5);
-  if (entries.length === 0) out.push("(brak wpisów)");
+  if (entries.length === 0) out.push(tr("(brak wpisów)"));
   for (const j of entries) out.push(`- ${j.at.replace("T", " ")} · ${j.author}: ${one(j.text)}`);
 
-  out.push("", "## Otwarte zadania", "");
+  out.push("", tr("## Otwarte zadania"), "");
   const open = tasks.filter((t) => t.status !== "done");
-  if (open.length === 0) out.push("(brak otwartych zadań)");
+  if (open.length === 0) out.push(tr("(brak otwartych zadań)"));
   for (const t of open) {
-    const due = t.due ? ` · termin ${t.due.replace("T", " ")}` : "";
+    const due = t.due ? tr(" · termin {0}", t.due.replace("T", " ")) : "";
     out.push(`- ^${t.id ?? "?"} ${t.title} (${TASK_STATUS_LABEL[t.status].toLowerCase()}${due})`);
   }
 
-  out.push("", "## Repozytoria", "");
-  if (project.repos.length === 0) out.push("(projekt nie ma repozytoriów)");
+  out.push("", tr("## Repozytoria"), "");
+  if (project.repos.length === 0) out.push(tr("(projekt nie ma repozytoriów)"));
   for (const r of project.repos) out.push(`- ${r.name}: ${r.path}`);
 
   const sorted = [...branches].sort((a, b) => a.repo.localeCompare(b.repo) || a.branch.localeCompare(b.branch));
   if (sorted.length) {
-    out.push("", "## Gałęzie tematu", "");
+    out.push("", tr("## Gałęzie tematu"), "");
     for (const b of sorted) {
-      const wt = b.worktree ? `, drzewo robocze ${b.worktree}` : "";
-      const seen = b.seen ? `, widziana ${b.seen.replace("T", " ")}` : "";
-      out.push(`- ${b.repo}: ${b.branch} (ostatni commit ${b.last_commit}${wt}${seen})`);
+      const wt = b.worktree ? tr(", drzewo robocze {0}", b.worktree) : "";
+      const seen = b.seen ? tr(", widziana {0}", b.seen.replace("T", " ")) : "";
+      out.push(tr("- {0}: {1} (ostatni commit {2}{3}{4})", b.repo, b.branch, b.last_commit, wt, seen));
     }
   }
 
   if (neighbours.length) {
-    out.push("", "## Połączone tematy", "");
+    out.push("", tr("## Połączone tematy"), "");
     for (const n of neighbours) out.push(`- ${n.kind}: ${n.project} / ${n.title}${n.sentence ? ` — ${n.sentence}` : ""}`);
   }
 
   out.push(
     "",
     "---",
-    `Zapisuj postęp w MontyBrain dla tego tematu (projekt \`${project.slug}\`, temat \`${topic.slug}\`): wpisy przez \`log_update\`, statusy zadań przez \`update_task\`, nowe zadania przez \`create_task\` (serwer MCP \`montybrain\`).`,
+    tr("Zapisuj postęp w MontyBrain dla tego tematu (projekt `{0}`, temat `{1}`): wpisy przez `log_update`, statusy zadań przez `update_task`, nowe zadania przez `create_task` (serwer MCP `montybrain`).", project.slug, topic.slug),
   );
   return `${out.join("\n")}\n`;
 }

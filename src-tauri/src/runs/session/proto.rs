@@ -46,6 +46,10 @@ pub enum Decision {
 /// One thing that happened in the CLI's output.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Act {
+    Connected(Option<String>),
+    Usage(super::telemetry::Usage),
+    Limits(Vec<super::telemetry::Limit>),
+    LimitStatus(String),
     /// A line to write to the CLI's stdin (protocol housekeeping).
     Write(String),
     /// Assistant text: `key` names the message; `append` adds a streamed piece.

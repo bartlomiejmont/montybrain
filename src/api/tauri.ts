@@ -70,7 +70,7 @@ export function createTauriApi(): MontyBrainApi {
     onQuickShow: (cb) => listen(QUICK_SHOW_EVENT, () => cb()),
 
     listRecipes: () => invoke("list_recipes"),
-    listProviders: () => invoke("list_providers"),
+    listProviders: (refresh = false) => invoke("list_providers", { refresh }),
     startRun: (request) => invoke("start_run", { request }),
     // Tauri maps JS camelCase keys to Rust snake_case parameters; the contract
     // names the parameter `run_id`, so both spellings are sent (extra keys are ignored).

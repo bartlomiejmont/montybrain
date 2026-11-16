@@ -60,6 +60,10 @@ pub struct ApplyItem {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum UndoItem {
+    RemoveTask {
+        index: usize,
+        removed: montybrain_core::RemovedTask,
+    },
     TaskStatus {
         index: usize,
         task: String,
@@ -129,7 +133,8 @@ impl UndoItem {
             UndoItem::TaskStatus { stamp, .. }
             | UndoItem::NewTask { stamp, .. }
             | UndoItem::TopicLog { stamp, .. } => *stamp = value,
-            UndoItem::NewTopic { .. }
+            UndoItem::RemoveTask { .. }
+            | UndoItem::NewTopic { .. }
             | UndoItem::Rejected { .. }
             | UndoItem::MovedTask { .. }
             | UndoItem::TopicFromTasks { .. } => {}
@@ -141,7 +146,8 @@ impl UndoItem {
             UndoItem::TaskStatus { stamp, .. }
             | UndoItem::NewTask { stamp, .. }
             | UndoItem::TopicLog { stamp, .. } => stamp.clone(),
-            UndoItem::NewTopic { .. }
+            UndoItem::RemoveTask { .. }
+            | UndoItem::NewTopic { .. }
             | UndoItem::Rejected { .. }
             | UndoItem::MovedTask { .. }
             | UndoItem::TopicFromTasks { .. } => None,
@@ -155,7 +161,8 @@ impl UndoItem {
 
     pub fn index(&self) -> usize {
         match self {
-            UndoItem::TaskStatus { index, .. }
+            UndoItem::RemoveTask { index, .. }
+            | UndoItem::TaskStatus { index, .. }
             | UndoItem::NewTask { index, .. }
             | UndoItem::TopicLog { index, .. }
             | UndoItem::NewTopic { index, .. }
@@ -228,6 +235,7 @@ fn unlink_branches(vault: &Vault, project: &str, item: &UndoItem) {
 fn file_stamp(vault: &Vault, project: &str, change: &Change) -> Option<String> {
     match change {
         Change::TaskStatus { task, .. } => vault.stamp_of_task(task).ok().flatten(),
+        Change::RemoveTask { .. } => None,
         Change::TopicLog { .. } | Change::NewTask { .. } => {
             vault.stamp_of(&change.location(project)).ok().flatten()
         }
@@ -243,6 +251,17 @@ fn run_change(
     index: usize,
 ) -> Result<(String, UndoItem), String> {
     match change {
+        Change::RemoveTask {
+            task, base, title, ..
+        } => vault
+            .remove_task_if(task, |t| proposal::same_task(t, base))
+            .and_then(|r| r.ok_or_else(|| montybrain_core::Error::TaskNotFound(task.clone())))
+            .map(|removed| {
+                (
+                    format!("Usunięto zadanie „{title}”."),
+                    UndoItem::RemoveTask { index, removed },
+                )
+            }),
         Change::TaskStatus { task, to, from, .. } => vault
             .update_task(
                 task,
@@ -562,6 +581,14 @@ fn undo_one(vault: &Vault, project: &str, item: &UndoItem) -> (UndoStatus, Strin
     };
     let failed = |e: montybrain_core::Error| (UndoStatus::Failed, e.to_string());
     match item {
+        UndoItem::RemoveTask { removed, .. } => match vault.restore_removed_task(removed) {
+            Ok(true) => (
+                UndoStatus::Undone,
+                "Przywrócono zadanie na jego miejscu.".into(),
+            ),
+            Ok(false) => changed("Plik zadania"),
+            Err(e) => failed(e),
+        },
         UndoItem::TaskStatus { task, from, to, .. } => {
             let patch = TaskPatch {
                 status: Some(*from),
@@ -1706,5 +1733,150 @@ mod tests {
             at: at("2026-11-14T14:06"),
             items,
         }
+    }
+    fn removal_proposal(f: &Fixture) -> StoredProposal {
+        let answer = format!(
+            "```{}\n{{\"changes\":[{{\"kind\":\"remove_task\",\"task\":\"{}\",\"reason\":\"Nieaktualne.\"}}]}}\n```",
+            proposal::FENCE_INFO,
+            f.open
+        );
+        StoredProposal::from_proposal(
+            proposal::parse(&answer, &f.vault.load().unwrap(), "beeking"),
+            "remove-run",
+            ProviderId::Codex,
+            TriggerKind::Manual,
+            at("2026-11-14T15:00"),
+        )
+    }
+
+    #[test]
+    fn removal_and_undo_restore_exact_file_id_notes_and_position() {
+        let f = fixture();
+        f.vault
+            .create_task(
+                &TaskLocation::Topic {
+                    project: "beeking".into(),
+                    topic: "platnosci".into(),
+                },
+                NewTask {
+                    title: "Następne zadanie".into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        f.vault
+            .update_task(
+                &f.open,
+                TaskPatch {
+                    notes: Some("Ważna notatka".into()),
+                    add_links: vec!["https://example.com".into()],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let path = f.vault.root().join("beeking/tematy/platnosci.md");
+        let before = std::fs::read_to_string(&path).unwrap();
+        let mut p = removal_proposal(&f);
+        let (r, items) = apply(&f.vault, "beeking", &mut p, &[0], at("2026-11-14T15:05"));
+        assert_eq!(r[0].status, ApplyStatus::Applied);
+        assert!(f.vault.load().unwrap().task(&f.open).is_none());
+        let record = UndoRecord {
+            token: "u".into(),
+            run_id: p.run_id.clone(),
+            at: at("2026-11-14T15:05"),
+            items,
+        };
+        let r = undo(&f.vault, "beeking", &record, Some(&mut p));
+        assert_eq!(r[0].status, UndoStatus::Undone);
+        assert_eq!(std::fs::read_to_string(path).unwrap(), before);
+    }
+
+    #[test]
+    fn removal_undo_never_overwrites_later_edits() {
+        let f = fixture();
+        let mut p = removal_proposal(&f);
+        let (_, items) = apply(&f.vault, "beeking", &mut p, &[0], at("2026-11-14T15:05"));
+        f.vault
+            .add_journal_entry(
+                "beeking",
+                "platnosci",
+                NewJournalEntry {
+                    author: "ja".into(),
+                    text: "Późniejszy wpis".into(),
+                    status: None,
+                    summary: None,
+                },
+            )
+            .unwrap();
+        let record = UndoRecord {
+            token: "u".into(),
+            run_id: p.run_id.clone(),
+            at: at("2026-11-14T15:05"),
+            items,
+        };
+        assert_eq!(
+            undo(&f.vault, "beeking", &record, Some(&mut p))[0].status,
+            UndoStatus::Changed
+        );
+        assert!(
+            f.vault
+                .load()
+                .unwrap()
+                .journal
+                .iter()
+                .any(|e| e.text == "Późniejszy wpis")
+        );
+    }
+
+    #[test]
+    fn mixed_proposal_is_reversible_and_automatic_selection_excludes_removals() {
+        let f = fixture();
+        let mut p = proposal_for(&f, ProviderId::Codex);
+        let snap = f.vault.load().unwrap();
+        let base = snap.task(&f.open).unwrap().clone();
+        // Remove a different task from the one whose status changes.
+        let obsolete = f
+            .vault
+            .create_task(
+                &base.location,
+                NewTask {
+                    title: "Nieaktualne".into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        p.changes.push(super::super::store::StoredChange {
+            change: Change::RemoveTask {
+                task: obsolete.id.clone().unwrap(),
+                title: obsolete.title.clone(),
+                reason: "r".into(),
+                base: obsolete,
+            },
+            outcome: None,
+            edited: false,
+        });
+        assert_eq!(p.automatic_indices(), vec![0, 1, 2]);
+        let path = f.vault.root().join("beeking/tematy/platnosci.md");
+        let before = std::fs::read_to_string(&path).unwrap();
+        let (r, items) = apply(
+            &f.vault,
+            "beeking",
+            &mut p,
+            &[0, 1, 2, 3],
+            at("2026-11-14T15:05"),
+        );
+        assert!(r.iter().all(|i| i.status == ApplyStatus::Applied), "{r:?}");
+        let record = UndoRecord {
+            token: "u".into(),
+            run_id: p.run_id.clone(),
+            at: at("2026-11-14T15:05"),
+            items,
+        };
+        assert!(
+            undo(&f.vault, "beeking", &record, Some(&mut p))
+                .iter()
+                .all(|i| i.status == UndoStatus::Undone)
+        );
+        assert_eq!(std::fs::read_to_string(path).unwrap(), before);
     }
 }

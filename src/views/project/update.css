@@ -3,6 +3,7 @@
 
 .view-head + .upd {
   margin-top: -14px;
+
 }
 
 .upd {
@@ -10,7 +11,7 @@
   margin: 0 0 30px;
   padding: 9px 10px 9px 12px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .upd-bar {
@@ -49,7 +50,7 @@
 .upd-title {
   flex: none;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-2);
   letter-spacing: 0.01em;
@@ -60,7 +61,7 @@
   min-width: 12ch;
   margin: 0;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-status.error {
@@ -69,7 +70,7 @@
 
 .upd-clock {
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-actions {
@@ -95,10 +96,13 @@
 }
 
 .upd-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   padding: 1px 3px;
   margin-left: -3px;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
   color: var(--text-2);
   text-decoration: underline;
   text-decoration-color: var(--line);
@@ -123,7 +127,7 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-3);
   overflow-wrap: anywhere;
 }
@@ -131,7 +135,7 @@
 .upd-sub-text,
 .upd-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-3);
   overflow-wrap: anywhere;
 }
@@ -144,10 +148,10 @@
   flex-basis: 100%;
   margin: 4px 0 0;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: oklch(0.205 0.005 265);
   color: var(--text-2);
-  font: 11.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  font: var(--text-sm)/1.5 ui-monospace, "SF Mono", Menlo, monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
@@ -164,7 +168,7 @@
   margin: 10px 0 2px 23px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   animation: reveal 140ms var(--ease);
 }
 
@@ -172,7 +176,7 @@
   flex: 1 1 280px;
   margin: 0;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-confirm-actions {
@@ -201,7 +205,7 @@
   margin: 0;
   max-width: 62ch;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-auto-row {
@@ -214,7 +218,7 @@
 .upd-auto-label {
   padding-top: 6px;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-auto-controls {
@@ -229,12 +233,12 @@
   flex-basis: 100%;
   margin: 0;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-select {
   height: 28px;
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 /* ---- review ---- */
@@ -257,7 +261,7 @@
 
 .upd-review-title {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text);
 }
@@ -269,7 +273,7 @@
 .upd-review-meta {
   font-weight: 400;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-changes {
@@ -303,6 +307,9 @@
 .upd-change-main {
   grid-column: 2;
   min-width: 0;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
 }
 
 .upd-change-line {
@@ -314,7 +321,7 @@
 
 .upd-change-kind {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-change-title {
@@ -324,7 +331,7 @@
 
 .upd-change-what {
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-change-body {
@@ -335,7 +342,7 @@
 .upd-change-detail {
   margin: 2px 0 0;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-base);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
@@ -351,13 +358,13 @@
 .upd-change-summary-label {
   display: block;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-change-summary p {
   margin: 1px 0 0;
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: var(--text-base);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
@@ -368,7 +375,7 @@
   grid-row: 1;
   width: 14px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 18px;
   color: var(--text-3);
 }
@@ -384,7 +391,7 @@
 .upd-outcome {
   grid-column: 2;
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-2);
 }
 
@@ -398,8 +405,8 @@
   gap: 6px;
   padding: 2px 4px;
   margin-left: -4px;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
   color: var(--text-3);
 }
 
@@ -420,7 +427,7 @@
   margin: 4px 0 0;
   padding: 0 0 0 18px;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .upd-review-actions {
@@ -438,7 +445,7 @@
 .upd-report-body {
   margin-top: 6px;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: oklch(0.205 0.005 265);
   max-height: 360px;
   overflow-y: auto;
@@ -500,7 +507,7 @@
 
 .upd-group-head {
   margin: 10px 0 2px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-3);
   letter-spacing: 0.01em;
@@ -513,7 +520,7 @@
 .upd-topic-tasks {
   margin: 6px 0 0;
   padding: 0 0 0 16px;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-2);
 }
 
@@ -523,14 +530,14 @@
 
 .upd-topic-task-status {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* ---- sources ---- */
 
 .upd-panel-head {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-2);
 }
@@ -543,7 +550,7 @@
 .upd-auto-static {
   padding-top: 5px;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-history-note {
@@ -551,7 +558,7 @@
   order: 3;
   margin: 0;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* ---- request („Zlecenie") ---- */
@@ -568,12 +575,12 @@
   min-height: 28px;
   padding: 4px 9px;
   resize: none;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   background: transparent;
 }
 
 .upd-ask-input.field:focus {
-  background: var(--bg-field);
+  background: var(--surface-field);
 }
 
 .upd-ask-go {
@@ -597,7 +604,7 @@
 
 .upd-ask-hint {
   margin: 3px 0 0 23px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-3);
 }
 
@@ -605,7 +612,7 @@
   flex-basis: 100%;
   order: 2;
   margin: 2px 0 4px;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -647,7 +654,7 @@
 
 .upd-edited {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-style: italic;
 }
 
@@ -669,7 +676,7 @@
   margin: 6px 0 2px;
   padding: 10px 12px;
   border: 1px solid var(--line-soft);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-raised);
 }
 
@@ -679,7 +686,7 @@
 }
 
 .upd-edit-label {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-3);
 }
 
@@ -700,7 +707,7 @@
   grid-template-columns: 16px minmax(0, 1fr) 130px;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-2);
 }
 
@@ -711,7 +718,7 @@
 .upd-edit-error {
   margin: 0;
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-edit-actions {
@@ -728,7 +735,7 @@
 .upd-compact-line {
   grid-column: 2;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-3);
   overflow-wrap: anywhere;
 }
@@ -747,7 +754,7 @@
 .upd-compare p {
   margin: 2px 0 0;
   white-space: pre-wrap;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-2);
 }
 
@@ -758,7 +765,7 @@
 .upd-answer-body {
   margin-top: 4px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: oklch(0.205 0.005 265);
 }
 
@@ -773,10 +780,9 @@
   margin: 6px 0 0 23px;
 }
 
-/* The actions stay reachable while a long review is on screen. */
+/* Read proposals in the page flow; decisions never cover a proposal. */
 .upd-review-actions {
-  position: sticky;
-  bottom: 0;
+  position: static;
   z-index: 1;
   padding: 8px 0;
   background: var(--bg);
@@ -811,25 +817,6 @@
   accent-color: var(--text-2);
 }
 
-/* The stuck action row never hides what is being accepted: it un-sticks in a
-   short window and while a correction form is open; elsewhere focus and
-   scrolling leave room for it. */
-@media (max-height: 800px) {
-  .upd-review-actions {
-    position: static;
-    box-shadow: none;
-  }
-}
-
-.upd-review:has(.upd-edit) .upd-review-actions {
-  position: static;
-  box-shadow: none;
-}
-
-.main-scroll:has(.upd-review) {
-  scroll-padding-bottom: 72px;
-}
-
 /* ---- drift ---- */
 
 .upd-drift {
@@ -859,7 +846,7 @@
   gap: 2px 10px;
   padding: 4px 0;
   border-bottom: 1px solid var(--line-soft);
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 
 .upd-drift-item:last-child {
@@ -877,7 +864,7 @@
 
 .upd-drift-meta {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
@@ -902,7 +889,7 @@
 
 .upd-similar {
   margin: 4px 0 0;
-  font-size: 12.5px;
+  font-size: var(--text-base);
   color: var(--text-2);
 }
 
@@ -911,3 +898,88 @@
     margin-left: 0;
   }
 }
+
+.upd-drift-facts {
+  display: grid;
+  gap: 3px;
+  list-style: none;
+  padding: 0 0 0 17px;
+  margin: 4px 0 6px;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+.upd-topic-tasks li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.upd-topic-task-status {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 5px;
+  white-space: nowrap;
+}
+.upd-review-actions {
+  scroll-margin: 16px;
+}
+
+.upd-review-content {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.upd-read-hint {
+  margin: 4px 0 8px;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+
+.upd-error-line {
+  margin: 4px 0 0 23px;
+  color: var(--danger);
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+}
+
+.upd-drift-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+
+.upd-drift-summary {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.upd-idle-ask {
+  margin: 6px 0 0 23px;
+}
+
+.upd-idle-ask .upd-ask-open {
+  margin-left: 0;
+}
+
+.upd-idle-ask .upd-ask,
+.upd-idle-ask .upd-ask-hint {
+  margin-left: 0;
+}
+
+@container (max-width: 420px) {
+  .upd-error-line,
+  .upd-idle-ask {
+    margin-left: 0;
+  }
+}
+
+/* Keep visually hidden announcements inside this scroller, not the document root. */
+.upd, .upd-review {
+  position: relative;
+}
+
+.upd-journal-request { flex-basis: 100%; min-width: 0; margin: 8px 0; color: var(--text-3); font-size: var(--text-sm); }
+.upd-journal-request summary { cursor: pointer; }
+.upd-journal-request blockquote { margin: 8px 0; padding-left: 10px; border-left: 1px solid var(--line); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; }

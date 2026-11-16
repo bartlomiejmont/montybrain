@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Skrzynka's field in agent mode: a free-form request to Claude Code or
 // Codex, with the choice of what it can reach ("Tylko MontyBrain" in the
 // background, or "Moje narzędzia" in a Terminal session) stated plainly under
@@ -19,7 +20,7 @@ export const MODE_SHORTCUT = IS_MAC ? "⌘J" : "Ctrl+J";
 /** The Komenda | Agent switch. */
 export function ModeSwitch({ mode, onChange }: { mode: FieldMode; onChange: (m: FieldMode) => void }) {
   return (
-    <div className="mode-switch" role="radiogroup" aria-label={`Tryb pola (${MODE_SHORTCUT} przełącza)`} title={`${MODE_SHORTCUT} przełącza`}>
+    <div className="mode-switch" role="radiogroup" aria-label={tr("Tryb pola ({0} przełącza)", MODE_SHORTCUT)} title={tr("{0} przełącza", MODE_SHORTCUT)}>
       {(["command", "agent"] as const).map((m) => (
         <button
           key={m}
@@ -31,7 +32,7 @@ export function ModeSwitch({ mode, onChange }: { mode: FieldMode; onChange: (m: 
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onChange(m)}
         >
-          {m === "command" ? "Komenda" : "Agent"}
+          {m === "command" ? tr("Komenda") : "Agent"}
         </button>
       ))}
     </div>
@@ -117,8 +118,8 @@ export const AgentField = forwardRef<
           autoFocus
           spellCheck={false}
           autoComplete="off"
-          aria-label="Prośba do agenta"
-          placeholder={tools === "mine" ? "Poproś agenta, np. sprawdź na Slacku, co z fakturą, i zaproponuj zadania…" : "Poproś agenta, np. rozpisz na kroki · dopasuj miejsca · co z tego jest pilne…"}
+          aria-label={tr("Prośba do agenta")}
+          placeholder={tools === "mine" ? tr("Poproś agenta, np. sprawdź na Slacku, co z fakturą, i zaproponuj zadania…") : tr("Poproś agenta, np. rozpisz na kroki · dopasuj miejsca · co z tego jest pilne…")}
           disabled={busy}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -144,17 +145,17 @@ export const AgentField = forwardRef<
           onChange={onProvider}
           options={(["claude", "codex"] as const).map((id) => {
             const p = providers.find((x) => x.id === id);
-            return { value: id, label: id === "claude" ? "Claude" : "Codex", disabled: !p?.available, title: p?.available ? (p.version ?? undefined) : `${PROVIDER_NAME[id]} nie jest dostępny${p?.problem ? `: ${p.problem}` : ""}` };
+            return { value: id, label: id === "claude" ? "Claude" : "Codex", disabled: !p?.available, title: p?.available ? (p.version ?? undefined) : tr("{0} nie jest dostępny{1}", PROVIDER_NAME[id], p?.problem ? `: ${p.problem}` : "") };
           })}
         />
-        <span className="ag-opts-label">Narzędzia</span>
+        <span className="ag-opts-label">{tr("Narzędzia")}</span>
         <Segmented
-          label="Narzędzia agenta"
+          label={tr("Narzędzia agenta")}
           value={tools}
           onChange={onTools}
           options={[
-            { value: "montybrain", label: "Tylko MontyBrain", title: "W tle: MontyBrain tylko do odczytu, nic więcej" },
-            { value: "mine", label: "Moje narzędzia", title: "Slack, poczta, sterowanie komputerem: sesja w Terminalu z twoją konfiguracją" },
+            { value: "montybrain", label: tr("Tylko MontyBrain"), title: tr("W tle: MontyBrain tylko do odczytu, nic więcej") },
+            { value: "mine", label: tr("Moje narzędzia"), title: tr("Slack, poczta, sterowanie komputerem: sesja w panelu aplikacji z twoją konfiguracją") },
           ]}
         />
         {tools === "mine" && onTerminal && (
@@ -162,7 +163,7 @@ export const AgentField = forwardRef<
             type="button"
             className="cf-link ag-term"
             disabled={!can}
-            title="Ta sama prośba jako sesja w oknie Terminala (odpowiedź wraca przez plik albo wklejenie)"
+            title={tr("Ta sama prośba jako sesja w oknie Terminala (odpowiedź wraca przez plik albo wklejenie)")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               if (!can) return;
@@ -170,23 +171,20 @@ export const AgentField = forwardRef<
               setText("");
             }}
           >
-            w Terminalu
-          </button>
+            {tr("w Terminalu")}</button>
         )}
         <button type="button" className="ag-send" disabled={!can} onMouseDown={(e) => e.preventDefault()} onClick={submit}>
-          {tools === "mine" ? "Uruchom sesję ↵" : "Wyślij ↵"}
+          {tools === "mine" ? tr("Uruchom sesję ↵") : tr("Wyślij ↵")}
         </button>
       </div>
       {consentPending ? (
-        <div className="ag-consent" role="alertdialog" aria-label="Zgoda na moje narzędzia">
-          <p>{MY_TOOLS_CONSENT}</p>
+        <div className="ag-consent" role="alertdialog" aria-label={tr("Zgoda na moje narzędzia")}>
+          <p>{tr(MY_TOOLS_CONSENT)}</p>
           <div className="ag-consent-actions">
             <button type="button" className="ag-send" onClick={() => onConsent(true)}>
-              Rozumiem, włącz
-            </button>
+              {tr("Rozumiem, włącz")}</button>
             <button type="button" className="cf-link" onClick={() => onConsent(false)}>
-              Nie teraz
-            </button>
+              {tr("Nie teraz")}</button>
           </div>
         </div>
       ) : reach ? (
@@ -194,7 +192,7 @@ export const AgentField = forwardRef<
           <span className="ag-can">{reach.can}</span> <span className="ag-cannot">{reach.cannot}</span> <span className="ag-returns">{reach.returns}</span>
         </p>
       ) : (
-        <p className="ag-reach">Żaden agent nie jest dostępny (Claude Code ani Codex).</p>
+        <p className="ag-reach">{tr("Żaden agent nie jest dostępny (Claude Code ani Codex).")}</p>
       )}
     </div>
   );

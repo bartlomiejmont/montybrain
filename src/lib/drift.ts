@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Drift between repositories and topics, as the project view shows it: the
 // one-line summary, the prepared request for "Zapytaj agenta", and the
 // "Podobny do" hint on a proposed new topic. Pure.
@@ -5,30 +6,30 @@
 import type { BranchRef, ProjectDrift, ProposedChange, Topic } from "../api/types";
 import { fold, plural } from "./text";
 
-const branches = (n: number) => `${n} ${plural(n, "gałąź", "gałęzie", "gałęzi")}`;
+const branches = (n: number) => `${n} ${plural(n, tr("gałąź"), tr("gałęzie"), tr("gałęzi"))}`;
 
 /** "Rozjazd: 3 gałęzie bez tematu · „Płatności”: 4 gałęzie w 2 repozytoriach · 12 nowych commitów od sprawdzenia"; `null` when there is nothing to say. */
 export function driftLine(d: ProjectDrift | null | undefined, titleOf: (slug: string) => string): string | null {
   if (!d) return null;
   const parts: string[] = [];
-  if (d.unknown.length) parts.push(`${branches(d.unknown.length)} bez tematu`);
-  for (const s of d.spread) parts.push(`„${titleOf(s.topic)}”: ${branches(s.branches)}${s.repos > 1 ? ` w ${s.repos} repozytoriach` : ""}`);
-  if (d.moved.length) parts.push(`${d.moved.length} ${plural(d.moved.length, "temat", "tematy", "tematów")} bez wpisu mimo commitów`);
-  if (d.new_commits) parts.push(`${d.new_commits} ${plural(d.new_commits, "nowy commit", "nowe commity", "nowych commitów")} od sprawdzenia`);
-  return parts.length ? `Rozjazd: ${parts.join(" · ")}` : null;
+  if (d.unknown.length) parts.push(tr("{0} bez tematu", branches(d.unknown.length)));
+  for (const s of d.spread) parts.push(`„${titleOf(s.topic)}”: ${branches(s.branches)}${s.repos > 1 ? tr(" w {0} repozytoriach", s.repos) : ""}`);
+  if (d.moved.length) parts.push(tr("{0} {1} bez wpisu mimo commitów", d.moved.length, plural(d.moved.length, tr("temat"), tr("tematy"), tr("tematów"))));
+  if (d.new_commits) parts.push(tr("{0} {1} od sprawdzenia", d.new_commits, plural(d.new_commits, tr("nowy commit"), tr("nowe commity"), tr("nowych commitów"))));
+  return parts.length ? tr("Rozjazd: {0}", parts.join(" · ")) : null;
 }
 
 /** The instruction "Zapytaj agenta" starts the request recipe with (the only paid path of the drift detector). */
 export function driftRequest(d: ProjectDrift, titleOf: (slug: string) => string): string {
   const lines: string[] = [];
   if (d.unknown.length) {
-    lines.push("Gałęzie, które nie pasują do żadnego tematu:");
-    for (const b of d.unknown) lines.push(`- ${b.repo}: ${b.branch} (ostatni commit ${b.last_commit}${b.worktree ? `, drzewo robocze ${b.worktree}` : ""})`);
+    lines.push(tr("Gałęzie, które nie pasują do żadnego tematu:"));
+    for (const b of d.unknown) lines.push(tr("- {0}: {1} (ostatni commit {2}{3})", b.repo, b.branch, b.last_commit, b.worktree ? tr(", drzewo robocze {0}", b.worktree) : ""));
   }
-  for (const s of d.spread) lines.push(`Temat „${titleOf(s.topic)}” ma ${branches(s.branches)}${s.repos > 1 ? ` w ${s.repos} repozytoriach` : ""}.`);
-  for (const m of d.moved) lines.push(`Temat „${titleOf(m.topic)}”: gałąź ${m.repo}/${m.branch} ma commity z ${m.last_commit}, a ostatni wpis w dzienniku jest ${m.last_entry ? `z ${m.last_entry}` : "brak"}.`);
+  for (const s of d.spread) lines.push(tr("Temat „{0}” ma {1}{2}.", titleOf(s.topic), branches(s.branches), s.repos > 1 ? tr(" w {0} repozytoriach", s.repos) : ""));
+  for (const m of d.moved) lines.push(tr("Temat „{0}”: gałąź {1}/{2} ma commity z {3}, a ostatni wpis w dzienniku jest {4}.", titleOf(m.topic), m.repo, m.branch, m.last_commit, m.last_entry ? tr("z {0}", m.last_entry) : tr("brak")));
   lines.push(
-    "Sprawdź w repozytoriach, czym są te gałęzie, i zaproponuj: dopisanie ich do istniejących tematów (topic_log z polem branches) albo nowe tematy (new_topic z polem branches). Porzucone lub drobne gałęzie tylko wymień w raporcie.",
+    tr("Sprawdź w repozytoriach, czym są te gałęzie, i zaproponuj: dopisanie ich do istniejących tematów (topic_log z polem branches) albo nowe tematy (new_topic z polem branches). Porzucone lub drobne gałęzie tylko wymień w raporcie."),
   );
   return lines.join("\n");
 }

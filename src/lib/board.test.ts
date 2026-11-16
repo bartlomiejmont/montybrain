@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFixtures } from "../api/fixtures";
-import type { Snapshot, Task, TaskStatus } from "../api/types";
+import type { Snapshot, Task, TaskStatus, Topic } from "../api/types";
 import {
   ALL_PROJECTS,
   DONE_CAP,
+  TOPIC_ARCHIVE_DAYS,
+  TOPIC_BOARD_COLUMNS,
   TASK_COLUMNS,
   adjacentColumn,
   beginMove,
@@ -16,6 +18,8 @@ import {
   firstLine,
   groupTasks,
   groupTopics,
+  taskLanes,
+  topicMoveColumns,
   type PendingMoves,
 } from "./board";
 import { buildItems } from "./palette";
@@ -73,10 +77,10 @@ describe("board grouping", () => {
   });
 
   it("groups topics by status, most recently updated first", () => {
-    const cols = groupTopics(snap, "whenubuy");
+    const cols = groupTopics(snap, "whenubuy", "2026-11-13");
     expect(cols.in_progress.map((t) => t.slug)).toContain("ab-testy-cen");
-    expect(cols.done.map((t) => t.slug)).toEqual(["onboarding"]);
-    const moved = groupTopics(snap, "whenubuy", new Map([["whenubuy/ab-testy-cen", "waiting" as const]]));
+    expect(cols.archive.map((t) => t.slug)).toEqual(["onboarding"]);
+    const moved = groupTopics(snap, "whenubuy", "2026-11-13", new Map([["whenubuy/ab-testy-cen", "waiting" as const]]));
     expect(moved.waiting.map((t) => t.slug)).toContain("ab-testy-cen");
   });
 
@@ -85,6 +89,169 @@ describe("board grouping", () => {
     expect(adjacentColumn(TASK_COLUMNS, "todo", -1)).toBeNull();
     expect(adjacentColumn(TASK_COLUMNS, "done", 1)).toBeNull();
     expect(firstLine("\n  pierwsza\ndruga")).toBe("pierwsza");
+  });
+});
+
+describe("topic archive", () => {
+  const today = "2026-11-15";
+  const topic = (slug: string, patch: Partial<Topic> = {}): Topic => ({
+    ...snap.topics[0]!, project: "whenubuy", slug, title: slug, status: "done",
+    updated: "2026-11-08T23:59", created: "2026-10-01", ...patch,
+  });
+  const snapshot = (...topics: Topic[]): Snapshot => ({ ...snap, topics });
+
+  it("splits at exactly seven calendar days using the supplied today", () => {
+    expect(TOPIC_ARCHIVE_DAYS).toBe(7);
+    const data = snapshot(topic("boundary"), topic("recent", { updated: "2026-11-09T00:00" }), topic("future", { updated: "2026-11-16T00:00" }), topic("active", { status: "in_progress" }));
+    const cols = groupTopics(data, ALL_PROJECTS, today);
+    expect(cols.archive.map((t) => t.slug)).toEqual(["boundary"]);
+    expect(cols.done.map((t) => t.slug)).toEqual(["future", "recent"]);
+    expect(cols.in_progress.map((t) => t.slug)).toEqual(["active"]);
+    expect(groupTopics(data, ALL_PROJECTS, "2026-11-14").archive).toHaveLength(0);
+    expect(TOPIC_BOARD_COLUMNS.flatMap((c) => cols[c])).toHaveLength(data.topics.length);
+    expect(data.topics[0]!.status).toBe("done");
+  });
+
+  it("uses created if updated is missing and keeps undated topics visible in done", () => {
+    const cols = groupTopics(snapshot(topic("created", { updated: null, created: "2026-11-08" }), topic("undated", { updated: null, created: null }), topic("edited", { updated: "2026-11-14T12:00" })), ALL_PROJECTS, today);
+    expect(cols.archive.map((t) => t.slug)).toEqual(["created"]);
+    expect(cols.done.map((t) => t.slug)).toEqual(["edited", "undated"]);
+  });
+
+  it("counts calendar days across daylight saving changes", () => {
+    const cols = groupTopics(snapshot(topic("dst", { updated: "2026-10-24T23:59" })), ALL_PROJECTS, "2026-10-31");
+    expect(cols.archive.map((t) => t.slug)).toEqual(["dst"]);
+  });
+
+  it("moves archived cards out optimistically and restores them on rollback", () => {
+    const data = snapshot(topic("old"));
+    const cols = groupTopics(data, ALL_PROJECTS, today, new Map([["whenubuy/old", "waiting"]]));
+    expect(cols.archive).toHaveLength(0);
+    expect(cols.waiting[0]?.status).toBe("waiting");
+    expect(groupTopics(data, ALL_PROJECTS, today).archive[0]).toBe(data.topics[0]);
+  });
+
+  it("keeps a new optimistic completion in done despite an old source timestamp", () => {
+    const data = snapshot(topic("stale", { status: "planned" }), topic("recent", { updated: "2026-11-14T12:00" }));
+    const cols = groupTopics(data, ALL_PROJECTS, today, new Map([["whenubuy/stale", "done"]]));
+    expect(cols.archive).toHaveLength(0);
+    expect(cols.done.map((t) => t.slug)).toEqual(["stale", "recent"]);
+    expect(data.topics[0]!.updated).toBe("2026-11-08T23:59");
+    const archived = snapshot(topic("unchanged"));
+    expect(groupTopics(archived, ALL_PROJECTS, today, new Map([["whenubuy/unchanged", "done"]])).archive).toHaveLength(1);
+  });
+
+  it("caps archive and done independently, newest first, keeping counts and scope", () => {
+    const topics = Array.from({ length: DONE_CAP + 3 }, (_, i) => topic(`old-${i}`, { updated: `2026-11-08T${String(i % 24).padStart(2, "0")}:00` }));
+    const recent = topics.map((t) => ({ ...t, slug: `new-${t.slug}`, updated: t.updated!.replace("11-08", "11-14") }));
+    const cols = groupTopics(snapshot(...topics, ...recent, topic("outside", { project: "other" })), "whenubuy", today);
+    for (const c of ["done", "archive"] as const) {
+      const capped = capColumn(cols[c], true);
+      expect(capped.shown).toHaveLength(DONE_CAP);
+      expect(capped.hidden).toBe(3);
+      expect(cols[c].map((t) => t.updated)).toEqual(cols[c].map((t) => t.updated).sort().reverse());
+      expect(cols[c].every((t) => t.project === "whenubuy")).toBe(true);
+    }
+  });
+
+  it("never offers archive as a move, or done for an already archived topic", () => {
+    expect(topicMoveColumns("planned")).toContain("done");
+    expect(topicMoveColumns("planned")).not.toContain("archive");
+    expect(topicMoveColumns("archive")).toEqual(["planned", "in_progress", "blocked", "waiting"]);
+    expect(adjacentColumn<string>([...topicMoveColumns("archive"), "archive"], "archive", -1)).toBe("waiting");
+    expect(adjacentColumn<string>([...topicMoveColumns("archive"), "archive"], "archive", 1)).toBeNull();
+  });
+});
+
+describe("task topic enclosures", () => {
+  it("keeps tasks of an archived topic in the usual task lane and status columns", () => {
+    const topic = { ...snap.topics[0]!, status: "done" as const, updated: "2026-10-01T12:00" };
+    const location = { kind: "topic" as const, project: topic.project, topic: topic.slug };
+    const tasks = ["todo", "done"].map((status, i) => ({ ...snap.tasks[0]!, id: `archived${i}`, location, status: status as TaskStatus }));
+    const data = { ...snap, topics: [topic], tasks };
+    expect(groupTopics(data, ALL_PROJECTS, "2026-11-15").archive).toEqual([topic]);
+    const lanes = taskLanes(groupTasks(data, ALL_PROJECTS), data.topics, true);
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0]!.topic).toBe(topic);
+    expect(lanes[0]!.columns.todo).toEqual([tasks[0]]);
+    expect(lanes[0]!.columns.done).toEqual([tasks[1]]);
+  });
+
+  it("keeps topic order when moving cards between status columns", () => {
+    const before = taskLanes(groupTasks(snap, ALL_PROJECTS), snap.topics, true).map((l) => l.key);
+    const task = snap.tasks.find((t) => t.location.kind === "topic" && t.status === "todo")!;
+    const after = taskLanes(groupTasks(snap, ALL_PROJECTS, new Map([[task.id!, "done"]])), snap.topics, true).map((l) => l.key);
+    expect(after).toEqual(before);
+  });
+
+  it("shows a pending topic change in its destination group and removes it from the source", () => {
+    const task = snap.tasks.find((t) => t.location.kind === "topic")!;
+    const target = snap.topics.find((t) => t.project !== (task.location.kind === "topic" ? task.location.project : ""))!;
+    const location = { kind: "topic" as const, project: target.project, topic: target.slug };
+    const cols = groupTasks(snap, ALL_PROJECTS, new Map([[task.id!, "doing"]]), new Map([[task.id!, location]]));
+    const all = TASK_COLUMNS.flatMap((c) => cols[c]);
+    expect(all.filter((t) => t.id === task.id)).toHaveLength(1);
+    expect(all.find((t) => t.id === task.id)).toMatchObject({ location, status: "doing" });
+    expect(TASK_COLUMNS.flatMap((c) => groupTasks(snap, location.project, new Map(), new Map([[task.id!, location]]))[c]).map((t) => t.id)).toContain(task.id);
+  });
+
+  it("keeps a topic in one lane across status columns, including a pending move", () => {
+    const cols = groupTasks(snap, "whenubuy");
+    const task = cols.todo.find((t) => t.location.kind === "topic")!;
+    const location = task.location;
+    const topic = location.kind === "topic" ? snap.topics.find((t) => t.project === location.project && t.slug === location.topic) : null;
+    expect(topic).toBeTruthy();
+    const moved = groupTasks(snap, "whenubuy", new Map([[task.id!, "doing" as const]]));
+    const lanes = taskLanes(moved, snap.topics, true);
+    const lane = lanes.find((l) => l.topic === topic)!;
+    expect(lane.columns.doing.map((t) => t.id)).toContain(task.id);
+    expect(lane.columns.todo.map((t) => t.id)).not.toContain(task.id);
+    expect(lanes.filter((l) => l.topic === topic)).toHaveLength(1);
+  });
+
+  it("encloses only topics with at least two scoped tasks, never lone or general tasks", () => {
+    const topic = snap.topics[0]!;
+    const task = { ...snap.tasks[0]!, location: { kind: "topic" as const, project: topic.project, topic: topic.slug } };
+    const general = { ...task, id: "other1", location: { kind: "project" as const, project: topic.project } };
+    const one = { todo: [task, general], doing: [], blocked: [], done: [] };
+    expect(taskLanes(one, [topic], false).map((l) => l.topic)).toEqual([null]);
+    const two = { ...one, doing: [{ ...task, id: "other2", status: "doing" as const }] };
+    const lanes = taskLanes(two, [topic], false);
+    expect(lanes[0]!.topic).toBe(topic);
+    expect(lanes[0]!.total).toBe(2);
+    expect(lanes[1]!.columns.todo).toEqual([general]);
+  });
+
+  it("preserves every visible card exactly once and accounts for hidden done cards", () => {
+    const cols = groupTasks(snap, ALL_PROJECTS);
+    const expanded = taskLanes(cols, snap.topics, true);
+    const collapsed = taskLanes(cols, snap.topics, false);
+    const cards = (lanes: ReturnType<typeof taskLanes>) => lanes.flatMap((l) => TASK_COLUMNS.flatMap((c) => l.columns[c]));
+    expect(new Set(cards(expanded)).size).toBe(cards(expanded).length);
+    expect(cards(expanded)).toHaveLength(TASK_COLUMNS.flatMap((c) => cols[c]).length);
+    expect(cards(collapsed)).toHaveLength(cols.todo.length + cols.doing.length + cols.blocked.length);
+    expect(cards(collapsed).some((t) => t.status === "done")).toBe(false);
+    for (const lane of collapsed) expect(lane.total).toBe(TASK_COLUMNS.flatMap((c) => lane.columns[c]).length + lane.hiddenDone);
+  });
+
+  it("never combines identical topic slugs from different projects", () => {
+    const topic = snap.topics[0]!;
+    const other = { ...topic, project: "other-project" };
+    const tasks = [topic, other].flatMap((t, i) => [0, 1].map((n) => ({ ...snap.tasks[0]!, id: `task${i}${n}`, status: "todo" as const, location: { kind: "topic" as const, project: t.project, topic: t.slug } })));
+    const lanes = taskLanes({ todo: tasks, doing: [], blocked: [], done: [] }, [topic, other], false);
+    expect(lanes).toHaveLength(2);
+    expect(lanes.map((l) => l.total)).toEqual([2, 2]);
+    expect(lanes.map((l) => l.key)).toEqual([`${topic.project}/${topic.slug}`, `${other.project}/${other.slug}`]);
+  });
+
+  it("caps completed cards globally while keeping them in the shared topic enclosure", () => {
+    const topic = snap.topics[0]!;
+    const task = { ...snap.tasks[0]!, status: "todo" as const, location: { kind: "topic" as const, project: topic.project, topic: topic.slug } };
+    const done = Array.from({ length: DONE_CAP + 5 }, (_, n) => ({ ...task, id: `done${n}`, status: "done" as const }));
+    const lanes = taskLanes({ todo: [task], doing: [], blocked: [], done }, [topic], true);
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0]).toMatchObject({ topic, total: DONE_CAP + 6, hiddenDone: 5 });
+    expect(lanes[0]!.columns.done).toHaveLength(DONE_CAP);
   });
 });
 

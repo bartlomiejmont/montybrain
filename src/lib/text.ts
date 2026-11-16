@@ -1,3 +1,4 @@
+import { getLanguage } from "../i18n";
 // Text helpers that mirror montybrain-core (`fold`, `slugify`) closely enough for
 // the browser mock and client-side matching.
 
@@ -57,6 +58,7 @@ export function linkLabel(url: string): string {
 /** Polish plural: plural(5, "zadanie", "zadania", "zadań"). */
 export function plural(n: number, one: string, few: string, many: string): string {
   if (n === 1) return one;
+  if (getLanguage() === "en") return many;
   const d = n % 10;
   const t = n % 100;
   if (d >= 2 && d <= 4 && (t < 12 || t > 14)) return few;

@@ -35,3 +35,13 @@ export function modelToSave(draft: string, stored: string | null): string | null
   const v = draft.trim() || null;
   return v === stored ? undefined : v;
 }
+
+/** The sentinel is UI-only: it must never be saved as a model id. */
+export const CUSTOM_MODEL = "__custom__";
+export function modelSelection(model: string | null, models: readonly string[]): string {
+  return !model ? "" : models.includes(model) ? model : CUSTOM_MODEL;
+}
+
+export function selectedModel(value: string): string | null | undefined {
+  return value === CUSTOM_MODEL ? undefined : value || null;
+}

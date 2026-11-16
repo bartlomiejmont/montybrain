@@ -1,4 +1,6 @@
-import { ChevronDown, ChevronRight, Copy, FileText, GitBranch, MoreHorizontal } from "lucide-react";
+import { t as tr } from "../i18n";
+import { askAboutTopic } from "../store/session";
+import { ChevronDown, ChevronRight, GitBranch, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import type { Project, Topic, TopicStatus } from "../api";
@@ -13,14 +15,12 @@ import { closeAfterSave, once, submitAction, topicPatch } from "../lib/form";
 import { openCount, statusChoices, statusPillLabel } from "../lib/topicStatus";
 import { dropDrafts, useDraft, useSubmitting } from "../store/drafts";
 import { useDrift } from "../store/signals";
-import { useTaskFlag } from "../store/ui";
+import { useOpenDetail } from "../store/details";
+import { taskTarget } from "../lib/details";
 import { useVault, useView } from "../store/vault";
-import { useActions } from "./actions";
-import { JournalForm, JournalList } from "./Journal";
 import { Menu } from "./Menu";
-import { TaskList } from "./TaskList";
-import { WaitingStep, openWaitStep, useWaitStepOpen } from "./WaitingStep";
-import { Button, ConfirmButton, DraftHint, SaveActions, Segmented } from "./ui";
+import { TopicSummary } from "./TopicSummary";
+import { DraftHint, SaveActions, Segmented } from "./ui";
 
 export function TopicStatusBadge({ status }: { status: TopicStatus }) {
   return (
@@ -58,7 +58,7 @@ export function TopicStatusPill({ project, topic, onChosen }: { project: Pick<Pr
         aria-expanded={anchor !== null}
         aria-label={statusPillLabel(topic.title, topic.status)}
         aria-busy={saving || undefined}
-        title="Zmień status tematu"
+        title={tr("Zmień status tematu")}
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
       >
         <span className="badge-mark" aria-hidden />
@@ -68,7 +68,7 @@ export function TopicStatusPill({ project, topic, onChosen }: { project: Pick<Pr
       {anchor && (
         <Menu
           anchor={anchor}
-          label={`Status tematu ${topic.title}`}
+          label={tr("Status tematu {0}", topic.title)}
           minWidth={150}
           onClose={() => setAnchor(null)}
           items={statusChoices(topic.status).map((c) => ({
@@ -97,7 +97,7 @@ export function useCopyContext() {
     const neighbourList = neighbours(graph, refTopicKey(projectSlug, topic.slug)).flatMap((n) => {
       const other = view.snapshot.topics.find((t) => refTopicKey(t.project, t.slug) === n.other);
       if (!other) return [];
-      const kind = n.edge.kind === "waits" ? (n.outgoing ? "Czeka na" : "Czeka na ten temat") : "Powiązane";
+      const kind = n.edge.kind === "waits" ? (n.outgoing ? tr("Czeka na") : tr("Czeka na ten temat")) : tr("Powiązane");
       const name = view.snapshot.projects.find((p) => p.slug === other.project)?.name ?? other.project;
       const prose = other.summary.split("\n").filter((l) => !/^(Czeka na|Powiązane):/.test(l.trim())).join(" ");
       return [{ kind, title: other.title, project: name, sentence: firstSentence(prose) }];
@@ -110,11 +110,11 @@ export function useCopyContext() {
       branches,
       neighbours: neighbourList,
     });
-    notify((await copyText(text)) ? "Skopiowano kontekst tematu." : "Nie udało się skopiować do schowka.");
+    notify((await copyText(text)) ? tr("Skopiowano kontekst tematu.") : tr("Nie udało się skopiować do schowka."));
   };
 }
 
-function TopicEditor({ project, topic, onDone }: { project: Project; topic: Topic; onDone: (status?: TopicStatus) => void }) {
+export function TopicEditor({ project, topic, onDone }: { project: Project; topic: Topic; onDone: (status?: TopicStatus) => void }) {
   const { run } = useVault();
   // Drafts live in the draft store: they survive file changes and the topic
   // moving between lists. Saving applies the user's version.
@@ -181,8 +181,7 @@ function TopicEditor({ project, topic, onDone }: { project: Project; topic: Topi
       onKeyDown={(e) => e.key === "Escape" && cancel()}
     >
       <label className="d-label" htmlFor={`tt-${topic.slug}`}>
-        Tytuł
-      </label>
+        {tr("Tytuł")}</label>
       <input
         id={`tt-${topic.slug}`}
         className="field"
@@ -192,18 +191,17 @@ function TopicEditor({ project, topic, onDone }: { project: Project; topic: Topi
         onFocus={titleD.onFocus}
         onBlur={titleD.onBlur}
       />
-      <DraftHint draft={titleD} what="Tytuł" />
+      <DraftHint draft={titleD} what={tr("Tytuł")} />
       <span className="d-label">Status</span>
       <Segmented<TopicStatus>
-        label="Status tematu"
+        label={tr("Status tematu")}
         value={status}
         onChange={(s) => statusD.setDraft(s)}
         options={TOPIC_STATUSES.map((s) => ({ value: s, label: TOPIC_STATUS_LABEL[s] }))}
       />
       <DraftHint draft={statusD} what="Status" />
       <label className="d-label" htmlFor={`tr-${topic.slug}`}>
-        Repozytorium
-      </label>
+        {tr("Repozytorium")}</label>
       <select
         id={`tr-${topic.slug}`}
         className="field select"
@@ -212,187 +210,71 @@ function TopicEditor({ project, topic, onDone }: { project: Project; topic: Topi
         onFocus={repoD.onFocus}
         onBlur={repoD.onBlur}
       >
-        <option value="">— brak —</option>
+        <option value="">{tr("— brak —")}</option>
         {project.repos.map((r) => (
           <option key={r.name} value={r.name}>
             {r.name}
           </option>
         ))}
       </select>
-      <DraftHint draft={repoD} what="Repozytorium" />
+      <DraftHint draft={repoD} what={tr("Repozytorium")} />
       <label className="d-label" htmlFor={`ts-${topic.slug}`}>
-        Stan obecny
-      </label>
+        {tr("Stan obecny")}</label>
       <textarea
         id={`ts-${topic.slug}`}
         className="field"
         rows={4}
-        placeholder="Krótko: gdzie jesteśmy, co dalej."
+        placeholder={tr("Krótko: gdzie jesteśmy, co dalej.")}
         value={summaryD.draft}
         onChange={(e) => summaryD.setDraft(e.target.value)}
         onFocus={summaryD.onFocus}
         onBlur={summaryD.onBlur}
       />
-      <DraftHint draft={summaryD} what="Stan obecny" />
+      <DraftHint draft={summaryD} what={tr("Stan obecny")} />
       <SaveActions busy={submitting.busy} onCancel={cancel} />
     </form>
   );
 }
 
-export function TopicItem({
-  project,
-  topic,
-  expanded,
-  onToggle,
-  select,
-  waitLine,
-}: {
+/** Project list: a read-only preview. All topic editing lives in the side panel. */
+export function TopicItem({ project, topic, onOpen, waitLine }: {
   project: Project;
   topic: Topic;
-  expanded: boolean;
-  onToggle: () => void;
-  /** Selection mode of the project view: the row's checkbox. */
-  select?: { checked: boolean; onClick: (shift: boolean) => void };
-  /** Waiting topics: what it waits for and when it is checked again. */
+  onOpen: () => void;
   waitLine?: string | null;
 }) {
   const view = useView();
-  const { run } = useVault();
-  const { reveal } = useActions();
-  const [editing, setEditing] = useTaskFlag("topic-editing", `${project.slug}/${topic.slug}`);
+  const openDetail = useOpenDetail();
   const loc = { kind: "topic", project: project.slug, topic: topic.slug } as const;
   const counts = countTasks(view.snapshot).topic.get(topicKey(project.slug, topic.slug)) ?? { open: 0, total: 0 };
-  const panelId = `topic-${project.slug}-${topic.slug}`;
-  const copyContext = useCopyContext();
+  const tasks = tasksAt(view.snapshot, loc);
+  const nextTask = tasks.find((t) => t.status === "doing") ?? tasks.find((t) => t.status !== "done");
+  const copy = useCopyContext();
   const [menu, setMenu] = useState<HTMLElement | null>(null);
-  // The waiting step after the status became Czeka / Zablokowany.
-  const waitKey = `topic:${project.slug}/${topic.slug}`;
-  const waitStep = useWaitStepOpen(waitKey);
-  const afterStatus = (s?: TopicStatus) => s && isWaiting(s) && openWaitStep(waitKey);
-
-  return (
-    <section className={`topic${expanded ? " expanded" : ""}`} data-status={topic.status}>
-      <div className="topic-head">
-        {select && (
-          <input
-            type="checkbox"
-            className="topic-check"
-            checked={select.checked}
-            aria-label={`Zaznacz temat ${topic.title}`}
-            onChange={() => {}}
-            onClick={(e) => select.onClick(e.shiftKey)}
-          />
-        )}
-        <button type="button" className="topic-toggle" aria-expanded={expanded} aria-controls={panelId} onClick={onToggle}>
-          <ChevronRight size={14} className="chev" />
-          <span className="topic-title" title={expanded ? undefined : topic.title}>
-            {topic.title}
-          </span>
-        </button>
-        <TopicStatusPill project={project} topic={topic} onChosen={afterStatus} />
-        <span className="topic-meta">
-          {topic.repo && (
-            <span className="repo-tag" title={`Repozytorium: ${topic.repo}`}>
-              <GitBranch size={11} />
-              {topic.repo}
-            </span>
-          )}
-          <span className="count" title={openCount(counts.open, counts.total)} aria-label={openCount(counts.open, counts.total)}>
-            {counts.open}/{counts.total}
-          </span>
-          {topic.updated && (
-            <span className="age" title={`Zaktualizowano ${topic.updated.replace("T", " ")}`}>
-              {formatAge(topic.updated, view.today)}
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          className="icon-btn topic-more"
-          aria-label={`Więcej: ${topic.title}`}
-          title="Więcej"
-          aria-haspopup="menu"
-          aria-expanded={menu !== null}
-          onClick={(e) => setMenu(menu ? null : e.currentTarget)}
-        >
-          <MoreHorizontal size={14} />
-        </button>
-        {menu && (
-          <Menu
-            anchor={menu}
-            label={`Temat ${topic.title}`}
-            minWidth={190}
-            onClose={() => setMenu(null)}
-            items={[
-              { key: "copy", label: "Kopiuj kontekst", onSelect: () => void copyContext(project.slug, topic) },
-              { key: "map", label: "Pokaż na mapie", onSelect: () => navigate(links.map(`${project.slug}/${topic.slug}`)) },
-            ]}
-          />
-        )}
-      </div>
-      {waitLine && <p className="topic-wait">{waitLine}</p>}
-      {waitStep && (
-        <WaitingStep
-          targets={[{ key: waitKey, kind: "topic", status: topic.status === "blocked" ? "blocked" : "waiting", project: project.slug, topic: topic.slug }]}
-          onDone={() => openWaitStep(null)}
-        />
-      )}
-      {!expanded && topic.summary && (
-        <p className="topic-summary clamp" onClick={onToggle}>
-          {topic.summary}
-        </p>
-      )}
-      {expanded && (
-        <div className="topic-body" id={panelId}>
-          {editing ? (
-            <TopicEditor
-              project={project}
-              topic={topic}
-              onDone={(s) => {
-                setEditing(false);
-                afterStatus(s);
-              }}
-            />
-          ) : (
-            <>
-              {topic.summary ? (
-                <p className="topic-summary full">{topic.summary}</p>
-              ) : (
-                <p className="topic-summary muted">Brak opisu stanu. Dodaj go w edycji tematu.</p>
-              )}
-              <div className="topic-actions">
-                <Button variant="quiet" onClick={() => setEditing(true)}>
-                  Edytuj temat
-                </Button>
-                <Button variant="quiet" onClick={() => void reveal(topic.path)}>
-                  <FileText size={13} /> Pokaż plik
-                </Button>
-                <Button variant="quiet" onClick={() => void copyContext(project.slug, topic)}>
-                  <Copy size={13} /> Kopiuj kontekst
-                </Button>
-                <ConfirmButton
-                  question="Usunąć temat razem z zadaniami i dziennikiem?"
-                  confirmLabel="Usuń temat"
-                  onConfirm={() => void run((a) => a.deleteTopic(project.slug, topic.slug))}
-                >
-                  Usuń
-                </ConfirmButton>
-              </div>
-            </>
-          )}
-
-          <TaskList
-            listId={`t:${project.slug}/${topic.slug}`}
-            tasks={tasksAt(view.snapshot, loc)}
-            addTo={loc}
-            addPlaceholder="Dodaj zadanie"
-          />
-
-          <div className="subhead">Dziennik</div>
-          <JournalForm project={project.slug} topic={topic.slug} status={topic.status} />
-          <JournalList entries={journalOf(view.snapshot, project.slug, topic.slug)} />
-        </div>
-      )}
-    </section>
-  );
+  return <section id={`topic-${project.slug}-${topic.slug}`} className="topic" data-status={topic.status}>
+    <div className="topic-head">
+      <button type="button" className="topic-toggle" onClick={onOpen} title={tr("Otwórz szczegóły tematu w panelu")}>
+        <ChevronRight size={14} className="chev" aria-hidden />
+        <span className="topic-title">{topic.title}</span>
+      </button>
+      <TopicStatusBadge status={topic.status} />
+      <span className="topic-meta">
+        {topic.repo && <span className="repo-tag" title={tr("Repozytorium: {0}", topic.repo)}><GitBranch size={11} />{topic.repo}</span>}
+        <span className="count" title={openCount(counts.open, counts.total)} aria-label={openCount(counts.open, counts.total)}>{tr("Otwarte:")} {counts.open} {tr("z")} {counts.total}</span>
+        {topic.updated && <span className="age" title={tr("Zaktualizowano {0}", topic.updated.replace("T", " "))}>{formatAge(topic.updated, view.today)}</span>}
+      </span>
+      <button type="button" className="icon-btn topic-more" aria-label={tr("Więcej: {0}", topic.title)} aria-haspopup="menu" aria-expanded={menu !== null} onClick={(e) => setMenu(menu ? null : e.currentTarget)}><MoreHorizontal size={14} /></button>
+      {menu && <Menu anchor={menu} label={tr("Temat {0}", topic.title)} onClose={() => setMenu(null)} items={[
+        { key: "details", label: tr("Otwórz szczegóły"), onSelect: onOpen },
+        { key: "agent", label: tr("Zapytaj agenta…"), onSelect: () => askAboutTopic(topic) },
+        { key: "copy", label: tr("Kopiuj kontekst"), onSelect: () => void copy(project.slug, topic) },
+        { key: "map", label: tr("Pokaż na mapie"), onSelect: () => navigate(links.map(`${project.slug}/${topic.slug}`)) },
+      ]} />}
+    </div>
+    {waitLine && <p className="topic-wait">{waitLine}</p>}
+    <div className="topic-preview">
+      {topic.summary && <TopicSummary text={topic.summary} compact />}
+      {nextTask && <p className="topic-next-step"><span>{tr("Następne zadanie")}</span><button type="button" onClick={() => openDetail?.(taskTarget(nextTask))}>{nextTask.title}</button></p>}
+    </div>
+  </section>;
 }

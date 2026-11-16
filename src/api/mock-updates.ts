@@ -4,7 +4,9 @@
 // (fixture) tasks; applying goes through the mock vault, so the views update.
 // `scenario` seeds one state for screenshots (URL `?update=<scenario>`, see index.ts).
 
+import { newJournalEntries, journalRefreshMarker } from "../lib/journalAgent";
 import type {
+  JournalRefreshMarker,
   ChangeEdit,
   DismissReport,
   JoinReport,
@@ -111,6 +113,21 @@ export function buildRequestProposal(snap: Snapshot, project: string, runId: str
 }
 
 /** A planned topic that only the conversation history shows (the mock's history source). */
+export function buildJournalProposal(snap: Snapshot, project: string, topicSlug: string, runId: string, provider: ProviderId, at: string, request: string): StoredProposal {
+  const topic = snap.topics.find((t) => t.project === project && t.slug === topicSlug);
+  const tasks = snap.tasks.filter((t) => t.location.kind === "topic" && t.location.project === project && t.location.topic === topicSlug && t.status !== "done" && t.id);
+  const changes: StoredChange[] = [];
+  if (topic && !/bez zmian|no changes/i.test(request)) {
+    changes.push({ change: { kind: "topic_log", topic: topic.slug, topic_title: topic.title, text: "Zmiana statusu i opisu wynika z zakończenia etapu opisanego we wpisie.", status: topic.status === "waiting" ? "in_progress" : "waiting", summary: "Etap zakończony; czekamy na potwierdzenie i przygotowujemy kolejny krok.", base_status: topic.status, base_summary: topic.summary }, outcome: null });
+    changes.push({ change: { kind: "new_task", topic: topic.slug, topic_title: topic.title, title: "Potwierdzić kolejny krok z zespołem", reason: "Wpis wskazuje potrzebę ustalenia kolejnego kroku." }, outcome: null });
+    const t = tasks[0];
+    if (t?.id) changes.push({ change: { kind: "task_status", task: t.id, title: t.title, from: t.status, to: "done", reason: "Wpis potwierdza wykonanie zadania." }, outcome: null });
+    const obsolete = tasks[1];
+    if (obsolete?.id) changes.push({ change: { kind: "remove_task", task: obsolete.id, title: obsolete.title, reason: "Według wpisu to zadanie straciło aktualność.", base: structuredClone(obsolete) }, outcome: null });
+  }
+  return { run_id: runId, provider, trigger: "manual", created_at: at, report: "Przeanalizowano nowe wpisy dziennika. Poniższe zmiany wymagają twojej decyzji.", changes, dropped: [], dropped_more: 0, problem: null, request, topic: topicSlug };
+}
+
 function historyTopic(project: string, repo: string | null): StoredChange {
   return {
     change: {
@@ -135,6 +152,7 @@ function historyTopic(project: string, repo: string | null): StoredChange {
 type Updated = { topic: string; written: string; before: string } | null;
 
 type UndoItem = (
+  | { index: number; kind: "remove_task"; removed: Task; position: number }
   | { index: number; kind: "task_status"; task: string; from: TaskStatus; to: TaskStatus }
   | { index: number; kind: "new_task"; task: string; title: string; location: TaskLocation }
   | { index: number; kind: "new_topic"; topic: string; stamp: string }
@@ -143,6 +161,7 @@ type UndoItem = (
 ) & { updated?: Updated };
 
 interface ProjectState {
+  journal_refresh?: Record<string, JournalRefreshMarker>;
   clock: string | null;
   last: UpdateResult | null;
   proposal: StoredProposal | null;
@@ -159,6 +178,7 @@ export function isLimitError(message: string): boolean {
 /** What the mock needs from the mock vault. */
 export interface MockVaultOps {
   snapshot(): Snapshot;
+  restoreTask?(task: Task, position: number): Promise<boolean>;
   setTaskStatus(id: string, status: TaskStatus): Promise<unknown>;
   addJournal(project: string, topic: string, author: string, text: string, status: TopicStatus | null, summary: string | null): Promise<JournalAdded>;
   createTask(location: TaskLocation, title: string): Promise<Task>;
@@ -391,6 +411,10 @@ function staleReason(c: StoredChange["change"], snap: Snapshot, project: string)
     const moved = c.tasks.some((e) => snap.tasks.find((x) => x.id === e.id)?.location.kind !== "inbox");
     return moved ? "zmienione w międzyczasie (wpis przeniesiono)" : null;
   }
+  if (c.kind === "remove_task") {
+    const t = snap.tasks.find((x) => x.id === c.task);
+    return t && JSON.stringify({ ...t, line: 0 }) === JSON.stringify({ ...c.base, line: 0 }) ? null : "zmienione w międzyczasie (zadanie zmieniono, przeniesiono lub usunięto)";
+  }
   if (c.kind === "task_status") {
     const t = snap.tasks.find((x) => x.id === c.task);
     if (!t) return "zmienione w międzyczasie (zadania już nie ma)";
@@ -446,6 +470,7 @@ export function createMockUpdates(
 ) {
   const now = opts.now ?? (() => new Date());
   const states = new Map<string, ProjectState>();
+  const journalInputs = new Map<string, { snapshot: Snapshot; marker: JournalRefreshMarker }>();
   const auto = new Map<string, AutoUpdate>();
   const sources = new Map<string, UpdateSources>();
   const listeners = new Set<(u: ProjectUpdateView[]) => void>();
@@ -463,6 +488,7 @@ export function createMockUpdates(
       const cfg = auto.get(project) ?? DEFAULT_AUTO;
       return {
         project,
+        journal_refresh: structuredClone(s.journal_refresh ?? {}),
         auto: structuredClone(cfg),
         sources: structuredClone(sources.get(project) ?? DEFAULT_SOURCES),
         next_due: cfg.schedule.kind !== "off" && s.proposal?.changes.some((c) => !c.outcome) ? null : nextDue(cfg, s.clock, now()),
@@ -486,15 +512,18 @@ export function createMockUpdates(
     const s = state(run.project);
     const at = stamp();
     const history = sources.get(run.project)?.history ?? false;
-    const note = history ? MOCK_REQUEST_HISTORY_NOTE : HISTORY_OFF_NOTE;
+    const note = run.topic ? null : history ? MOCK_REQUEST_HISTORY_NOTE : HISTORY_OFF_NOTE;
     const request = run.request ?? "";
     if (run.status === "failed") s.last = { at, provider: run.provider, trigger: "manual", outcome: { kind: "failed", message: run.error ?? "Uruchomienie nie powiodło się.", limit: isLimitError(run.error ?? "") }, request, history_note: note };
     else if (run.status === "cancelled") s.last = { at, provider: run.provider, trigger: "manual", outcome: { kind: "cancelled" }, request, history_note: note };
     else {
-      const p = buildRequestProposal(vault.snapshot(), run.project, run.id, run.provider, at, request, history);
+      const p = run.topic ? buildJournalProposal(journalInputs.get(run.id)?.snapshot ?? vault.snapshot(), run.project, run.topic, run.id, run.provider, at, request) : buildRequestProposal(vault.snapshot(), run.project, run.id, run.provider, at, request, history);
       s.proposal = p;
+      const input = journalInputs.get(run.id);
+      if (run.topic && input && !p.problem) (s.journal_refresh ??= {})[run.topic] = input.marker;
       s.last = { at, provider: run.provider, trigger: "manual", outcome: p.changes.length ? { kind: "proposed", count: p.changes.length } : { kind: "no_changes" }, request, history_note: note };
     }
+    journalInputs.delete(run.id);
     changed();
   });
 
@@ -650,6 +679,19 @@ export function createMockUpdates(
   }
 
   return {
+    prepareJournalRefresh(project: string, topic: string) {
+      const snapshot = vault.snapshot();
+      const entries = snapshot.journal.filter((e) => e.project === project && e.topic === topic);
+      const previous = state(project).journal_refresh?.[topic];
+      const fresh = newJournalEntries(entries, previous);
+      if (!fresh.length) throw new Error("Brak nowych wpisów.");
+      const marker = journalRefreshMarker(entries)!;
+      marker.at = previous && previous.at > marker.at ? previous.at : marker.at;
+      return { entries: fresh, snapshot, marker };
+    },
+    trackJournalRefresh(runId: string, input: { snapshot: Snapshot; marker: JournalRefreshMarker }) {
+      journalInputs.set(runId, input);
+    },
     async listUpdates(): Promise<ProjectUpdateView[]> {
       return views();
     },
@@ -688,7 +730,12 @@ export function createMockUpdates(
           const before = touched ? vault.updatedOf(project, touched) : null;
           const n = written.length;
           try {
-            if (c.kind === "task_status") {
+            if (c.kind === "remove_task") {
+              const position = vault.snapshot().tasks.findIndex((t) => t.id === c.task);
+              const removed = vault.snapshot().tasks[position];
+              if (!removed || !await vault.deleteTaskIf(c.task, (t) => JSON.stringify({ ...t, line: 0 }) === JSON.stringify({ ...c.base, line: 0 }))) throw new Error("Zadanie zmieniło się w międzyczasie.");
+              written.push({ index, kind: "remove_task", removed, position });
+            } else if (c.kind === "task_status") {
               await vault.setTaskStatus(c.task, c.to);
               written.push({ index, kind: "task_status", task: c.task, from: c.from, to: c.to });
             } else if (c.kind === "topic_log") {
@@ -754,6 +801,8 @@ export function createMockUpdates(
           const sc = s.proposal?.run_id === runId ? s.proposal.changes[it.index] : undefined;
           if (sc?.outcome?.status === "rejected") [status, message] = ["undone", "Przywrócono propozycję."];
           else message = "Propozycja nie jest już odrzucona.";
+        } else if (it.kind === "remove_task") {
+          if (await vault.restoreTask?.(it.removed, it.position)) [status, message] = ["undone", "Przywrócono zadanie na jego miejscu."];
         } else if (it.kind === "task_status") {
           if (await vault.setTaskStatusIf(it.task, it.to, it.from)) [status, message] = ["undone", "Przywrócono poprzedni status."];
         } else if (it.kind === "new_topic") {

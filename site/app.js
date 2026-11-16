@@ -42,7 +42,8 @@
       if (!codeEl) return;
       const ok = await copyText(codeEl.textContent || "", codeEl);
       const prev = btn.textContent;
-      btn.textContent = ok ? "Skopiowano" : "Zaznaczono";
+      btn.setAttribute("aria-live", "polite");
+      btn.textContent = ok ? "Copied" : "Select and copy";
       if (ok) btn.setAttribute("data-copied", "true");
       window.setTimeout(() => {
         btn.textContent = prev;
@@ -91,30 +92,5 @@
       e.preventDefault();
       closeDialog();
     });
-  }
-
-  // Highlight active section in side TOC
-  const tocLinks = Array.from(document.querySelectorAll(".toc a[href^='#']"));
-  if (tocLinks.length > 0 && "IntersectionObserver" in window) {
-    const byId = new Map();
-    for (const link of tocLinks) {
-      const id = link.getAttribute("href").slice(1);
-      const target = document.getElementById(id);
-      if (target) byId.set(target, link);
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            for (const l of tocLinks) l.removeAttribute("aria-current");
-            const active = byId.get(entry.target);
-            if (active) active.setAttribute("aria-current", "location");
-            break;
-          }
-        }
-      },
-      { rootMargin: "-15% 0px -70% 0px", threshold: 0 },
-    );
-    for (const el of byId.keys()) observer.observe(el);
   }
 })();

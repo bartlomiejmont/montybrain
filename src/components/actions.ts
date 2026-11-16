@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Mutation helpers shared by the views. All go through the store's `run`, which
 // re-fetches the state afterwards and reports errors as toasts.
 
@@ -11,7 +12,7 @@ export function useActions() {
   return useMemo(() => {
     const withId = <T,>(task: Task, f: (id: string) => Promise<T | undefined>) => {
       if (!task.id) {
-        notify("To zadanie nie ma jeszcze identyfikatora — za chwilę zostanie nadany.");
+        notify(tr("To zadanie nie ma jeszcze identyfikatora — za chwilę zostanie nadany."));
         return Promise.resolve(undefined);
       }
       return f(task.id);
@@ -28,7 +29,13 @@ export function useActions() {
       /** A "dodaj zadanie" field: the text is read by the backend (title + trailing `!`/`@`). */
       captureTask: (location: TaskLocation, text: string) => run((a) => a.captureTask(location, text)),
       openUrl: (url: string) => run((a) => a.openUrl(url)),
-      reveal: (path: string) => run((a) => a.revealPath(path)),
+      reveal: async (path: string) => {
+        const res = await run((a) => a.revealPath(path));
+        if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) {
+          notify(tr("Podgląd w przeglądarce — plik w repozytorium: {0}", path));
+        }
+        return res;
+      },
     };
   }, [run, notify]);
 }

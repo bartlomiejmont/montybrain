@@ -70,6 +70,7 @@ describe("dates", () => {
     expect(formatDue(TODAY, TODAY)).toBe("dziś");
     expect(formatDue(`${addDays(TODAY, 1)}T09:30`, TODAY)).toBe("jutro 09:30");
     expect(formatDue(addDays(TODAY, -1), TODAY)).toBe("wczoraj");
+    expect(formatDue("2026-11-17T14:00", TODAY)).toBe("wt 17 14:00");
     expect(formatDue("2026-12-24", TODAY)).toMatch(/^24 gru/);
     expect(formatDue("2027-01-02", TODAY)).toMatch(/2027/);
   });

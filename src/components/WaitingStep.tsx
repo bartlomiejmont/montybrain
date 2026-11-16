@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // The small, skippable step after something starts waiting: "Na co czeka?"
 // (written as a normal journal entry of the topic, or a line in the task's
 // notes) and "Przypomnij za" (the check schedule, app state). Skipping keeps
@@ -39,13 +40,13 @@ export function useWaitStepOpen(key: string): boolean {
 }
 
 const DAYS = [1, 2, 3, 7] as const;
-const dayLabel = (d: number) => (d === 1 ? "1 dzień" : `${d} dni`);
+const dayLabel = (d: number) => (d === 1 ? tr("1 dzień") : tr("{0} dni", d));
 
 /** The text written for a reason: "Czeka: …", "Zablokowany: …" (topic), "Zablokowane: …" (task). */
 export function reasonText(t: Pick<WaitTarget, "kind" | "status">, reason: string): string {
   const r = reason.replace(/\s+/g, " ").trim();
-  if (t.kind === "task") return `Zablokowane: ${r}`;
-  return t.status === "blocked" ? `Zablokowany: ${r}` : `Czeka: ${r}`;
+  if (t.kind === "task") return tr("Zablokowane: {0}", r);
+  return t.status === "blocked" ? tr("Zablokowany: {0}", r) : tr("Czeka: {0}", r);
 }
 
 export function WaitingStep({ targets, onDone, title }: { targets: WaitTarget[]; onDone: () => void; title?: string }) {
@@ -74,7 +75,7 @@ export function WaitingStep({ targets, onDone, title }: { targets: WaitTarget[];
       let list = null;
       for (const t of targets) list = await api.setWaiting(t.key, days);
       if (list) waitingStore.set(list);
-      notify(`Przypomnę za ${dayLabel(days)}.`);
+      notify(tr("Przypomnę za {0}.", dayLabel(days)));
       onDone();
     } catch (e) {
       notify(describeError(e));
@@ -85,7 +86,7 @@ export function WaitingStep({ targets, onDone, title }: { targets: WaitTarget[];
   return (
     <form
       className="wait-step"
-      aria-label="Na co czeka"
+      aria-label={tr("Na co czeka")}
       onSubmit={(e) => {
         e.preventDefault();
         void save();
@@ -99,19 +100,19 @@ export function WaitingStep({ targets, onDone, title }: { targets: WaitTarget[];
     >
       {title && <p className="wait-step-title">{title}</p>}
       <label className="wait-step-label">
-        {blocked ? "Co blokuje?" : "Na co czeka?"}
+        {blocked ? tr("Co blokuje?") : tr("Na co czeka?")}
         <input
           ref={ref}
           className="field"
           value={reason}
-          placeholder={blocked ? "np. brak odpisu z KRS (opcjonalnie)" : "np. weryfikacja konta w Przelewy24 (opcjonalnie)"}
+          placeholder={blocked ? tr("np. brak odpisu z KRS (opcjonalnie)") : tr("np. weryfikacja konta w Przelewy24 (opcjonalnie)")}
           onChange={(e) => setReason(e.target.value)}
         />
       </label>
       <div className="wait-step-row">
-        <span className="wait-step-label">Przypomnij za</span>
+        <span className="wait-step-label">{tr("Przypomnij za")}</span>
         <Segmented<string>
-          label="Przypomnij za"
+          label={tr("Przypomnij za")}
           value={String(days)}
           onChange={(v) => setDays(Number(v))}
           options={DAYS.map((d) => ({ value: String(d), label: dayLabel(d) }))}
@@ -119,11 +120,10 @@ export function WaitingStep({ targets, onDone, title }: { targets: WaitTarget[];
       </div>
       <div className="wait-step-actions">
         <Button type="submit" variant="ghost" disabled={busy}>
-          {busy ? "Zapisuję…" : "Zapisz"}
+          {busy ? tr("Zapisuję…") : tr("Zapisz")}
         </Button>
-        <Button variant="quiet" disabled={busy} onClick={onDone} title={`Przypomnienie i tak za ${dayLabel(defaultDays)}`}>
-          Pomiń
-        </Button>
+        <Button variant="quiet" disabled={busy} onClick={onDone} title={tr("Przypomnienie i tak za {0}", dayLabel(defaultDays))}>
+          {tr("Pomiń")}</Button>
       </div>
     </form>
   );

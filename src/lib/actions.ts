@@ -1,3 +1,4 @@
+import { t as tr, getLocale } from "../i18n";
 // Pure logic of the „Akcje" view: parameter values, validation, request building,
 // provider choice and time formatting.
 
@@ -17,15 +18,15 @@ export function initialValues(recipe: Recipe): ParamValues {
 function check(p: RecipeParam, raw: string | undefined, projects: readonly string[] | null): string | null {
   const value = (raw ?? "").trim();
   if (p.kind === "period") {
-    if (value !== "dzis" && value !== "tydzien") return `Wybierz okres: ${p.label}.`;
+    if (value !== "dzis" && value !== "tydzien") return tr("Wybierz okres: {0}.", p.label);
     return null;
   }
   if (p.kind === "project") {
-    if (value && projects && !projects.includes(value)) return `Nie ma takiego projektu: ${value}.`;
-    if (!value && p.required) return `Uzupełnij pole: ${p.label}.`;
+    if (value && projects && !projects.includes(value)) return tr("Nie ma takiego projektu: {0}.", value);
+    if (!value && p.required) return tr("Uzupełnij pole: {0}.", p.label);
     return null;
   }
-  if (!value && p.required) return `Uzupełnij pole: ${p.label}.`;
+  if (!value && p.required) return tr("Uzupełnij pole: {0}.", p.label);
   return null;
 }
 
@@ -85,14 +86,14 @@ export function formatRunTime(at: string, now: Date = new Date()): string {
   const d = new Date(ms);
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   if (d.toDateString() === now.toDateString()) return hm;
-  const MONTHS = ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru"];
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${hm}`;
+  const month = new Intl.DateTimeFormat(getLocale(), { month: "short" }).format(d).replace(/\.$/, "");
+  return `${d.getDate()} ${month} ${hm}`;
 }
 
-export const MODE_LABEL: Record<RunMode, string> = { background: "W tle", terminal: "Terminal" };
+export const MODE_LABEL: Record<RunMode, string> = { get background() { return tr("W tle"); }, terminal: "Terminal" };
 export const STATUS_LABEL = {
-  running: "W toku",
-  succeeded: "Zakończone",
-  failed: "Błąd",
-  cancelled: "Przerwane",
+  get running() { return tr("W toku"); },
+  get succeeded() { return tr("Zakończone"); },
+  get failed() { return tr("Błąd"); },
+  get cancelled() { return tr("Przerwane"); },
 } as const;

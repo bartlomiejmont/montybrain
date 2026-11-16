@@ -39,6 +39,7 @@ use crate::runs::{
 use crate::state::VaultState;
 
 pub mod apply;
+pub mod journal;
 pub mod schedule;
 pub mod store;
 
@@ -328,7 +329,13 @@ fn apply_locked<R: Runtime>(
     let Some(prop) = st.proposal.as_mut() else {
         return (Vec::new(), None);
     };
-    let (items, written) = apply::apply(vault, project, prop, indices, now);
+    let automatic = prop.automatic_indices();
+    let safe: Vec<_> = indices
+        .iter()
+        .copied()
+        .filter(|i| trigger != TriggerKind::Auto || automatic.contains(i))
+        .collect();
+    let (items, written) = apply::apply(vault, project, prop, &safe, now);
     let mut token = None;
     if !written.is_empty() {
         let t = format!(
@@ -499,11 +506,17 @@ pub fn run_finished<R: Runtime>(app: &AppHandle<R>, info: &RunInfo, ctx: &RunCon
     let current = app.state::<VaultState>().snapshot();
     let base = ctx.base.clone().unwrap_or_else(|| current.clone());
     let end = match info.status {
-        RunStatus::Succeeded => RunEnd::Parsed(proposal::parse(
-            info.result.as_deref().unwrap_or_default(),
-            &base,
-            &project,
-        )),
+        RunStatus::Succeeded => RunEnd::Parsed(if let Some(topic) = &ctx.topic {
+            proposal::parse_journal(
+                info.result.as_deref().unwrap_or_default(),
+                &base,
+                &project,
+                topic,
+                ctx.request.as_deref().unwrap_or_default(),
+            )
+        } else {
+            proposal::parse(info.result.as_deref().unwrap_or_default(), &base, &project)
+        }),
         RunStatus::Failed => RunEnd::Failed(
             info.error
                 .clone()
@@ -532,7 +545,13 @@ pub fn run_finished<R: Runtime>(app: &AppHandle<R>, info: &RunInfo, ctx: &RunCon
     {
         let mut st = crate::lock(&updates.store);
         let p = st.project(&project);
+        if let (Some(topic), Some(input)) = (&ctx.topic, &ctx.journal_refresh) {
+            journal::advance(p, topic, input, &end);
+        }
         let pending = store::record_finished(p, &finished, end);
+        if let Some(prop) = p.proposal.as_mut().filter(|p| p.run_id == info.id) {
+            prop.topic = ctx.topic.clone();
+        }
         if let (Some(n), Trigger::Auto) = (pending, ctx.trigger) {
             match cfg.on_result {
                 OnResult::Propose => {
@@ -898,6 +917,7 @@ impl<R: Runtime> AutoEnv for TauriEnv<R> {
                 trigger: Trigger::Auto,
                 agent: agent_choice(&self.0, cfg.provider),
                 history,
+                journal_refresh: None,
             },
         )
         .map(|info| info.id)

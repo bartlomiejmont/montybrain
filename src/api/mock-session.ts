@@ -1,11 +1,11 @@
 // The in-app agent session in the browser mock: a scripted conversation (no
 // agent runs). `pnpm dev` with "Moje narzędzia" plays it: a tool call, a
 // permission card, the answer with proposals, follow-ups. URL states for
-// screenshots: `?session=working|card|question|idle|failed` (the panel opens).
+// screenshots: `?session=working|card|question|idle|failed|history|queue|finished` (the panel opens).
 
 import type { ProviderId, SessionAnswer, SessionEntry, SessionStartRequest, SessionView } from "./types";
 
-export const MOCK_SESSION_STATES = ["working", "card", "question", "idle", "failed"] as const;
+export const MOCK_SESSION_STATES = ["working", "card", "question", "idle", "failed", "history", "queue", "finished"] as const;
 export type MockSessionState = (typeof MOCK_SESSION_STATES)[number];
 
 const at = "2026-11-14T10:00:00";
@@ -23,6 +23,7 @@ function base(provider: ProviderId = "claude"): SessionView {
     proposal: null,
     error: null,
     remembered: [],
+    telemetry: { connected: true, model: provider === "claude" ? "claude-fable" : "gpt-6-sol", usage: { input_tokens: 12480, output_tokens: 730, cached_input_tokens: 8192, cache_write_tokens: 0, cost_usd: provider === "claude" ? 0.042 : null }, limits: [] },
   };
 }
 
@@ -67,6 +68,19 @@ const answer: SessionEntry[] = [
 export function mockSessionView(state: MockSessionState): SessionView {
   const v = base();
   switch (state) {
+    case "history":
+      return { ...v, entries: [
+        ...Array.from({ length: 16 }, (_, i): SessionEntry[] => [
+          { kind: "assistant", id: 200 + i * 3, text: `Sprawdzam wątek ${i + 1}. Zebrane informacje porównam z zadaniami w Skrzynce.` },
+          { kind: "tool", id: 201 + i * 3, name: "mcp__slack__read_thread", summary: `wątek ${i + 1}`, detail: "", status: i === 4 ? "failed" : "done", output: i === 4 ? "Wątek niedostępny." : "Sprawdzono wiadomości." },
+          { kind: "tool", id: 202 + i * 3, name: "mcp__montybrain__list_tasks", summary: "Skrzynka", detail: "", status: "done", output: "9 wpisów" },
+        ]).flat(),
+        { kind: "tool", id: 300, name: "mcp__slack__read_channel", summary: "#zespol", detail: "", status: "running", output: "" },
+      ] };
+    case "queue":
+      return { ...v, status: "needs_you", entries: [...intro, card, { ...(mockSessionView("question").entries.at(-1) as Extract<SessionEntry, { kind: "permission" }>), id: 8 }] };
+    case "finished":
+      return { ...mockSessionView("idle"), status: "ended", ended_at: at };
     case "working":
       return { ...v, entries: intro };
     case "card":
@@ -127,9 +141,10 @@ export function createMockSession(initial: SessionView | null) {
       timers.forEach((t) => globalThis.clearTimeout(t));
       timers = [];
       const request = r.text.trim() || "Porządek w Skrzynce";
-      view = { ...base(r.provider), request, scope: r.scope === "project" ? { kind: "project", project: r.project ?? "" } : { kind: "inbox" }, status: "starting", entries: [{ kind: "user", id: 1, text: request }] };
+      view = { ...base(r.provider), request, scope: r.scope === "project" ? { kind: "project", project: r.project ?? "" } : { kind: "inbox" }, status: "starting",
+        telemetry: { connected: false, model: null, usage: null, limits: [] }, entries: [{ kind: "user", id: 1, text: request }] };
       const name = r.provider === "claude" ? "Claude Code" : "Codex";
-      later(400, () => (add({ kind: "notice", id: 2, text: `${name} połączony (podgląd w przeglądarce).`, error: false }), set({ status: "working" }), emit()));
+      later(400, () => (add({ kind: "notice", id: 2, text: `${name} połączony (podgląd w przeglądarce).`, error: false }), set({ status: "working", telemetry: { ...base(r.provider).telemetry, usage: null } }), emit()));
       later(1100, () => (add(intro[2]!), add(intro[3]!), emit()));
       later(1800, () => (add(intro[4]!), add(denied), add(card), set({ status: "needs_you" }), emit()));
       return structuredClone(view);
@@ -148,6 +163,7 @@ export function createMockSession(initial: SessionView | null) {
       if (!view) throw new Error("Nie ma sesji agenta.");
       const e = view.entries.find((x) => x.id === entry);
       if (!e || e.kind !== "permission" || e.state !== "pending") throw new Error("Na to pytanie nie można już odpowiedzieć.");
+      if (a !== "deny" && e.questions.some((q) => !answers?.[q.id]?.trim())) throw new Error("Odpowiedz na wszystkie pytania przed wysłaniem.");
       const state = a === "allow" ? "allowed" : a === "allow_session" ? "allowed_session" : "denied";
       view = {
         ...view,
@@ -155,13 +171,18 @@ export function createMockSession(initial: SessionView | null) {
         entries: view.entries.map((x) => (x.id === entry && x.kind === "permission" ? { ...x, state, note: answers ? Object.values(answers).join(", ") : "" } : x)),
         remembered: a === "allow_session" ? [...view.remembered, e.tool] : view.remembered,
       };
+      if (view.entries.some((x) => x.kind === "permission" && x.state === "pending")) {
+        set({ status: "needs_you" });
+        emit();
+        return;
+      }
       emit();
       later(900, () => {
         if (!view) return;
         view = { ...view, entries: view.entries.map((x) => (x.kind === "tool" && x.status === "running" ? { ...x, status: a === "deny" ? "failed" : "done", output: a === "deny" ? "Odmówiono." : "50 wiadomości" } : x)) };
         if (a === "deny") add({ kind: "assistant", id: next++, text: "Bez dostępu do Slacka nie sprawdzę kanału. Mogę za to uporządkować wpisy w Skrzynce." });
         else answer.forEach((x) => add({ ...x, id: next++ }));
-        set({ status: "idle", proposal: a === "deny" ? null : { count: 3, at } });
+        set({ status: "idle", proposal: a === "deny" ? null : { count: 3, at }, telemetry: base(view.provider).telemetry });
         emit();
       });
     },

@@ -1,3 +1,4 @@
+import { t as tr, getLocale } from "../i18n";
 // Local-date helpers. Dates travel as strings ("YYYY-MM-DD", "YYYY-MM-DDTHH:MM");
 // arithmetic is done on plain calendar dates, never on UTC instants.
 
@@ -44,15 +45,15 @@ export function joinDue(date: IsoDate, time: string | null | undefined): DueStri
   return time ? `${date}T${time}` : date;
 }
 
-const fmtDayMonth = new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "short" });
-const fmtDayMonthYear = new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "short", year: "numeric" });
-const fmtWeekdayShort = new Intl.DateTimeFormat("pl-PL", { weekday: "short" });
-const fmtLong = new Intl.DateTimeFormat("pl-PL", { weekday: "long", day: "numeric", month: "long" });
+const fmtDayMonth = () => new Intl.DateTimeFormat(getLocale(), { day: "numeric", month: "short" });
+const fmtDayMonthYear = () => new Intl.DateTimeFormat(getLocale(), { day: "numeric", month: "short", year: "numeric" });
+const fmtWeekdayShort = () => new Intl.DateTimeFormat(getLocale(), { weekday: "short" });
+const fmtLong = () => new Intl.DateTimeFormat(getLocale(), { weekday: "long", day: "numeric", month: "long" });
 
 export function shortDate(date: IsoDate, today: IsoDate): string {
   const d = parseDate(date);
   const sameYear = date.slice(0, 4) === today.slice(0, 4);
-  return (sameYear ? fmtDayMonth : fmtDayMonthYear).format(d).replace(/\.$/, "");
+  return (sameYear ? fmtDayMonth() : fmtDayMonthYear()).format(d).replace(/\.$/, "");
 }
 
 /** "dziś", "jutro", "wczoraj", "pt", "20 lis" (+ " 14:00"). */
@@ -60,10 +61,10 @@ export function formatDue(due: DueString, today: IsoDate): string {
   const { date, time } = splitDue(due);
   const diff = daysBetween(today, date);
   let label: string;
-  if (diff === 0) label = "dziś";
-  else if (diff === 1) label = "jutro";
-  else if (diff === -1) label = "wczoraj";
-  else if (diff > 1 && diff < 7) label = fmtWeekdayShort.format(parseDate(date)).replace(/\.$/, "");
+  if (diff === 0) label = tr("dziś");
+  else if (diff === 1) label = tr("jutro");
+  else if (diff === -1) label = tr("wczoraj");
+  else if (diff > 1 && diff < 7) label = `${fmtWeekdayShort().format(parseDate(date)).replace(/\.$/, "")} ${parseDate(date).getDate()}`;
   else label = shortDate(date, today);
   return time ? `${label} ${time}` : label;
 }
@@ -78,7 +79,7 @@ export function formatStamp(at: IsoMinute, today: IsoDate): string {
   const [date = at, time = ""] = at.split("T");
   const diff = daysBetween(today, date);
   if (diff === 0) return time;
-  if (diff === -1) return `wczoraj ${time}`;
+  if (diff === -1) return tr("wczoraj {0}", time);
   return `${shortDate(date, today)} ${time}`.trim();
 }
 
@@ -86,13 +87,13 @@ export function formatStamp(at: IsoMinute, today: IsoDate): string {
 export function formatAge(at: IsoMinute | IsoDate, today: IsoDate): string {
   const date = at.slice(0, 10);
   const diff = daysBetween(date, today);
-  if (diff <= 0) return "dziś";
-  if (diff === 1) return "wczoraj";
-  if (diff < 7) return `${diff} dni temu`;
+  if (diff <= 0) return tr("dziś");
+  if (diff === 1) return tr("wczoraj");
+  if (diff < 7) return tr("{0} dni temu", diff);
   return shortDate(date, today);
 }
 
 /** "piątek, 13 listopada" */
 export function formatLongDate(today: IsoDate): string {
-  return fmtLong.format(parseDate(today));
+  return fmtLong().format(parseDate(today));
 }

@@ -1,3 +1,4 @@
+import { t as tr } from "../../i18n";
 // „Aktualizacja": the update strip under the project header. Starts the
 // read-only `aktualizacja` recipe for this project ("Sprawdź projekt") or a
 // free-form request (`zlecenie`, the input under the bar), shows its progress,
@@ -7,7 +8,7 @@
 // State: store/updates.ts (backend: src-tauri/src/updates/).
 
 import { ChevronDown, ChevronRight, MoreHorizontal, RefreshCw } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useId, type ReactNode, type RefObject } from "react";
 
 import {
   api,
@@ -42,6 +43,7 @@ import {
   counts,
   decidedLine,
   defaultSelection,
+  undecidedChanges,
   describeChange,
   formatNext,
   formatWhen,
@@ -64,6 +66,7 @@ import {
   runningStatus,
   secondaryLabel,
   statusLine,
+  showStrip,
   stripState,
   undoSummary,
   updateRunFor,
@@ -72,7 +75,6 @@ import { navigate } from "../../router/router";
 import { readPref, writePref } from "../../store/ui";
 import { runStore, useRuns } from "../../store/runs";
 import { sessionStore } from "../../store/session";
-import { MY_TOOLS_CONSENT, MY_TOOLS_CONSENT_KEY } from "../../lib/agentMode";
 import { updateStore, useProviders, useUpdates } from "../../store/updates";
 import { useVault, useView } from "../../store/vault";
 import { Markdown } from "../actions/Markdown";
@@ -81,7 +83,7 @@ import { driftStore, useDrift } from "../../store/signals";
 import { presetAction } from "../actions/preset";
 import "./update.css";
 
-const PROVIDER_PREF = "montybrain.aktualizacja.provider";
+export const PROVIDER_PREF = "montybrain.aktualizacja.provider";
 const DEFAULT_AUTO: AutoUpdate = { schedule: { kind: "off" }, provider: "claude", on_result: "propose" };
 const DEFAULT_SOURCES: UpdateSources = { history: false, history_days: 14 };
 /** Typed requests per project: survive navigating away and back (module scope, like Akcje's form). */
@@ -113,15 +115,14 @@ function InlineConfirm({ question, confirmLabel, onConfirm, onCancel, danger }: 
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => ref.current?.focus(), []);
   return (
-    <div className="upd-confirm" role="group" aria-label="Potwierdzenie" onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onCancel())}>
+    <div className="upd-confirm" role="group" aria-label={tr("Potwierdzenie")} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onCancel())}>
       <p className="upd-confirm-q">{question}</p>
       <div className="upd-confirm-actions">
         <Button ref={ref} variant={danger ? "danger" : "ghost"} onClick={onConfirm}>
           {confirmLabel}
         </Button>
         <Button variant="quiet" onClick={onCancel}>
-          Anuluj
-        </Button>
+          {tr("Anuluj")}</Button>
       </div>
     </div>
   );
@@ -206,7 +207,7 @@ function AutoPanel({
       className="upd-auto"
       id={id}
       role="group"
-      aria-label="Źródła i automatyczna aktualizacja"
+      aria-label={tr("Źródła i automatyczna aktualizacja")}
       onKeyDown={(e) => {
         if (e.key === "Escape" && !confirmApply && !confirmHistory) {
           e.stopPropagation();
@@ -215,19 +216,18 @@ function AutoPanel({
       }}
     >
       <h3 className="upd-panel-head" id={`upd-src-${project.slug}`}>
-        Źródła
-      </h3>
+        {tr("Źródła")}</h3>
       <div className="upd-auto-row">
-        <span className="upd-auto-label">Repozytoria</span>
+        <span className="upd-auto-label">{tr("Repozytoria")}</span>
         <div className="upd-auto-controls">
-          <span className="upd-auto-static">zawsze: commity, gałęzie, drzewa robocze</span>
+          <span className="upd-auto-static">{tr("zawsze: commity, gałęzie, drzewa robocze")}</span>
         </div>
       </div>
       <div className="upd-auto-row" ref={historyRow}>
-        <span className="upd-auto-label">Historia rozmów</span>
+        <span className="upd-auto-label">{tr("Historia rozmów")}</span>
         <div className="upd-auto-controls">
           <Segmented<"off" | "on">
-            label="Historia rozmów (Claude Code, Codex)"
+            label={tr("Historia rozmów (Claude Code, Codex)")}
             value={src.history ? "on" : "off"}
             disabled={busy || confirmHistory}
             onChange={(v) => {
@@ -236,34 +236,33 @@ function AutoPanel({
               if (t.save) void saveSources(t.save);
             }}
             options={[
-              { value: "off", label: "Wyłączona" },
+              { value: "off", label: tr("Wyłączona") },
               { value: "on", label: "Claude Code, Codex" },
             ]}
           />
           {src.history && (
             <select
               className="field select upd-select"
-              aria-label="Okno historii rozmów"
+              aria-label={tr("Okno historii rozmów")}
               value={src.history_days}
               disabled={busy}
               onChange={(e) => void saveSources({ ...src, history_days: Number(e.target.value) })}
             >
               {[7, 14, 30].map((d) => (
                 <option key={d} value={d}>
-                  ostatnie {d} dni
-                </option>
+                  {tr("ostatnie")} {d}  {tr("dni")}</option>
               ))}
             </select>
           )}
           {src.history && !confirmHistory && (
-            <p className="upd-auto-warn">Polecenia z sesji w repozytoriach projektu idą do agenta razem ze stanem repozytoriów, po wycięciu fragmentów wyglądających na sekrety.</p>
+            <p className="upd-auto-warn">{tr("Polecenia z sesji w repozytoriach projektu idą do agenta razem ze stanem repozytoriów, po wycięciu fragmentów wyglądających na sekrety.")}</p>
           )}
         </div>
       </div>
       {confirmHistory && (
         <InlineConfirm
-          question={HISTORY_CONSENT}
-          confirmLabel="Włącz historię"
+          question={tr(HISTORY_CONSENT)}
+          confirmLabel={tr("Włącz historię")}
           onConfirm={() => {
             setConfirmHistory(false);
             const t = historyToggle(src, true, true);
@@ -276,33 +275,33 @@ function AutoPanel({
           }}
         />
       )}
-      <h3 className="upd-panel-head">Automatycznie</h3>
-      <p className="upd-auto-note">Każde sprawdzenie zużywa limit wybranej subskrypcji. Działa tylko, gdy MontyBrain jest uruchomiony.</p>
+      <h3 className="upd-panel-head">{tr("Automatycznie")}</h3>
+      <p className="upd-auto-note">{tr("Każde sprawdzenie zużywa limit wybranej subskrypcji. Działa tylko, gdy MontyBrain jest uruchomiony.")}</p>
       <div className="upd-auto-row">
-        <span className="upd-auto-label">Harmonogram</span>
+        <span className="upd-auto-label">{tr("Harmonogram")}</span>
         <div className="upd-auto-controls">
           <Segmented<UpdateSchedule["kind"]>
-            label="Harmonogram"
+            label={tr("Harmonogram")}
             value={s.kind}
             disabled={busy}
             onChange={(k) => setSchedule(k === "off" ? { kind: "off" } : k === "every" ? { kind: "every", hours: 6 } : { kind: "daily", hour: 9 })}
             options={[
-              { value: "off", label: "Wyłączona" },
-              { value: "every", label: "Co kilka godzin" },
-              { value: "daily", label: "Codziennie" },
+              { value: "off", label: tr("Wyłączona") },
+              { value: "every", label: tr("Co kilka godzin") },
+              { value: "daily", label: tr("Codziennie") },
             ]}
           />
           {s.kind === "every" && (
-            <select className="field select upd-select" aria-label="Odstęp między sprawdzeniami" value={s.hours} disabled={busy} onChange={(e) => setSchedule({ kind: "every", hours: Number(e.target.value) })}>
+            <select className="field select upd-select" aria-label={tr("Odstęp między sprawdzeniami")} value={s.hours} disabled={busy} onChange={(e) => setSchedule({ kind: "every", hours: Number(e.target.value) })}>
               {hourChoices(s.hours).map((h) => (
                 <option key={h} value={h}>
-                  co {h} h
+                  {tr("co")} {h} h
                 </option>
               ))}
             </select>
           )}
           {s.kind === "daily" && (
-            <select className="field select upd-select" aria-label="Godzina sprawdzenia" value={s.hour} disabled={busy} onChange={(e) => setSchedule({ kind: "daily", hour: Number(e.target.value) })}>
+            <select className="field select upd-select" aria-label={tr("Godzina sprawdzenia")} value={s.hour} disabled={busy} onChange={(e) => setSchedule({ kind: "daily", hour: Number(e.target.value) })}>
               {Array.from({ length: 24 }, (_, h) => (
                 <option key={h} value={h}>
                   {String(h).padStart(2, "0")}:00
@@ -313,10 +312,10 @@ function AutoPanel({
         </div>
       </div>
       <div className="upd-auto-row">
-        <span className="upd-auto-label">Subskrypcja</span>
+        <span className="upd-auto-label">{tr("Subskrypcja")}</span>
         <div className="upd-auto-controls">
           <Segmented<ProviderId>
-            label="Subskrypcja automatycznej aktualizacji"
+            label={tr("Subskrypcja automatycznej aktualizacji")}
             value={cfg.provider}
             disabled={busy}
             onChange={(provider) => void save({ ...cfg, provider })}
@@ -324,37 +323,36 @@ function AutoPanel({
               value: p.id,
               label: PROVIDER_LABEL[p.id],
               disabled: !p.available,
-              hint: p.available ? undefined : (p.problem ?? "Niedostępny"),
+              hint: p.available ? undefined : (p.problem ?? tr("Niedostępny")),
             }))}
           />
           {savedMissing && (
             <p className="upd-auto-warn" role="status">
-              {PROVIDER_LABEL[cfg.provider]} jest niedostępny — zainstaluj CLI lub wybierz inną subskrypcję.
-            </p>
+              {PROVIDER_LABEL[cfg.provider]}  {tr("jest niedostępny — zainstaluj CLI lub wybierz inną subskrypcję.")}</p>
           )}
         </div>
       </div>
       <div className="upd-auto-row" ref={resultRow}>
-        <span className="upd-auto-label">Wynik</span>
+        <span className="upd-auto-label">{tr("Wynik")}</span>
         <div className="upd-auto-controls">
           <Segmented<AutoUpdate["on_result"]>
-            label="Co zrobić z wynikiem"
+            label={tr("Co zrobić z wynikiem")}
             value={cfg.on_result}
             disabled={busy || confirmApply}
             onChange={(on_result) => (on_result === "apply" ? setConfirmApply(true) : void save({ ...cfg, on_result }))}
             options={[
-              { value: "propose", label: "Pokaż propozycje" },
-              { value: "apply", label: "Zapisuj bez pytania" },
+              { value: "propose", label: tr("Pokaż propozycje") },
+              { value: "apply", label: tr("Zapisuj bez pytania") },
             ]}
           />
-          {cfg.on_result === "apply" && !confirmApply && <p className="upd-auto-warn">Zmiany trafią do zadań i dziennika, zanim je zobaczysz.</p>}
+          {cfg.on_result === "apply" && !confirmApply && <p className="upd-auto-warn">{tr("Zmiany trafią do zadań i dziennika, zanim je zobaczysz.")}</p>}
         </div>
       </div>
       {confirmApply && (
         <InlineConfirm
           danger
-          question="Zapisywać zmiany bez pytania? Agent będzie sam zmieniać zadania i tematy w tym projekcie. Cofnięcie będzie ręczne."
-          confirmLabel="Zapisuj bez pytania"
+          question={tr("Zapisywać zmiany bez pytania? Agent będzie sam zmieniać zadania i tematy w tym projekcie. Cofnięcie będzie ręczne.")}
+          confirmLabel={tr("Zapisuj bez pytania")}
           onConfirm={() => {
             setConfirmApply(false);
             void save({ ...cfg, on_result: "apply" }).then(() => focusIn(resultRow));
@@ -368,7 +366,7 @@ function AutoPanel({
       {view?.held ? (
         <p className="upd-auto-next">{heldText(view.pending)}</p>
       ) : (
-        view?.next_due && <p className="upd-auto-next">Następne sprawdzenie: {formatNext(view.next_due, new Date())}.</p>
+        view?.next_due && <p className="upd-auto-next">{tr("Następne sprawdzenie:")} {formatNext(view.next_due, new Date())}.</p>
       )}
     </div>
   );
@@ -401,10 +399,11 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
         return { kind: "task_status", status: taskStatus };
       case "new_task":
         return { kind: "new_task", title };
+      case "remove_task":
       case "move_task":
       case "topic_from_tasks":
         // Not editable: the review offers no "Edytuj" for these kinds.
-        throw new Error("Tej propozycji nie da się poprawić.");
+        throw new Error(tr("Tej propozycji nie da się poprawić."));
     }
   };
   async function save() {
@@ -412,7 +411,7 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
     setError(null);
     try {
       updateStore.set(await api.editUpdate(runId, index, edit()));
-      notify("Zapisano poprawkę propozycji.");
+      notify(tr("Zapisano poprawkę propozycji."));
       onDone(true);
     } catch (e) {
       setError(describeError(e));
@@ -430,7 +429,7 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
   return (
     <form
       className="upd-edit"
-      aria-label="Popraw propozycję"
+      aria-label={tr("Popraw propozycję")}
       onSubmit={(e) => {
         e.preventDefault();
         void save();
@@ -443,10 +442,10 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
       }}
     >
       {(c.kind === "new_topic" || c.kind === "new_task") &&
-        field("Tytuł", "title", <input ref={first} id={`${id}-title`} className="field" value={title} onChange={(e) => setTitle(e.target.value)} />)}
+        field(tr("Tytuł"), "title", <input ref={first} id={`${id}-title`} className="field" value={title} onChange={(e) => setTitle(e.target.value)} />)}
       {(c.kind === "new_topic" || c.kind === "topic_log") &&
         field(
-          "Status tematu",
+          tr("Status tematu"),
           "status",
           <select
             ref={c.kind === "topic_log" ? first : undefined}
@@ -455,7 +454,7 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
             value={topicStatus}
             onChange={(e) => setTopicStatus(e.target.value as TopicStatus | "")}
           >
-            {c.kind === "topic_log" && <option value="">bez zmiany ({TOPIC_STATUS_LABEL[c.base_status].toLowerCase()})</option>}
+            {c.kind === "topic_log" && <option value="">{tr("bez zmiany (")}{TOPIC_STATUS_LABEL[c.base_status].toLowerCase()})</option>}
             {TOPIC_STATUSES.map((st) => (
               <option key={st} value={st}>
                 {TOPIC_STATUS_LABEL[st]}
@@ -464,29 +463,29 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
           </select>,
         )}
       {(c.kind === "new_topic" || c.kind === "topic_log") &&
-        field("Opis stanu", "summary", <textarea id={`${id}-summary`} className="field" rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />)}
+        field(tr("Opis stanu"), "summary", <textarea id={`${id}-summary`} className="field" rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />)}
       {(c.kind === "new_topic" || c.kind === "topic_log") &&
         field(
-          c.kind === "new_topic" ? "Pierwszy wpis w dzienniku" : "Wpis w dzienniku",
+          c.kind === "new_topic" ? tr("Pierwszy wpis w dzienniku") : tr("Wpis w dzienniku"),
           "text",
           <textarea id={`${id}-text`} className="field" rows={2} value={text} onChange={(e) => setText(e.target.value)} />,
         )}
       {c.kind === "new_topic" && c.tasks.length > 0 && (
         <fieldset className="upd-edit-tasks">
-          <legend className="upd-edit-label">Zadania tematu</legend>
+          <legend className="upd-edit-label">{tr("Zadania tematu")}</legend>
           {tasks.map((t, k) => (
             <div key={k} className={`upd-edit-task${t.keep ? "" : " off"}`}>
-              <input type="checkbox" checked={t.keep} aria-label={`Dodaj zadanie ${k + 1}`} onChange={() => setTask(k, { keep: !t.keep })} />
+              <input type="checkbox" checked={t.keep} aria-label={tr("Dodaj zadanie {0}", k + 1)} onChange={() => setTask(k, { keep: !t.keep })} />
               <input
                 className="field"
-                aria-label={`Tytuł zadania ${k + 1}`}
+                aria-label={tr("Tytuł zadania {0}", k + 1)}
                 value={t.title}
                 disabled={!t.keep}
                 onChange={(e) => setTask(k, { title: e.target.value })}
               />
               <select
                 className="field select"
-                aria-label={`Status zadania ${k + 1}`}
+                aria-label={tr("Status zadania {0}", k + 1)}
                 value={t.status}
                 disabled={!t.keep}
                 onChange={(e) => setTask(k, { status: e.target.value as TaskStatus })}
@@ -503,7 +502,7 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
       )}
       {c.kind === "task_status" &&
         field(
-          `Status zadania (teraz: ${TASK_STATUS_LABEL[c.from].toLowerCase()})`,
+          tr("Status zadania (teraz: {0})", TASK_STATUS_LABEL[c.from].toLowerCase()),
           "task",
           <select ref={first} id={`${id}-task`} className="field select" value={taskStatus} onChange={(e) => setTaskStatus(e.target.value as TaskStatus)}>
             {TASK_STATUSES.filter((st) => st !== c.from).map((st) => (
@@ -520,11 +519,10 @@ function ChangeEditor({ sc, index, runId, onDone }: { sc: StoredChange; index: n
       )}
       <div className="upd-edit-actions">
         <Button type="submit" variant="ghost" disabled={busy}>
-          {busy ? "Zapisuję…" : "Zapisz poprawkę"}
+          {busy ? tr("Zapisuję…") : tr("Zapisz poprawkę")}
         </Button>
         <Button variant="quiet" disabled={busy} onClick={() => onDone(false)}>
-          Anuluj
-        </Button>
+          {tr("Anuluj")}</Button>
       </div>
     </form>
   );
@@ -537,20 +535,20 @@ function SummaryCompare({ id, now, after }: { id: string; now: string; after: st
     <div className="upd-change-summary">
       {!open && (
         <>
-          <span className="upd-change-summary-label">Nowy opis tematu</span>
-          <p>{after || "(pusty)"}</p>
+          <span className="upd-change-summary-label">{tr("Nowy opis tematu")}</span>
+          <p>{after || tr("(pusty)")}</p>
         </>
       )}
-      <Disclosure label={open ? "Zwiń porównanie" : "Porównaj opis"} open={open} onToggle={() => setOpen(!open)} controls={id} />
+      <Disclosure label={open ? tr("Zwiń porównanie") : tr("Porównaj opis")} open={open} onToggle={() => setOpen(!open)} controls={id} />
       {open && (
         <div className="upd-compare" id={id}>
           <div>
-            <span className="upd-change-summary-label">Obecnie</span>
-            <p>{now || "(pusty)"}</p>
+            <span className="upd-change-summary-label">{tr("Obecnie")}</span>
+            <p>{now || tr("(pusty)")}</p>
           </div>
           <div>
-            <span className="upd-change-summary-label">Po zapisie</span>
-            <p>{after || "(pusty)"}</p>
+            <span className="upd-change-summary-label">{tr("Po zapisie")}</span>
+            <p>{after || tr("(pusty)")}</p>
           </div>
         </div>
       )}
@@ -586,28 +584,13 @@ function ChangeRow({
 }) {
   const t = describeChange(sc.change);
   const o = sc.outcome;
-  const inputId = `upd-c-${runId}-${index}`;
+  const instance = useId();
+  const inputId = `upd-c-${instance}-${runId}-${index}`;
   const selectable = !o && onToggle;
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const editBtn = useRef<HTMLButtonElement>(null);
   const view = useView();
-  if (compact && o && !expanded) {
-    return (
-      <li className={`upd-change is-compact st-${o.status}`}>
-        <span className={`upd-mark st-${o.status}`} aria-hidden>
-          {OUTCOME_MARK[o.status]}
-        </span>
-        <p className="upd-compact-line">
-          {decidedLine(sc)}
-          {sc.edited && <span className="upd-edited"> · zmienione przez ciebie</span>}{" "}
-          <button type="button" className="upd-link upd-compact-more" aria-expanded={false} onClick={() => setExpanded(true)}>
-            Szczegóły
-          </button>
-        </p>
-      </li>
-    );
-  }
   const c = sc.change;
   const { notify } = useVault();
   const drift = useDrift();
@@ -621,7 +604,7 @@ function ChangeRow({
       const r = await api.joinUpdate(runId, index, topic);
       updateStore.set(r.updates);
       const title = joinTargets.find((x) => x.slug === topic)?.title ?? topic;
-      notify(`Dołączono do tematu „${title}”.${r.skipped.length ? ` Pominięto ${r.skipped.length} (już są w temacie).` : ""}`);
+      notify(tr("Dołączono do tematu „{0}”.{1}", title, r.skipped.length ? tr(" Pominięto {0} (już są w temacie).", r.skipped.length) : ""));
     } catch (e) {
       notify(describeError(e));
     }
@@ -631,8 +614,23 @@ function ChangeRow({
     setEditing(false);
     requestAnimationFrame(() => editBtn.current?.focus());
   };
+  if (compact && o && !expanded) {
+    return (
+      <li className={`upd-change is-compact st-${o.status}`}>
+        <span className={`upd-mark st-${o.status}`} aria-hidden>
+          {OUTCOME_MARK[o.status]}
+        </span>
+        <p className="upd-compact-line">
+          {decidedLine(sc)}
+          {sc.edited && <span className="upd-edited">  {tr("· zmienione przez ciebie")}</span>}{" "}
+          <button type="button" className="upd-link upd-compact-more" aria-expanded={false} onClick={() => setExpanded(true)}>
+            {tr("Szczegóły")}</button>
+        </p>
+      </li>
+    );
+  }
   return (
-    <li className={`upd-change${t.topic ? " is-topic" : ""}${o ? ` st-${o.status}` : ""}`}>
+    <li className={`upd-change${c.kind === "remove_task" ? " is-removal" : ""}${t.topic ? " is-topic" : ""}${o ? ` st-${o.status}` : ""}`}>
       {o ? (
         <span className={`upd-mark st-${o.status}`} aria-hidden>
           {OUTCOME_MARK[o.status]}
@@ -647,7 +645,7 @@ function ChangeRow({
           <span className="upd-change-kind">{t.kind}</span>
           <span className="upd-change-title">{t.title}</span>
           {t.what && <span className="upd-change-what">{t.what}</span>}
-          {sc.edited && <span className="upd-edited">zmienione przez ciebie</span>}
+          {sc.edited && <span className="upd-edited">{tr("zmienione przez ciebie")}</span>}
         </span>
       </label>
       {editing ? (
@@ -659,15 +657,15 @@ function ChangeRow({
           {sc.change.kind === "new_topic" ? (
             <>
               <div className="upd-change-summary">
-                <span className="upd-change-summary-label">Opis stanu</span>
-                <p>{t.summary || "(pusty)"}</p>
+                <span className="upd-change-summary-label">{tr("Opis stanu")}</span>
+                <p>{t.summary || tr("(pusty)")}</p>
               </div>
               <div className="upd-change-summary">
                 <span className="upd-change-summary-label">{t.detailLabel}</span>
                 <p>{t.detail}</p>
               </div>
               {t.tasks.length > 0 && (
-                <ul className="upd-topic-tasks" aria-label={`Zadania tematu ${t.title}`}>
+                <ul className="upd-topic-tasks" aria-label={tr("Zadania tematu {0}", t.title)}>
                   {t.tasks.map((x, k) => (
                     <li key={k}>
                       <span className="upd-topic-task-title">{x.title}</span> <span className="upd-topic-task-status">{x.status}</span>
@@ -681,11 +679,11 @@ function ChangeRow({
             <>
               {t.summary && (
                 <div className="upd-change-summary">
-                  <span className="upd-change-summary-label">Opis stanu</span>
+                  <span className="upd-change-summary-label">{tr("Opis stanu")}</span>
                   <p>{t.summary}</p>
                 </div>
               )}
-              <ul className="upd-topic-tasks" aria-label={`Wpisy tematu ${t.title}`}>
+              <ul className="upd-topic-tasks" aria-label={tr("Wpisy tematu {0}", t.title)}>
                 {t.tasks.map((x, k) => (
                   <li key={k}>
                     <span className="upd-topic-task-title">{x.title}</span> <span className="upd-topic-task-status">{x.status}</span>
@@ -701,39 +699,36 @@ function ChangeRow({
             </>
           )}
           {(c.kind === "new_topic" || c.kind === "topic_log") && (c.branches?.length ?? 0) > 0 && (
-            <p className="upd-change-detail upd-branches">Gałęzie: {c.branches!.map((b) => `${b.repo}/${b.branch}`).join(", ")}</p>
+            <p className="upd-change-detail upd-branches">{tr("Gałęzie:")} {c.branches!.map((b) => `${b.repo}/${b.branch}`).join(", ")}</p>
           )}
-          {editable && !o && c.kind !== "move_task" && c.kind !== "topic_from_tasks" && (
+          {editable && !o && c.kind !== "remove_task" && c.kind !== "move_task" && c.kind !== "topic_from_tasks" && (
             <span className="upd-row-actions">
-              <button ref={editBtn} type="button" className="upd-link upd-edit-btn" disabled={busy} onClick={() => setEditing(true)}>
-                Edytuj
-              </button>
+              <button ref={editBtn} type="button" className="btn btn-quiet upd-edit-btn" disabled={busy} onClick={() => setEditing(true)}>
+                {tr("Edytuj")}</button>
               {c.kind === "new_topic" && joinTargets.length > 0 && (
                 <button
                   type="button"
-                  className="upd-link upd-edit-btn"
+                  className="btn btn-quiet upd-edit-btn"
                   disabled={busy}
                   aria-haspopup="menu"
                   aria-expanded={joinMenu !== null}
                   onClick={(e) => setJoinMenu(joinMenu ? null : e.currentTarget)}
                 >
-                  Dołącz do tematu…
-                </button>
+                  {tr("Dołącz do tematu…")}</button>
               )}
             </span>
           )}
           {editable && !o && similar && (
             <p className="upd-similar">
-              Podobny do: „{similar.title}”.{" "}
+              {tr("Podobny do: „")}{similar.title}”.{" "}
               <button type="button" className="upd-link" disabled={busy} onClick={() => void join(similar.slug)}>
-                Dołączyć?
-              </button>
+                {tr("Dołączyć?")}</button>
             </p>
           )}
           {joinMenu && (
             <Menu
               anchor={joinMenu}
-              label="Dołącz do tematu"
+              label={tr("Dołącz do tematu")}
               minWidth={240}
               onClose={() => setJoinMenu(null)}
               items={joinTargets.map((t) => ({ key: t.slug, label: t.title, onSelect: () => void join(t.slug) }))}
@@ -744,14 +739,13 @@ function ChangeRow({
       {o && (
         <p className="upd-outcome">
           {OUTCOME_LABEL[o.status]}
-          {(o.status === "stale" || o.status === "failed") && `: ${o.message}`}
-          {o.status === "applied" && o.message.startsWith("Cofnięto częściowo") && ` · ${o.message}`}
+          {(o.status === "stale" || o.status === "failed") && `: ${describeError(o.message)}`}
+          {o.status === "applied" && o.message.startsWith("Cofnięto częściowo") && ` · ${describeError(o.message)}`}
           {compact && (
             <>
               {" "}
               <button type="button" className="upd-link" aria-expanded onClick={() => setExpanded(false)}>
-                Zwiń
-              </button>
+                {tr("Zwiń")}</button>
             </>
           )}
         </p>
@@ -766,13 +760,13 @@ function AnswerBox({ text }: { text: string }) {
   const long = text.length > 600 || text.split("\n").length > 8;
   return (
     <div className="upd-answer">
-      <span className="upd-change-summary-label">Odpowiedź agenta</span>
+      <span className="upd-change-summary-label">{tr("Odpowiedź agenta")}</span>
       <div className={`upd-answer-body${long && !full ? " clamped" : ""}`}>
         <Markdown text={text} />
       </div>
       {long && (
         <button type="button" className="upd-link" aria-expanded={full} onClick={() => setFull(!full)}>
-          {full ? "Zwiń" : "Pokaż całość"}
+          {full ? tr("Zwiń") : tr("Pokaż całość")}
         </button>
       )}
     </div>
@@ -783,7 +777,7 @@ function ReportBox({ id, text }: { id: string; text: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="upd-report">
-      <Disclosure label="Raport agenta" open={open} onToggle={() => setOpen(!open)} controls={id} />
+      <Disclosure label={tr("Raport agenta")} open={open} onToggle={() => setOpen(!open)} controls={id} />
       {open && (
         <div className="upd-report-body" id={id}>
           <Markdown text={text} />
@@ -794,10 +788,18 @@ function ReportBox({ id, text }: { id: string; text: string }) {
 }
 
 /** The request a result answers, quoted above it. */
-function RequestQuote({ text }: { text: string }) {
+function RequestQuote({ text, topic }: { text: string; topic?: string | null }) {
+  if (topic) {
+    const [head = "", ...body] = text.split("\n");
+    const refresh = head?.startsWith("Odświeżenie tematu · ");
+    return <details className="upd-journal-request">
+      <summary>{tr("Odświeżenie z dziennika")}{refresh ? ` · ${head.slice(tr("Odświeżenie tematu · ").length)}` : ""}</summary>
+      <blockquote>{refresh ? body.join("\n").trim() : text}</blockquote>
+    </details>;
+  }
   return (
     <p className="upd-request">
-      <span className="upd-request-label">Zlecenie</span> <q className="upd-request-text">{text}</q>
+      <span className="upd-request-label">{tr("Zlecenie")}</span> <q className="upd-request-text">{text}</q>
     </p>
   );
 }
@@ -834,7 +836,7 @@ function RequestInput({
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [consent, setConsent] = useState(false);
+  const [delivery, setDelivery] = useState<"background" | "session">("background");
   const ref = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const wasOpened = useRef(false);
@@ -867,11 +869,9 @@ function RequestInput({
     if (ok) setText("");
     requestAnimationFrame(() => ref.current?.focus());
   }
-  async function session(agreed = false) {
+  async function session() {
     const t = text.trim();
     if (!t || !chosen || busy || !onSession) return;
-    if (!agreed && readPref(MY_TOOLS_CONSENT_KEY) !== "1") return setConsent(true);
-    setConsent(false);
     setBusy(true);
     const ok = await onSession(t);
     setBusy(false);
@@ -889,16 +889,18 @@ function RequestInput({
           setOpen(true);
         }}
       >
-        Nowe zlecenie…
-      </button>
+        {tr("Nowe zlecenie…")}</button>
     );
   }
   return (
     <div className={`upd-ask-wrap${collapsed ? " in-review" : ""}`}>
+      {onSession && <div className="upd-delivery" role="group" aria-label={tr("Sposób wykonania zlecenia")}>
+        <button type="button" className="btn btn-secondary" disabled={busy} aria-pressed={delivery === "background"} onClick={() => setDelivery("background")}>{tr("W tle")}</button>
+        <button type="button" className="btn btn-secondary" disabled={busy} aria-pressed={delivery === "session"} onClick={() => setDelivery("session")}>{tr("Rozmowa z agentem")}</button>
+      </div>}
       <div className="upd-ask">
         <label className="sr-only" htmlFor={id}>
-          Zlecenie dla agenta
-        </label>
+          {tr("Zlecenie dla agenta")}</label>
         <textarea
           ref={ref}
           id={id}
@@ -906,7 +908,7 @@ function RequestInput({
           rows={1}
           value={text}
           disabled={busy}
-          placeholder="Zleć agentowi, np. „rozpisz temat X na podstawie historii rozmów”"
+          placeholder={tr("Zleć agentowi, np. „rozpisz temat X na podstawie historii rozmów”")}
           aria-describedby={`${id}-note`}
           onChange={(e) => setText(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -914,7 +916,8 @@ function RequestInput({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              void go("background");
+              if (delivery === "session") void session();
+              else void go("background");
             } else if (e.key === "Escape") {
               e.stopPropagation();
               if (collapsed && !text) {
@@ -927,60 +930,37 @@ function RequestInput({
         <Button
           variant="ghost"
           className="upd-ask-go"
-          disabled={!ready || !!blocked}
-          title={blocked ?? (chosen ? `${PROVIDER_LABEL[chosen]} wykona zlecenie w tle; zmiany zaproponuje do akceptacji` : "Żaden agent nie jest dostępny")}
-          onClick={() => void go("background")}
+          disabled={!ready || (delivery === "background" && !!blocked)}
+          title={delivery === "session" ? tr("Otwórz panel z twoimi narzędziami") : blocked ?? (chosen ? tr("{0} wykona zlecenie w tle; zmiany zaproponuje do akceptacji", PROVIDER_LABEL[chosen]) : tr("Żaden agent nie jest dostępny"))}
+          onClick={() => delivery === "session" ? void session() : void go("background")}
         >
-          {busy ? "Uruchamiam…" : "Zleć"}
+          {busy ? tr("Uruchamiam…") : delivery === "session" ? tr("Otwórz panel") : tr("Zleć")}
         </Button>
         <button
           type="button"
           className="upd-link upd-ask-term"
           disabled={!ready}
-          title={chosen ? `Sesja ${PROVIDER_LABEL[chosen]} w Terminalu, z twoimi narzędziami; zapis po potwierdzeniu` : undefined}
+          title={chosen ? tr("Sesja {0} w Terminalu, z twoimi narzędziami; zapis po potwierdzeniu", PROVIDER_LABEL[chosen]) : undefined}
           onClick={() => void go("terminal")}
         >
-          w Terminalu
-        </button>
-        {onSession && (
-          <button
-            type="button"
-            className="upd-link upd-ask-term"
-            disabled={!ready}
-            title={chosen ? `Sesja ${PROVIDER_LABEL[chosen]} w aplikacji, z twoimi narzędziami (Slack, poczta, sterowanie komputerem, jeśli je masz); MontyBrain tylko do odczytu, zmiany jako propozycje` : undefined}
-            onClick={() => void session()}
-          >
-            z moimi narzędziami
-          </button>
-        )}
+          {tr("w Terminalu")}</button>
+
       </div>
       <p className="upd-ask-hint" id={`${id}-note`}>
-        {requestNote(history)}
-        {!history && (
+        {delivery === "session" ? tr("Rozmowa w panelu z twoimi narzędziami (np. Slack, poczta). Zakres i uruchomienie potwierdzisz w panelu.") : requestNote(history)}
+        {delivery === "background" && !history && (
           <>
             {" "}
             <button type="button" className="upd-link" onClick={onEnableHistory}>
-              Włącz historię
-            </button>
+              {tr("Włącz historię")}</button>
           </>
         )}
-        {focused && <span className="upd-ask-keys"> Enter: zleć, Shift+Enter: nowa linia.</span>}
+        {focused && <span className="upd-ask-keys">  {tr("Enter: zleć, Shift+Enter: nowa linia.")}</span>}
       </p>
-      {consent && (
-        <InlineConfirm
-          question={MY_TOOLS_CONSENT}
-          confirmLabel="Rozumiem, uruchom"
-          onConfirm={() => {
-            writePref(MY_TOOLS_CONSENT_KEY, "1");
-            void session(true);
-          }}
-          onCancel={() => setConsent(false)}
-        />
-      )}
       {confirm && (
         <InlineConfirm
           question={recheckQuestion(pending, true, chosen)}
-          confirmLabel="Uruchom"
+          confirmLabel={tr("Uruchom")}
           onConfirm={() => void go("background", true)}
           onCancel={() => {
             setConfirm(false);
@@ -1031,12 +1011,20 @@ function DriftPanel({
   };
   return (
     <div className="upd-drift">
-      <Disclosure className="upd-drift-toggle" label={line} open={open} onToggle={onToggle} controls={id} />
+      <div className="upd-drift-head">
+        <Disclosure className="upd-drift-toggle" label={tr("Rozjazd w projekcie")} open={open} onToggle={onToggle} controls={id} />
+        {!open && <span className="upd-drift-summary">{line.replace(/^Rozjazd:\s*/, "")}</span>}
+      </div>
       {open && (
         <div className="upd-drift-body" id={id}>
+          <ul className="upd-drift-facts">
+            {line.replace(/^Rozjazd:\s*/, "").split(" · ").map((fact, i) => (
+              <li key={i}>{fact}</li>
+            ))}
+          </ul>
           {d.unknown.length > 0 && (
             <>
-              <h4 className="upd-group-head">Gałęzie bez tematu</h4>
+              <h4 className="upd-group-head">{tr("Gałęzie bez tematu")}</h4>
               <ul className="upd-drift-list">
                 {d.unknown.map((b) => (
                   <li key={`${b.repo}/${b.branch}`} className="upd-drift-item">
@@ -1044,8 +1032,8 @@ function DriftPanel({
                       <span className="upd-drift-repo">{b.repo}</span> {b.branch}
                     </span>
                     <span className="upd-drift-meta">
-                      ostatni commit {formatWhen(`${b.last_commit}T00:00`, new Date()).replace(/ 00:00$/, "")}
-                      {b.worktree ? ` · drzewo robocze ${b.worktree}` : ""}
+                      {tr("ostatni commit")} {formatWhen(`${b.last_commit}T00:00`, new Date()).replace(/ 00:00$/, "")}
+                      {b.worktree ? tr(" · drzewo robocze {0}", b.worktree) : ""}
                     </span>
                     <span className="upd-drift-actions">
                       <button
@@ -1055,15 +1043,13 @@ function DriftPanel({
                         disabled={topics.length === 0}
                         onClick={(e) => setMenu({ anchor: e.currentTarget, repo: b.repo, branch: b.branch })}
                       >
-                        Przypisz do tematu…
-                      </button>
+                        {tr("Przypisz do tematu…")}</button>
                       <button
                         type="button"
                         className="upd-link"
-                        onClick={() => void act(() => api.ignoreBranch(project.slug, b.repo, b.branch), `Gałąź ${b.branch} nie będzie już zgłaszana.`)}
+                        onClick={() => void act(() => api.ignoreBranch(project.slug, b.repo, b.branch), tr("Gałąź {0} nie będzie już zgłaszana.", b.branch))}
                       >
-                        Ignoruj
-                      </button>
+                        {tr("Ignoruj")}</button>
                     </span>
                   </li>
                 ))}
@@ -1072,7 +1058,7 @@ function DriftPanel({
           )}
           {d.spread.length > 0 && (
             <>
-              <h4 className="upd-group-head">Dużo rozgałęzień jednego tematu</h4>
+              <h4 className="upd-group-head">{tr("Dużo rozgałęzień jednego tematu")}</h4>
               <ul className="upd-drift-list">
                 {d.spread.map((x) => (
                   <li key={x.topic} className="upd-drift-item">
@@ -1090,13 +1076,13 @@ function DriftPanel({
           )}
           {d.moved.length > 0 && (
             <>
-              <h4 className="upd-group-head">Repozytorium ruszyło, temat nie</h4>
+              <h4 className="upd-group-head">{tr("Repozytorium ruszyło, temat nie")}</h4>
               <ul className="upd-drift-list">
                 {d.moved.map((m) => (
                   <li key={m.topic} className="upd-drift-item">
                     <span className="upd-drift-name">„{titleOf(m.topic)}”</span>
                     <span className="upd-drift-meta">
-                      {m.repo}/{m.branch}: commit {m.last_commit}, ostatni wpis {m.last_entry ?? "brak"}
+                      {m.repo}/{m.branch}{tr(": commit")} {m.last_commit}{tr(", ostatni wpis")} {m.last_entry ?? "brak"}
                     </span>
                   </li>
                 ))}
@@ -1104,24 +1090,22 @@ function DriftPanel({
             </>
           )}
           <div className="upd-drift-foot">
-            <Button variant="ghost" disabled={!!askDisabled} title={askDisabled ?? "Agent sprawdzi te gałęzie i zaproponuje tematy (zużywa limit subskrypcji)"} onClick={() => onAsk(driftRequest(d, titleOf))}>
-              Zapytaj agenta
-            </Button>
-            <button type="button" className="upd-link" onClick={() => void api.refreshDrift().then((ok) => notify(ok ? "Sprawdzam repozytoria…" : "Sprawdzanie repozytoriów już trwa."))}>
-              Sprawdź repozytoria teraz
-            </button>
-            {d.collected_at && <span className="upd-drift-meta">zebrano {formatWhen(d.collected_at, new Date())}, bez agenta</span>}
+            <Button variant="ghost" disabled={!!askDisabled} title={askDisabled ?? tr("Agent sprawdzi te gałęzie i zaproponuje tematy (zużywa limit subskrypcji)")} onClick={() => onAsk(driftRequest(d, titleOf))}>
+              {tr("Zapytaj agenta")}</Button>
+            <button type="button" className="upd-link" onClick={() => void api.refreshDrift().then((ok) => notify(ok ? tr("Sprawdzam repozytoria…") : tr("Sprawdzanie repozytoriów już trwa.")))}>
+              {tr("Sprawdź repozytoria teraz")}</button>
+            {d.collected_at && <span className="upd-drift-meta">{tr("zebrano")} {formatWhen(d.collected_at, new Date())}{tr(", bez agenta")}</span>}
           </div>
           {menu && (
             <Menu
               anchor={menu.anchor}
-              label="Przypisz do tematu"
+              label={tr("Przypisz do tematu")}
               minWidth={240}
               onClose={() => setMenu(null)}
               items={topics.map((t) => ({
                 key: t.slug,
                 label: t.title,
-                onSelect: () => void act(() => api.linkBranch(project.slug, menu.repo, menu.branch, t.slug), `Przypisano ${menu.branch} do „${t.title}”.`),
+                onSelect: () => void act(() => api.linkBranch(project.slug, menu.repo, menu.branch, t.slug), tr("Przypisano {0} do „{1}”.", menu.branch, t.title)),
               }))}
             />
           )}
@@ -1133,22 +1117,23 @@ function DriftPanel({
 
 type ProjectDriftList = Awaited<ReturnType<typeof api.listDrift>>;
 
-function DroppedBox({ proposal }: { proposal: StoredProposal }) {
+export function DroppedBox({ proposal }: { proposal: StoredProposal }) {
   const [open, setOpen] = useState(false);
   const n = proposal.dropped.length + proposal.dropped_more;
+  const instance = useId();
   if (n === 0) return null;
-  const id = `upd-dropped-${proposal.run_id}`;
+  const id = `upd-dropped-${proposal.run_id}-${instance}`;
   return (
     <div className="upd-dropped">
-      <Disclosure label={`Nie da się zapisać (${n})`} open={open} onToggle={() => setOpen(!open)} controls={id} />
+      <Disclosure label={tr("Nie da się zapisać ({0})", n)} open={open} onToggle={() => setOpen(!open)} controls={id} />
       {open && (
         <ul className="upd-dropped-list" id={id}>
           {proposal.dropped.map((d) => (
             <li key={d.index}>
-              {d.label}: {d.reason}
+              {d.label}: {describeError(d.reason)}
             </li>
           ))}
-          {proposal.dropped_more > 0 && <li>… i {proposal.dropped_more} więcej</li>}
+          {proposal.dropped_more > 0 && <li>{tr("… i")} {proposal.dropped_more}  {tr("więcej")}</li>}
         </ul>
       )}
     </div>
@@ -1180,6 +1165,8 @@ export function Review({
   const [busy, setBusy] = useState<"apply" | "dismiss" | null>(null);
   const headRef = useRef<HTMLHeadingElement>(null);
   const id = proposal.run_id;
+  const instance = useId();
+  const reviewId = `${id}-${instance}`;
   const c = counts(proposal);
 
   useEffect(() => {
@@ -1187,7 +1174,7 @@ export function Review({
   }, [autoFocus]);
   // Outcomes arrived (applied, undone): the user's ticks stay as they were;
   // only rows that became undecided again (an undo) are ticked.
-  const undecidedKey = defaultSelection(proposal).join(",");
+  const undecidedKey = undecidedChanges(proposal).join(",");
   const prevUndecided = useRef(defaultSelection(proposal));
   useEffect(() => {
     const undecided = defaultSelection(proposal);
@@ -1195,7 +1182,7 @@ export function Review({
     prevUndecided.current = undecided;
   }, [undecidedKey]);
 
-  const undecided = defaultSelection(proposal);
+  const undecided = undecidedChanges(proposal);
   const partial = c.pending > 0 && c.pending < c.total;
   const toggle = (i: number) =>
     setSelected((cur) => {
@@ -1222,7 +1209,7 @@ export function Review({
       const report = await api.applyUpdate(id, [...selected].filter((i) => undecided.includes(i)).sort((a, b) => a - b));
       updateStore.set(report.updates);
       const token = report.undo;
-      notify(applySummary(report.items), token ? { label: "Cofnij", run: () => void undo(token) } : undefined);
+      notify(applySummary(report.items), token ? { label: tr("Cofnij"), run: () => void undo(token) } : undefined);
       onApplied();
     } catch (e) {
       notify(describeError(e));
@@ -1237,7 +1224,7 @@ export function Review({
       updateStore.set(r.updates);
       const token = r.undo;
       // Undoable, with the user's corrections kept: no confirmation needed.
-      if (r.count > 0) notify(rejectSummary(r.count), token ? { label: "Cofnij", run: () => void undo(token, true) } : undefined);
+      if (r.count > 0) notify(rejectSummary(r.count), token ? { label: tr("Cofnij"), run: () => void undo(token, true) } : undefined);
       onDecided();
     } catch (e) {
       notify(describeError(e));
@@ -1251,54 +1238,63 @@ export function Review({
   return (
     <div className="upd-review">
       <div className="upd-review-head">
-        <h3 ref={headRef} tabIndex={-1} className="upd-review-title" id={`upd-review-${id}`}>
+        <h3 ref={headRef} tabIndex={-1} className="upd-review-title" id={`upd-review-${reviewId}`}>
           {reviewHeading(c)}
           <span className="upd-review-meta">
             {" "}
             · {PROVIDER_LABEL[proposal.provider]}
-            {proposal.trigger === "auto" ? " · automatycznie" : ""} · {formatWhen(proposal.created_at, new Date())}
+            {proposal.trigger === "auto" ? tr(" · automatycznie") : ""} · {formatWhen(proposal.created_at, new Date())}
           </span>
         </h3>
-        {proposal.request && <RequestQuote text={proposal.request} />}
+        <button type="button" className="upd-link" onClick={(e) => {
+          const actions = e.currentTarget.closest(".upd-review")?.querySelector<HTMLElement>(".upd-review-actions");
+          actions?.scrollIntoView({ block: "center" });
+          actions?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
+        }}>{tr("Przejdź do decyzji · wybrano")} {chosen}</button>
+        {proposal.request && <RequestQuote text={proposal.request} topic={proposal.topic} />}
         {proposal.history_note && <p className="upd-history-note">{historyLine(proposal.history_note, "review")}</p>}
         {undecided.length > 3 && (
           <button type="button" className="upd-link" onClick={() => setSelected(allOn ? new Set() : new Set(undecided))}>
-            {allOn ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
+            {allOn ? tr("Odznacz wszystkie") : tr("Zaznacz wszystkie")}
           </button>
         )}
       </div>
-      {proposal.request && proposal.report && <AnswerBox text={proposal.report} />}
-      <GroupedChanges
-        proposal={proposal}
-        labelledBy={`upd-review-${id}`}
-        row={(i) => (
-          <ChangeRow
-            key={i}
-            project={project}
-            sc={proposal.changes[i]!}
-            index={i}
-            runId={id}
-            selected={selected.has(i)}
-            onToggle={() => toggle(i)}
-            busy={busy !== null}
-            compact={partial}
-            editable
-            proposalTopics={proposal.changes.flatMap((x) => (x.change.kind === "topic_log" ? [x.change.topic] : []))}
-          />
-        )}
-      />
+      <p className="upd-read-hint">{tr("Przeczytaj propozycje przed zastosowaniem. Możesz odznaczyć lub edytować każdą zmianę.")}</p>
+      <div className="upd-review-content" role="region" aria-label={tr("Propozycje zmian")}>
+        {proposal.request && proposal.report && <AnswerBox text={proposal.report} />}
+        <GroupedChanges
+          proposal={proposal}
+          labelledBy={`upd-review-${reviewId}`}
+          row={(i) => (
+            <ChangeRow
+              key={i}
+              project={project}
+              sc={proposal.changes[i]!}
+              index={i}
+              runId={id}
+              selected={selected.has(i)}
+              onToggle={() => toggle(i)}
+              busy={busy !== null}
+              compact={partial}
+              editable
+              proposalTopics={proposal.changes.flatMap((x) => (x.change.kind === "topic_log" ? [x.change.topic] : []))}
+            />
+          )}
+        />
 
-      <DroppedBox proposal={proposal} />
-      {!proposal.request && proposal.report && <ReportBox id={`upd-report-${id}`} text={proposal.report} />}
+        <DroppedBox proposal={proposal} />
+        {!proposal.request && proposal.report && <ReportBox id={`upd-report-${reviewId}`} text={proposal.report} />}
 
-      <div className="upd-review-actions">
+      </div>
+
+      <div className="upd-review-actions" id={`upd-decision-${reviewId}`} aria-label={tr("Decyzja o propozycjach")}>
         {c.pending > 0 && (
           <Button variant="primary" disabled={chosen === 0 || busy !== null} aria-busy={busy === "apply" || undefined} onClick={() => void apply()}>
-            {busy === "apply" ? "Zapisuję…" : `Zastosuj zaznaczone (${chosen})`}
+            {busy === "apply" ? tr("Zapisuję…") : tr("Zastosuj zaznaczone ({0})", chosen)}
           </Button>
         )}
         {secondary && (
-          <Button variant="quiet" disabled={busy !== null} onClick={() => void dismiss()}>
+          <Button variant="danger" disabled={busy !== null} onClick={() => void dismiss()}>
             {secondary}
           </Button>
         )}
@@ -1323,14 +1319,12 @@ function GroupedChanges({ proposal, row, labelledBy, label }: { proposal: Stored
   return (
     <div className="upd-groups" role="group" aria-labelledby={labelledBy} aria-label={label}>
       <h4 className="upd-group-head" id={`${base}-topics`}>
-        Tematy
-      </h4>
+        {tr("Tematy")}</h4>
       <ul className="upd-changes" aria-labelledby={`${base}-topics`}>
         {g.topics.map(row)}
       </ul>
       <h4 className="upd-group-head" id={`${base}-tasks`}>
-        Zadania
-      </h4>
+        {tr("Zadania")}</h4>
       <ul className="upd-changes" aria-labelledby={`${base}-tasks`}>
         {g.tasks.map(row)}
       </ul>
@@ -1339,14 +1333,14 @@ function GroupedChanges({ proposal, row, labelledBy, label }: { proposal: Stored
 }
 
 /** The last result, reopened from the receipt line (rows with outcomes + the report). */
-function ResultDetails({ project, proposal }: { project: string; proposal: StoredProposal }) {
+export function ResultDetails({ project, proposal }: { project: string; proposal: StoredProposal }) {
   return (
     <div className="upd-review" id={`upd-details-${proposal.run_id}`}>
-      {proposal.request && <RequestQuote text={proposal.request} />}
+      {proposal.request && <RequestQuote text={proposal.request} topic={proposal.topic} />}
       {proposal.request && proposal.report && <AnswerBox text={proposal.report} />}
       <GroupedChanges
         proposal={proposal}
-        label="Wynik ostatniej aktualizacji"
+        label={tr("Wynik ostatniej aktualizacji")}
         row={(i) => <ChangeRow key={i} project={project} sc={proposal.changes[i]!} index={i} runId={proposal.run_id} />}
       />
       <DroppedBox proposal={proposal} />
@@ -1405,22 +1399,22 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
     if (!w) return;
     if (strip.kind === "review" && proposalRun === w.run) {
       const c = counts(strip.proposal);
-      setAnnounce(`Gotowe: ${plural(c.total, "propozycja", "propozycje", "propozycji")} zmian.`);
+      setAnnounce(tr("Gotowe: {0} zmian.", plural(c.total, tr("propozycja"), tr("propozycje"), tr("propozycji"))));
       // Focus moves to the result only from inside the strip or from nowhere in particular.
       const active = document.activeElement;
       if (!active || active === document.body || sectionRef.current?.contains(active)) setFocusReview(w.run);
       watched.current = null;
     } else if (lastAt !== w.lastAt) {
       const last = view?.last;
-      const what = last?.request ? "Zlecenie" : "Sprawdzanie";
+      const what = last?.request ? tr("Zlecenie") : tr("Sprawdzanie");
       setAnnounce(
         last?.outcome.kind === "failed"
-          ? `${what} nie powiodło się.`
+          ? tr("{0} nie powiodło się.", what)
           : last?.outcome.kind === "cancelled"
-            ? `${what} przerwane.`
+            ? tr("{0} przerwane.", what)
             : last?.request
-              ? "Gotowe: odpowiedź bez zmian w MontyBrain."
-              : "Gotowe: bez zmian.",
+              ? tr("Gotowe: odpowiedź bez zmian w MontyBrain.")
+              : tr("Gotowe: bez zmian."),
       );
       watched.current = null;
     }
@@ -1478,7 +1472,7 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
     setBusy(true);
     try {
       const r = await runStore.startRun({ recipe: UPDATE_RECIPE, provider: chosen, mode, params: { project: project.slug } });
-      if (r.mode === "terminal") notify(r.status === "failed" ? (r.error ?? "Nie udało się otworzyć Terminala.") : `Otwarto sesję ${PROVIDER_LABEL[chosen]} w Terminalu.`);
+      if (r.mode === "terminal") notify(r.status === "failed" ? (r.error ?? tr("Nie udało się otworzyć Terminala.")) : tr("Otwarto sesję {0} w Terminalu.", PROVIDER_LABEL[chosen]));
       else {
         setShowDetails(false);
         focusStatus();
@@ -1495,10 +1489,10 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
       const r = await runStore.startRun({ recipe: REQUEST_RECIPE, provider: chosen, mode, params: { project: project.slug, text } });
       if (r.mode === "terminal") {
         if (r.status === "failed") {
-          notify(r.error ?? "Nie udało się otworzyć Terminala.");
+          notify(r.error ?? tr("Nie udało się otworzyć Terminala."));
           return false;
         }
-        notify(`Otwarto sesję ${PROVIDER_LABEL[chosen]} w Terminalu.`);
+        notify(tr("Otwarto sesję {0} w Terminalu.", PROVIDER_LABEL[chosen]));
       } else {
         setShowDetails(false);
         focusStatus();
@@ -1511,13 +1505,8 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
   }
   async function startSession(text: string): Promise<boolean> {
     if (!chosen) return false;
-    try {
-      await sessionStore.begin({ scope: "project", project: project.slug, provider: chosen, text });
-      return true;
-    } catch (e) {
-      notify(describeError(e));
-      return false;
-    }
+    sessionStore.prepare({ scope: "project", project: project.slug, provider: chosen, text, origin: window.location.hash });
+    return true;
   }
   async function cancel() {
     if (strip.kind !== "running") return;
@@ -1560,21 +1549,21 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
   const menuItems: MenuItem[] = [
     ...(strip.kind === "review"
       ? [
-          { key: "h-upd", label: "Aktualizacja", header: true },
-          { key: "recheck", label: chosen ? `Sprawdź ponownie (${PROVIDER_LABEL[chosen]})…` : "Sprawdź ponownie…", disabled: !chosen || !!elsewhere, onSelect: () => setConfirmRecheck(true) },
+          { key: "h-upd", label: tr("Aktualizacja"), header: true },
+          { key: "recheck", label: chosen ? tr("Sprawdź ponownie ({0})…", PROVIDER_LABEL[chosen]) : tr("Sprawdź ponownie…"), disabled: !chosen || !!elsewhere, onSelect: () => setConfirmRecheck(true) },
         ]
       : []),
-    { key: "h-more", label: "Otwórz w Akcjach", header: true },
-    { key: "postep", label: "Raport postępu…", onSelect: () => goTo("postep", { project: project.slug }) },
-    { key: "raport", label: "Raport z dnia lub tygodnia…", onSelect: () => goTo("raport", { project: project.slug }) },
-    { key: "zadania", label: "Zadania z notatek…", onSelect: () => goTo("zadania", { project: project.slug }) },
-    { key: "h-term", label: "Od razu", header: true },
+    { key: "h-more", label: tr("Otwórz w Akcjach"), header: true },
+    { key: "postep", label: tr("Raport postępu…"), onSelect: () => goTo("postep", { project: project.slug }) },
+    { key: "raport", label: tr("Raport z dnia lub tygodnia…"), onSelect: () => goTo("raport", { project: project.slug }) },
+    { key: "zadania", label: tr("Zadania z notatek…"), onSelect: () => goTo("zadania", { project: project.slug }) },
+    { key: "h-term", label: tr("Od razu"), header: true },
     {
       key: "term",
-      label: "Sprawdź w Terminalu",
+      label: tr("Sprawdź w Terminalu"),
       hint: chosen ? PROVIDER_LABEL[chosen] : undefined,
       disabled: !chosen,
-      title: chosen ? undefined : "Żaden agent nie jest dostępny",
+      title: chosen ? undefined : tr("Żaden agent nie jest dostępny"),
       onSelect: () => void start("terminal"),
     },
   ];
@@ -1583,8 +1572,8 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
     label: PROVIDER_LABEL[p.id],
     checked: chosen === p.id,
     disabled: !p.available,
-    hint: p.available ? undefined : "niedostępny",
-    title: p.available ? undefined : (p.problem ?? "Niedostępny"),
+    hint: p.available ? undefined : tr("niedostępny"),
+    title: p.available ? undefined : (p.problem ?? tr("Niedostępny")),
     onSelect: () => {
       setProvider(p.id);
       writePref(PROVIDER_PREF, p.id);
@@ -1597,7 +1586,7 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
       key={project.slug}
       project={project}
       chosen={chosen}
-      blocked={elsewhere ? `W tle trwa już akcja „${elsewhere.recipe_title}”.` : null}
+      blocked={elsewhere ? tr("W tle trwa już akcja „{0}”.", elsewhere.recipe_title) : null}
       pending={pending}
       history={view?.sources.history ?? false}
       collapsed={collapsed}
@@ -1616,11 +1605,24 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
   else if (strip.kind === "review") status = reviewStatus(c!);
   else if (strip.kind === "receipt") status = receiptLine(strip.proposal, new Date(now));
   else if (!available) {
-    status = "Agent niedostępny";
+    status = tr("Agent niedostępny");
     statusError = true;
   } else {
     status = line.text;
     statusError = line.error;
+  }
+
+  if (!showStrip(project)) {
+    return <section ref={sectionRef} className="upd" aria-label={tr("Agent projektu")}>
+      <div className="upd-bar">
+        <h2 className="upd-title">{tr("Agent projektu")}</h2>
+        <Button variant="quiet" onClick={() => sessionStore.prepare({ scope: "project", project: project.slug, text: "", origin: window.location.hash })}>{tr("Rozmowa z agentem")}</Button>
+        {undoToken && <button type="button" className="upd-link upd-undo" disabled={busy} onClick={() => void undoLast()}>{view?.undo_rejection ? tr("Cofnij odrzucenie") : tr("Cofnij zapis")}</button>}
+      </div>
+      {strip.kind === "review" && <Review key={strip.proposal.run_id} project={project.slug} proposal={strip.proposal} autoFocus={false} onApplied={focusAfterApply} onDecided={focusStrip} onUndone={focusAfterUndo} />}
+      {strip.kind === "receipt" && <ResultDetails project={project.slug} proposal={strip.proposal} />}
+      {idleReport && <AnswerBox text={idleReport.report} />}
+    </section>;
   }
 
   return (
@@ -1641,16 +1643,15 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
         <div className="upd-text">
           <RefreshCw size={13} className={`upd-icon${running ? " spin" : ""}`} aria-hidden />
           <h2 className="upd-title upd-title-focus" id={`upd-title-${project.slug}`} tabIndex={-1}>
-            Aktualizacja
-          </h2>
+            {tr("Aktualizacja")}</h2>
           <p className={`upd-status${statusError ? " error" : ""}`} aria-live="polite" tabIndex={-1}>
-            {status}
+            {statusError && status !== "Agent niedostępny" ? tr("Błąd sprawdzania") : status}
           </p>
           {strip.kind === "running" && <time className="upd-clock">{formatElapsed(runElapsedMs(strip.run.started_at, null, now))}</time>}
           {strip.kind === "receipt" && (
             <Disclosure
               className="upd-receipt-toggle"
-              label={showDetails ? "Ukryj szczegóły" : "Pokaż szczegóły"}
+              label={showDetails ? tr("Ukryj szczegóły") : tr("Pokaż szczegóły")}
               open={showDetails}
               onToggle={() => setShowDetails(!showDetails)}
               controls={`upd-details-${strip.proposal.run_id}`}
@@ -1661,10 +1662,10 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
               type="button"
               className="upd-link upd-undo"
               disabled={busy}
-              title={view?.undo_rejection ? "Przywraca odrzucone propozycje do przeglądu, z twoimi poprawkami" : "Cofa ostatni zapis, o ile nic się od tego czasu nie zmieniło"}
+              title={view?.undo_rejection ? tr("Przywraca odrzucone propozycje do przeglądu, z twoimi poprawkami") : tr("Cofa ostatni zapis, o ile nic się od tego czasu nie zmieniło")}
               onClick={() => void undoLast()}
             >
-              {view?.undo_rejection ? "Cofnij odrzucenie" : "Cofnij zapis"}
+              {view?.undo_rejection ? tr("Cofnij odrzucenie") : tr("Cofnij zapis")}
             </button>
           )}
         </div>
@@ -1674,8 +1675,7 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
           </Button>
           {running ? (
             <Button variant="danger" onClick={() => void cancel()}>
-              Przerwij
-            </Button>
+              {tr("Przerwij")}</Button>
           ) : strip.kind !== "review" ? (
             <>
               {providers && providers.length > 0 && (
@@ -1684,11 +1684,11 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
                   className="btn btn-quiet upd-provider"
                   aria-haspopup="menu"
                   aria-expanded={providerMenu !== null}
-                  aria-label={`Subskrypcja: ${chosen ? PROVIDER_LABEL[chosen] : "brak"}. Zmień`}
+                  aria-label={tr("Subskrypcja: {0}. Zmień", chosen ? PROVIDER_LABEL[chosen] : "brak")}
                   disabled={!available}
                   onClick={(e) => setProviderMenu(providerMenu ? null : e.currentTarget)}
                 >
-                  {chosen ? PROVIDER_LABEL[chosen] : "Brak agenta"}
+                  {chosen ? PROVIDER_LABEL[chosen] : tr("Brak agenta")}
                   <ChevronDown size={12} aria-hidden />
                 </button>
               )}
@@ -1696,18 +1696,18 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
                 variant="ghost"
                 className="upd-main"
                 disabled={!chosen || busy || !!elsewhere}
-                title={elsewhere ? `W tle trwa już akcja „${elsewhere.recipe_title}”.` : chosen ? `${PROVIDER_LABEL[chosen]} sprawdzi projekt w tle, tylko do odczytu` : undefined}
+                title={elsewhere ? tr("W tle trwa już akcja „{0}”.", elsewhere.recipe_title) : chosen ? tr("{0} sprawdzi projekt w tle, tylko do odczytu", PROVIDER_LABEL[chosen]) : undefined}
                 onClick={() => void start("background")}
               >
-                {busy ? "Uruchamiam…" : "Sprawdź projekt"}
+                {busy ? tr("Uruchamiam…") : tr("Sprawdź projekt")}
               </Button>
             </>
           ) : null}
           <button
             type="button"
             className="icon-btn"
-            aria-label="Więcej akcji dla projektu"
-            title="Więcej akcji dla projektu"
+            aria-label={tr("Więcej akcji dla projektu")}
+            title={tr("Więcej akcji dla projektu")}
             aria-haspopup="menu"
             aria-expanded={menu !== null}
             onClick={(e) => setMenu(menu ? null : e.currentTarget)}
@@ -1717,19 +1717,36 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
         </div>
       </div>
 
+      {statusError && status !== "Agent niedostępny" && (
+        <p className="upd-error-line" role="alert">
+          {status}
+        </p>
+      )}
+
+      {strip.kind === "idle" && available && line.detail && (
+        <div className="upd-sub">
+          <Disclosure label={tr("Szczegóły techniczne")} open={showTech} onToggle={() => setShowTech(!showTech)} controls={`upd-tech-${project.slug}`} />
+          {showTech && (
+            <pre className="upd-tech" id={`upd-tech-${project.slug}`}>
+              {line.detail}
+            </pre>
+          )}
+        </div>
+      )}
+
       {strip.kind !== "running" && (
         <DriftPanel
           project={project}
           open={driftOpen}
           onToggle={() => setDriftOpen(!driftOpen)}
-          askDisabled={!chosen ? "Żaden agent nie jest dostępny" : elsewhere ? `W tle trwa już akcja „${elsewhere.recipe_title}”.` : null}
+          askDisabled={!chosen ? tr("Żaden agent nie jest dostępny") : elsewhere ? tr("W tle trwa już akcja „{0}”.", elsewhere.recipe_title) : null}
           onAsk={(text) => (pending > 0 ? setAskDrift(text) : void startRequest(text, "background"))}
         />
       )}
       {askDrift && (
         <InlineConfirm
           question={recheckQuestion(pending, true, chosen)}
-          confirmLabel="Uruchom"
+          confirmLabel={tr("Uruchom")}
           onConfirm={() => {
             const t = askDrift;
             setAskDrift(null);
@@ -1738,11 +1755,13 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
           onCancel={() => setAskDrift(null)}
         />
       )}
-      {strip.kind !== "running" && strip.kind !== "review" && available && requestInput(false)}
+      {strip.kind !== "running" && strip.kind !== "review" && available && (
+        <div className="upd-idle-ask">{requestInput(true)}</div>
+      )}
       {strip.kind === "running" && (
         <div className="upd-run">
           <p className="upd-run-line" aria-live="polite">
-            {lastEvent ? progressText(lastEvent, topicTitle) : "Czekam na pierwsze komunikaty agenta…"}
+            {lastEvent ? progressText(lastEvent, topicTitle) : tr("Czekam na pierwsze komunikaty agenta…")}
           </p>
           <a
             href="#/akcje"
@@ -1753,26 +1772,14 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
               runStore.select(strip.run.id);
             }}
           >
-            Otwórz przebieg w Akcjach →
-          </a>
+            {tr("Otwórz przebieg w Akcjach →")}</a>
         </div>
       )}
       {strip.kind === "idle" && !available && (
         <div className="upd-sub">
-          <p className="upd-sub-text">Nie znaleziono Claude Code ani Codex. Zainstaluj jedno z nich i zaloguj się na swoją subskrypcję.</p>
+          <p className="upd-sub-text">{tr("Nie znaleziono Claude Code ani Codex. Zainstaluj jedno z nich i zaloguj się na swoją subskrypcję.")}</p>
           <button type="button" className="upd-link" onClick={() => void updateStore.loadProviders(true).catch((e) => notify(describeError(e)))}>
-            Sprawdź ponownie
-          </button>
-        </div>
-      )}
-      {strip.kind === "idle" && available && line.detail && (
-        <div className="upd-sub">
-          <Disclosure label="Szczegóły techniczne" open={showTech} onToggle={() => setShowTech(!showTech)} controls={`upd-tech-${project.slug}`} />
-          {showTech && (
-            <pre className="upd-tech" id={`upd-tech-${project.slug}`}>
-              {line.detail}
-            </pre>
-          )}
+            {tr("Sprawdź ponownie")}</button>
         </div>
       )}
       {strip.kind === "idle" && view?.last?.history_note && (
@@ -1782,19 +1789,18 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
             <>
               {" "}
               <button type="button" className="upd-link" onClick={openHistory}>
-                Włącz historię
-              </button>
+                {tr("Włącz historię")}</button>
             </>
           )}
         </p>
       )}
-      {strip.kind === "idle" && elsewhere && <p className="upd-hint">W tle trwa już akcja „{elsewhere.recipe_title}”. Sprawdzenie uruchomisz po jej zakończeniu.</p>}
+      {strip.kind === "idle" && elsewhere && <p className="upd-hint">{tr("W tle trwa już akcja „")}{tr(elsewhere.recipe_title)}{tr("”. Sprawdzenie uruchomisz po jej zakończeniu.")}</p>}
       {strip.kind === "review" && view?.held && !autoOpen && <p className="upd-hint">{heldText(pending)}</p>}
 
       {confirmRecheck && strip.kind === "review" && (
         <InlineConfirm
           question={recheckQuestion(pending, false, chosen)}
-          confirmLabel="Uruchom"
+          confirmLabel={tr("Uruchom")}
           onConfirm={() => {
             setConfirmRecheck(false);
             void start("background");
@@ -1834,8 +1840,8 @@ export function UpdateStrip({ project, openAuto = false, openDrift = false }: { 
         {announce}
       </p>
 
-      {menu && <Menu anchor={menu} items={menuItems} onClose={() => setMenu(null)} label="Więcej akcji dla projektu" minWidth={250} />}
-      {providerMenu && <Menu anchor={providerMenu} items={providerItems} onClose={() => setProviderMenu(null)} label="Subskrypcja" minWidth={200} />}
+      {menu && <Menu anchor={menu} items={menuItems} onClose={() => setMenu(null)} label={tr("Więcej akcji dla projektu")} minWidth={250} />}
+      {providerMenu && <Menu anchor={providerMenu} items={providerItems} onClose={() => setProviderMenu(null)} label={tr("Subskrypcja")} minWidth={200} />}
     </section>
   );
 }

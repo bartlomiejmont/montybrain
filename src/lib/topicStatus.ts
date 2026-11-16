@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Quick topic status changes in the project view: the status pill's menu and
 // the selection mode ("Zaznacz") that sets one status on many topics at once.
 // Pure logic; the view is ProjectView + TopicItem.
@@ -8,12 +9,12 @@ import { plural } from "./text";
 
 /** The topic row's counter in words: "1 otwarte zadanie z 1", "2 otwarte zadania z 3", "5 otwartych zadań z 8". */
 export function openCount(open: number, total: number): string {
-  return `${open} ${plural(open, "otwarte zadanie", "otwarte zadania", "otwartych zadań")} z ${total}`;
+  return tr("{0} {1} z {2}", open, plural(open, tr("otwarte zadanie"), tr("otwarte zadania"), tr("otwartych zadań")), total);
 }
 
 /** Accessible name of the status pill: "Status tematu Płatności: W toku. Zmień". */
 export function statusPillLabel(title: string, status: TopicStatus): string {
-  return `Status tematu ${title}: ${TOPIC_STATUS_LABEL[status]}. Zmień`;
+  return tr("Status tematu {0}: {1}. Zmień", title, TOPIC_STATUS_LABEL[status]);
 }
 
 /** The five statuses for the menu; `current` checked (none in the bulk menu). */
@@ -63,7 +64,7 @@ export function pruneSelection(sel: Selection, order: readonly string[]): Select
 
 /** "Zaznaczono 3". */
 export function selectionLabel(n: number): string {
-  return `Zaznaczono ${n}`;
+  return tr("Zaznaczono {0}", n);
 }
 
 /** The selected topics that a bulk change to `status` would change (the others already have it). */
@@ -83,16 +84,16 @@ export interface BulkResult {
  */
 export function bulkSummary(results: readonly BulkResult[], status: TopicStatus): string {
   const to = `„${TOPIC_STATUS_LABEL[status]}”`;
-  if (results.length === 0) return `Zaznaczone tematy mają już status ${to}.`;
+  if (results.length === 0) return tr("Zaznaczone tematy mają już status {0}.", to);
   const failed = results.filter((r) => r.error !== null);
   const ok = results.length - failed.length;
-  const topics = (n: number) => plural(n, "tematu", "tematów", "tematów");
-  if (failed.length === 0) return `Zmieniono status ${ok} ${topics(ok)} na ${to}.`;
+  const topics = (n: number) => plural(n, tr("tematu"), tr("tematów"), tr("tematów"));
+  if (failed.length === 0) return tr("Zmieniono status {0} {1} na {2}.", ok, topics(ok), to);
   const named = failed
     .slice(0, 3)
     .map((r) => `„${r.title}” (${r.error})`)
     .join(", ");
-  const more = failed.length > 3 ? ` i ${failed.length - 3} więcej` : "";
-  if (ok === 0) return `Nie udało się zmienić statusu: ${named}${more}.`;
-  return `Zmieniono status ${ok} z ${results.length} ${topics(results.length)} na ${to}. Nie udało się: ${named}${more}.`;
+  const more = failed.length > 3 ? tr(" i {0} więcej", failed.length - 3) : "";
+  if (ok === 0) return tr("Nie udało się zmienić statusu: {0}{1}.", named, more);
+  return tr("Zmieniono status {0} z {1} {2} na {3}. Nie udało się: {4}{5}.", ok, results.length, topics(results.length), to, named, more);
 }

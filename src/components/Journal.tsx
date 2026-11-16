@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 import { useState } from "react";
 
 import type { JournalEntry, TopicStatus } from "../api";
@@ -5,11 +6,14 @@ import { formatStamp } from "../lib/dates";
 import { TOPIC_STATUSES, TOPIC_STATUS_LABEL } from "../lib/labels";
 import { clearAfterSubmit } from "../lib/form";
 import { links } from "../router/router";
+import { topicTarget } from "../lib/details";
+import { useOpenDetail } from "../store/details";
 import { useDraft, useSubmitting } from "../store/drafts";
 import { useVault, useView } from "../store/vault";
-import { Button, ProjectDot } from "./ui";
+import { Button, ProjectName } from "./ui";
 
 export function JournalList({ entries, showTopic = false }: { entries: JournalEntry[]; showTopic?: boolean }) {
+  const openDetail = useOpenDetail();
   const view = useView();
   return (
     <ol className="journal">
@@ -25,8 +29,13 @@ export function JournalList({ entries, showTopic = false }: { entries: JournalEn
               <div className="j-head">
                 <span className="j-author">{e.author}</span>
                 {showTopic && (
-                  <a className="j-topic" href={links.project(e.project, e.topic)} title={`${project?.name ?? e.project} · ${topic?.title ?? e.topic}`}>
-                    <ProjectDot color={project?.color} size={6} />
+                  <a className="j-topic" href={links.project(e.project, e.topic)} title={`${project?.name ?? e.project} · ${topic?.title ?? e.topic}`} onClick={(event) => {
+                    if (openDetail && topic && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                      event.preventDefault();
+                      openDetail(topicTarget(topic));
+                    }
+                  }}>
+                    <ProjectName name={project?.name ?? e.project} color={project?.color} />
                     <span className="ctx-text">{topic?.title ?? e.topic}</span>
                   </a>
                 )}
@@ -52,7 +61,7 @@ export function JournalForm({ project, topic, status }: { project: string; topic
 
   const submit = async () => {
     const t = text.trim();
-    if (!t || !begin()) return;
+    if (!t.trim() || !begin()) return;
     let ok = false;
     try {
       ok = (await run((a) => a.addJournalEntry(project, topic, { text: t, author: "ja", status: nextStatus || null }))) !== undefined;
@@ -76,13 +85,13 @@ export function JournalForm({ project, topic, status }: { project: string; topic
       <textarea
         className="field"
         rows={text.includes("\n") ? 3 : 1}
-        placeholder="Co się wydarzyło? (⌘↩ zapisuje)"
-        aria-label="Nowy wpis w dzienniku"
+        placeholder={tr("Co się wydarzyło? (⌘↩ zapisuje)")}
+        aria-label={tr("Nowy wpis w dzienniku")}
         value={text}
         disabled={busy}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "Enter") {
             e.preventDefault();
             void submit();
           }
@@ -91,20 +100,19 @@ export function JournalForm({ project, topic, status }: { project: string; topic
       <div className="j-form-row">
         <select
           className="field select"
-          aria-label="Zmień status tematu"
+          aria-label={tr("Zmień status tematu")}
           value={nextStatus}
           onChange={(e) => setNextStatus(e.target.value as TopicStatus | "")}
         >
-          <option value="">Status bez zmian</option>
+          <option value="">{tr("Status bez zmian")}</option>
           {TOPIC_STATUSES.filter((s) => s !== status).map((s) => (
             <option key={s} value={s}>
-              Zmień na: {TOPIC_STATUS_LABEL[s]}
+              {tr("Zmień na:")} {TOPIC_STATUS_LABEL[s]}
             </option>
           ))}
         </select>
         <Button type="submit" variant="primary" disabled={!text.trim() || busy}>
-          Dodaj wpis
-        </Button>
+          {tr("Dodaj wpis")}</Button>
       </div>
     </form>
   );

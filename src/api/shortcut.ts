@@ -1,3 +1,4 @@
+import { t as tr } from "../i18n";
 // Global shortcut strings, mirroring src-tauri/src/shortcut.rs.
 // Stored form: "Ctrl+Alt+Shift+Cmd" modifiers in that order + one key named
 // like `KeyboardEvent.code` without the "Key"/"Digit" prefix ("Ctrl+Alt+Space").
@@ -43,7 +44,7 @@ export function shortcutFromEvent(e: KeyLike): string | null {
 
 /** Validates + normalizes like the backend; throws with a Polish message. */
 export function canonicalShortcut(input: string): string {
-  const bad = () => new Error(`Nieprawidłowy skrót: ${input}`);
+  const bad = () => new Error(tr("Nieprawidłowy skrót: {0}", input));
   const tokens = input.split("+").map((t) => t.trim());
   const rawKey = tokens.pop();
   if (!rawKey) throw bad();
@@ -58,7 +59,7 @@ export function canonicalShortcut(input: string): string {
   const named = [...NAMED_KEYS].find((n) => n.toLowerCase() === bare.toLowerCase());
   const key = /^[a-z0-9]$/i.test(bare) || isFn ? bare.toUpperCase() : named;
   if (!key) throw bad();
-  if (!(on[0] || on[1] || on[3] || isFn)) throw new Error("Skrót musi zawierać ⌃, ⌥ lub ⌘.");
+  if (!(on[0] || on[1] || on[3] || isFn)) throw new Error(tr("Skrót musi zawierać ⌃, ⌥ lub ⌘."));
   const mods = MODIFIERS.filter((_, i) => on[i]).map(([name]) => name);
   return [...mods, key].join("+");
 }
@@ -68,7 +69,7 @@ const SYMBOLS: Record<string, string> = {
   Alt: "⌥",
   Shift: "⇧",
   Cmd: "⌘",
-  Space: "Spacja",
+  get Space() { return tr("Spacja"); },
   Enter: "↩",
   Tab: "⇥",
   Backspace: "⌫",

@@ -1,10 +1,14 @@
 // Tiny Markdown-subset parser for agent answers (untrusted model output).
 // Produces plain data; the view turns it into React elements, so nothing is ever
-// interpreted as HTML. Supported: paragraphs, **bold**, `code`, -/*/+ and 1. lists
-// (one nesting level), # headings, fenced code blocks. Everything else (links,
-// tables, HTML, *italics*…) stays literal text. All scans are linear.
+// interpreted as HTML. Supported: paragraphs, **bold**, *italic* / _italic_,
+// `code`, -/*/+ and 1. lists (one nesting level), # headings, fenced code
+// blocks. Everything else (links, tables, HTML…) stays literal text. All scans are linear.
 
-export type Inline = { t: "text"; text: string } | { t: "bold"; children: Inline[] } | { t: "code"; text: string };
+export type Inline =
+  | { t: "text"; text: string }
+  | { t: "bold"; children: Inline[] }
+  | { t: "italic"; children: Inline[] }
+  | { t: "code"; text: string };
 
 export interface ListItem {
   inline: Inline[];
@@ -19,19 +23,51 @@ export interface ListBlock {
 
 export type Block =
   | { t: "p"; inline: Inline[] }
-  | { t: "heading"; inline: Inline[] }
+  | { t: "heading"; level: number; inline: Inline[] }
   | { t: "code"; text: string }
   | ListBlock;
 
 /** Input beyond this is cut off (a runaway answer must not freeze the UI). */
 export const MAX_MARKDOWN_CHARS = 200_000;
 
-export function parseInline(src: string, allowBold = true): Inline[] {
+const WORD_CHAR = /[A-Za-z0-9_]/;
+
+function findClosingItalic(src: string, start: number, marker: "*" | "_"): number {
+  let pos = start + 1;
+  while (pos < src.length) {
+    const end = src.indexOf(marker, pos);
+    if (end === -1) return -1;
+    if (marker === "*") {
+      // Skip `**` (bold marker) and whitespace-preceded `*`.
+      if (src[end + 1] === "*" || src[end - 1] === "*") {
+        pos = end + 1;
+        while (src[pos] === "*") pos++;
+        continue;
+      }
+      if (end > start + 1 && !/\s/.test(src[end - 1]!)) return end;
+      pos = end + 1;
+    } else {
+      if (src[end + 1] === "_" || src[end - 1] === "_") {
+        pos = end + 1;
+        while (src[pos] === "_") pos++;
+        continue;
+      }
+      const after = src[end + 1];
+      if (end > start + 1 && !/\s/.test(src[end - 1]!) && (!after || !WORD_CHAR.test(after))) return end;
+      pos = end + 1;
+    }
+  }
+  return -1;
+}
+
+export function parseInline(src: string, allowBold = true, allowItalic = true): Inline[] {
   const out: Inline[] = [];
   let buf = "";
   let i = 0;
   // Once a closing marker is missing after position p, it is missing for every later start too.
   let noBoldClose = !allowBold;
+  let noStarItalicClose = !allowItalic;
+  let noUnderItalicClose = !allowItalic;
   let noCodeClose = false;
   const flush = () => {
     if (buf) out.push({ t: "text", text: buf });
@@ -43,8 +79,35 @@ export function parseInline(src: string, allowBold = true): Inline[] {
       if (end === -1) noBoldClose = true;
       else if (end > i + 2) {
         flush();
-        out.push({ t: "bold", children: parseInline(src.slice(i + 2, end), false) });
+        out.push({ t: "bold", children: parseInline(src.slice(i + 2, end), false, allowItalic) });
         i = end + 2;
+        continue;
+      }
+    }
+    if (!noStarItalicClose && src[i] === "*" && src[i + 1] !== "*" && src[i + 1] && !/\s/.test(src[i + 1]!)) {
+      const end = findClosingItalic(src, i, "*");
+      if (end === -1) noStarItalicClose = true;
+      else {
+        flush();
+        out.push({ t: "italic", children: parseInline(src.slice(i + 1, end), allowBold, false) });
+        i = end + 1;
+        continue;
+      }
+    }
+    if (
+      !noUnderItalicClose &&
+      src[i] === "_" &&
+      src[i + 1] !== "_" &&
+      src[i + 1] &&
+      !/\s/.test(src[i + 1]!) &&
+      (i === 0 || !WORD_CHAR.test(src[i - 1]!))
+    ) {
+      const end = findClosingItalic(src, i, "_");
+      if (end === -1) noUnderItalicClose = true;
+      else {
+        flush();
+        out.push({ t: "italic", children: parseInline(src.slice(i + 1, end), allowBold, false) });
+        i = end + 1;
         continue;
       }
     }
@@ -66,7 +129,7 @@ export function parseInline(src: string, allowBold = true): Inline[] {
 }
 
 const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
-const HEADING = /^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/;
+const HEADING = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
 const BULLET = /^(\s*)[-*+•]\s+(.*)$/;
 const NUMBERED = /^(\s*)\d{1,9}[.)]\s+(.*)$/;
 
@@ -122,7 +185,7 @@ export function parseMarkdown(input: string): Block[] {
     if (h) {
       flushPara();
       list = null;
-      blocks.push({ t: "heading", inline: parseInline(h[1]!) });
+      blocks.push({ t: "heading", level: h[1]!.length, inline: parseInline(h[2]!) });
       continue;
     }
     const m = BULLET.exec(line) ?? NUMBERED.exec(line);

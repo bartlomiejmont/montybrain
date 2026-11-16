@@ -1,10 +1,12 @@
+import { t as tr } from "../../i18n";
+import { scopeLabel } from "../../lib/session";
 // „Akcje": prepared agent recipes, run in the background (progress and answer
 // stream into a panel) or in Terminal.app. Run state lives in store/runs.ts.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { api, mockQuery, type ProviderId, type ProviderInfo, type Recipe, type RecipeParam, type RunMode } from "../../api";
-import { Button } from "../../components/ui";
+import { Button, Segmented } from "../../components/ui";
 import { STATUS_LABEL as SESSION_STATUS, providerName } from "../../lib/session";
 import { sessionStore, useSession } from "../../store/session";
 import "../../components/session.css";
@@ -33,7 +35,21 @@ const providerPref = (recipe: string) => `montybrain.akcje.provider.${recipe}`;
 const formMemory = new Map<string, ParamValues>();
 let catalog: { recipes: Recipe[]; providers: ProviderInfo[] } | null = null;
 
-function AutoTextarea({ value, onChange, placeholder, id, invalid }: { value: string; onChange: (v: string) => void; placeholder: string | null; id: string; invalid: boolean }) {
+function AutoTextarea({
+  value,
+  onChange,
+  placeholder,
+  id,
+  invalid,
+  describedBy,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string | null;
+  id: string;
+  invalid: boolean;
+  describedBy?: string;
+}) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -50,6 +66,7 @@ function AutoTextarea({ value, onChange, placeholder, id, invalid }: { value: st
       value={value}
       placeholder={placeholder ?? undefined}
       aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
       onChange={(e) => onChange(e.target.value)}
     />
   );
@@ -69,38 +86,47 @@ function ParamField({
   error: string | undefined;
 }) {
   const id = `act-p-${param.key}`;
+  const errId = error ? `${id}-err` : undefined;
   return (
     <div className="act-field">
       <label className="act-label" htmlFor={id}>
-        {param.label}
-        {!param.required && <span className="act-opt"> · opcjonalnie</span>}
+        {tr(param.label)}
+        {!param.required && <span className="act-opt">  {tr("· opcjonalnie")}</span>}
       </label>
       {param.kind === "project" && (
-        <select id={id} className="field select act-select" value={value} aria-invalid={!!error || undefined} onChange={(e) => onChange(e.target.value)}>
-          <option value="">{param.required ? "Wybierz projekt…" : "Wszystkie aktywne projekty"}</option>
+        <select
+          id={id}
+          className="field select act-select"
+          value={value}
+          aria-invalid={!!error || undefined}
+          aria-describedby={errId}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">{param.required ? tr("Wybierz projekt…") : tr("Wszystkie aktywne projekty")}</option>
           {projects.map((p) => (
             <option key={p.slug} value={p.slug}>
               {p.name}
-              {p.paused ? " (wstrzymany)" : ""}
+              {p.paused ? tr(" (wstrzymany)") : ""}
             </option>
           ))}
         </select>
       )}
       {param.kind === "period" && (
-        <div className="segmented" role="radiogroup" aria-label={param.label} id={id}>
-          {[
-            ["dzis", "Dziś"],
-            ["tydzien", "Tydzień"],
-          ].map(([v, label]) => (
-            <button key={v} type="button" role="radio" aria-checked={value === v} className={value === v ? "on" : undefined} onClick={() => onChange(v!)}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label={tr(param.label)}
+          value={value}
+          options={[
+            { value: "dzis", label: tr("Dziś") },
+            { value: "tydzien", label: tr("Tydzień") },
+          ]}
+          onChange={onChange}
+        />
       )}
-      {param.kind === "text" && <AutoTextarea id={id} value={value} onChange={onChange} placeholder={param.placeholder} invalid={!!error} />}
+      {param.kind === "text" && (
+        <AutoTextarea id={id} value={value} onChange={onChange} placeholder={tr(param.placeholder ?? "")} invalid={!!error} describedBy={errId} />
+      )}
       {error && (
-        <p className="act-error" role="alert">
+        <p id={errId} className="act-error" role="alert">
           {error}
         </p>
       )}
@@ -113,27 +139,21 @@ function ProviderSwitch({ providers, value, onChange }: { providers: ProviderInf
   return (
     <div className="act-field">
       <span className="act-label" id="act-provider-label">
-        Subskrypcja
-      </span>
-      <div className="segmented" role="radiogroup" aria-labelledby="act-provider-label">
-        {providers.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="radio"
-            aria-checked={value === p.id}
-            disabled={!p.available}
-            title={p.available ? (p.version ? `${p.name} ${p.version}` : p.name) : (p.problem ?? "Niedostępny")}
-            className={value === p.id ? "on" : undefined}
-            onClick={() => onChange(p.id)}
-          >
-            {p.name}
-          </button>
-        ))}
-      </div>
+        {tr("Subskrypcja")}</span>
+      <Segmented
+        label={tr("Subskrypcja")}
+        value={(value ?? "") as ProviderId}
+        options={providers.map((p) => ({
+          value: p.id,
+          label: p.name,
+          disabled: !p.available,
+          hint: p.available ? (p.version ? `${p.name} ${p.version}` : p.name) : (p.problem ?? tr("Niedostępny")),
+        }))}
+        onChange={onChange}
+      />
       {broken.map((p) => (
         <p key={p.id} className="act-hint">
-          {p.name} niedostępny: {p.problem ?? "nie znaleziono polecenia."}
+          {p.name}  {tr("niedostępny:")} {p.problem ?? tr("nie znaleziono polecenia.")}
         </p>
       ))}
     </div>
@@ -189,6 +209,11 @@ function RecipeForm({ recipe, providers, runningBackground }: { recipe: Recipe; 
       if (problem) errs[projectParam.key] = problem;
     }
     setErrors(errs);
+    const firstInvalid = recipe.params.find((p) => errs[p.key]);
+    if (firstInvalid) {
+      requestAnimationFrame(() => document.getElementById(`act-p-${firstInvalid.key}`)?.focus());
+      return;
+    }
     if (Object.keys(errs).length) return;
     setBusy(mode);
     try {
@@ -205,12 +230,12 @@ function RecipeForm({ recipe, providers, runningBackground }: { recipe: Recipe; 
   const hasBackground = recipe.modes.includes("background");
   const hasTerminal = recipe.modes.includes("terminal");
   const noProvider = provider === null;
-  const backgroundBlocked = runningBackground ? "Inna akcja w tle jest w toku — poczekaj na jej koniec albo ją przerwij." : null;
+  const backgroundBlocked = runningBackground ? tr("Inna akcja w tle jest w toku — poczekaj na jej koniec albo ją przerwij.") : null;
 
   return (
-    <section className="act-form" aria-label={recipe.title}>
-      <h2 className="act-form-title">{recipe.title}</h2>
-      <p className="act-form-desc">{recipe.description}</p>
+    <section className="act-form" aria-label={tr(recipe.title)}>
+      <h2 className="act-form-title">{tr(recipe.title)}</h2>
+      <p className="act-form-desc">{tr(recipe.description)}</p>
 
       {recipe.params.map((p) => (
         <ParamField key={p.key} param={p} value={values[p.key] ?? ""} onChange={(v) => set(p.key, v)} projects={projects} error={errors[p.key]} />
@@ -228,24 +253,23 @@ function RecipeForm({ recipe, providers, runningBackground }: { recipe: Recipe; 
       <div className="act-buttons">
         {hasBackground && (
           <Button variant="primary" disabled={noProvider || runningBackground || busy !== null} onClick={() => void start("background")}>
-            {busy === "background" ? "Uruchamiam…" : "Uruchom w tle"}
+            {busy === "background" ? tr("Uruchamiam…") : tr("Uruchom w tle")}
           </Button>
         )}
         {hasTerminal && (
           <Button variant="ghost" disabled={noProvider || busy !== null} onClick={() => void start("terminal")}>
-            {busy === "terminal" ? "Otwieram…" : "Otwórz w terminalu"}
+            {busy === "terminal" ? tr("Otwieram…") : tr("Otwórz w terminalu")}
           </Button>
         )}
       </div>
       <div className="act-notes">
-        {noProvider && <p className="act-hint">Żaden agent nie jest dostępny — zainstaluj Claude Code albo Codex i zaloguj się.</p>}
-        {!hasBackground && <p className="act-hint">Ta akcja działa tylko w terminalu: tam możesz odpowiadać agentowi na bieżąco.</p>}
+        {noProvider && <p className="act-hint">{tr("Żaden agent nie jest dostępny — zainstaluj Claude Code albo Codex i zaloguj się.")}</p>}
+        {!hasBackground && <p className="act-hint">{tr("Ta akcja działa tylko w terminalu: tam możesz odpowiadać agentowi na bieżąco.")}</p>}
         {hasBackground && backgroundBlocked && <p className="act-hint">{backgroundBlocked}</p>}
-        {recipe.proposes && <p className="act-hint">Propozycje pojawią się w widoku projektu, w pasku Aktualizacja.</p>}
+        {recipe.proposes && <p className="act-hint">{tr("Propozycje pojawią się w widoku projektu, w pasku Aktualizacja.")}</p>}
         {recipe.background_writes && (
           <p className="act-hint act-warn">
-            Uruchomiona w tle, ta akcja dodaje zadania w MontyBrain bez pytania. W terminalu agent najpierw je zaproponuje.
-          </p>
+            {tr("Uruchomiona w tle, ta akcja dodaje zadania w MontyBrain bez pytania. W terminalu agent najpierw je zaproponuje.")}</p>
         )}
         {failure && (
           <p className="act-error" role="alert">
@@ -260,17 +284,17 @@ function RecipeForm({ recipe, providers, runningBackground }: { recipe: Recipe; 
 /** The in-app agent session ("moje narzędzia"), while there is one: opens its panel. */
 function SessionRow() {
   const { view } = useSession();
+  const vault = useVault();
   if (!view) return null;
   return (
-    <div className="act-session" role="group" aria-label="Sesja agenta">
+    <div className="act-session" role="group" aria-label={tr("Sesja agenta")}>
       <span className={`ags-dot st-${view.status}`} aria-hidden />
       <span className="act-session-text">
-        <span className="act-session-label">Sesja agenta · {providerName(view.provider)}</span> {view.request}
+        <span className="act-session-label">{tr("Sesja agenta ·")} {providerName(view.provider)} · {scopeLabel(view.scope, vault.view?.snapshot.projects ?? [])}</span> {view.request}
       </span>
       <span className="act-session-status">{SESSION_STATUS[view.status]}</span>
       <button type="button" className="btn btn-quiet" onClick={() => sessionStore.open()}>
-        Otwórz
-      </button>
+        {tr("Otwórz")}</button>
     </div>
   );
 }
@@ -306,30 +330,39 @@ export function ActionsView() {
   return (
     <div className="view actions">
       <header className="view-head">
-        <h1 className="view-title">Akcje</h1>
-        <p className="view-sub">Gotowe przepisy dla agenta. Uruchom w tle albo w terminalu, na wybranej subskrypcji.</p>
+        <h1 className="view-title">{tr("Akcje")}</h1>
+        <p className="view-sub">{tr("Gotowe przepisy dla agenta. Uruchom w tle albo w terminalu, na wybranej subskrypcji.")}</p>
       </header>
 
       <SessionRow />
 
       {loadError && !cat && (
         <div className="empty compact">
-          <p className="empty-title">Nie udało się wczytać akcji.</p>
+          <p className="empty-title">{tr("Nie udało się wczytać akcji.")}</p>
           <p className="empty-text">{loadError}</p>
         </div>
       )}
 
       {cat && (
         <div className="act-layout">
-          <aside className="act-side">
-            <div className="group-head">Przepisy</div>
-            <div className="act-recipes" role="group" aria-label="Przepisy">
+          <div className="act-picker">
+            <label className="act-label" htmlFor="act-recipe-picker">{tr("Przepis")}</label>
+            <select id="act-recipe-picker" className="field select" value={recipe?.id ?? ""} onChange={(e) => {
+              setRecipeId(e.target.value);
+              writePref(RECIPE_PREF, e.target.value);
+            }}>
+              {cat.recipes.map((r) => <option key={r.id} value={r.id}>{tr(r.title)}</option>)}
+            </select>
+          </div>
+          <aside className="act-catalog">
+            <div className="group-head">{tr("Przepisy")}</div>
+            <div className="act-recipes" role="group" aria-label={tr("Przepisy")}>
               {cat.recipes.map((r) => (
                 <button
                   key={r.id}
                   type="button"
                   aria-pressed={r.id === recipe?.id}
-                  aria-label={r.title}
+                  aria-label={tr(r.title)}
                   aria-describedby={`act-recipe-desc-${r.id}`}
                   className={`act-recipe${r.id === recipe?.id ? " on" : ""}`}
                   onClick={() => {
@@ -337,9 +370,9 @@ export function ActionsView() {
                     writePref(RECIPE_PREF, r.id);
                   }}
                 >
-                  <span className="act-recipe-title">{r.title}</span>
+                  <span className="act-recipe-title">{tr(r.title)}</span>
                   <span className="act-recipe-desc" id={`act-recipe-desc-${r.id}`}>
-                    {r.description}
+                    {tr(r.description)}
                   </span>
                   <span className="act-badges">
                     {r.modes.map((m) => (
@@ -347,16 +380,21 @@ export function ActionsView() {
                         {MODE_LABEL[m]}
                       </span>
                     ))}
-                    {r.background_writes && <span className="act-badge warn">zapisuje w MontyBrain</span>}
-                    {r.proposes && <span className="act-badge">zapis po akceptacji</span>}
+                    {r.background_writes && <span className="act-badge warn">{tr("zapisuje w MontyBrain")}</span>}
+                    {r.proposes && <span className="act-badge">{tr("zapis po akceptacji")}</span>}
                   </span>
                 </button>
               ))}
             </div>
-
-            <div className="group-head act-recent-head">Ostatnie uruchomienia</div>
+          </aside>
+          <div className="act-main">
+            {recipe && <RecipeForm key={recipe.id} recipe={recipe} providers={cat.providers} runningBackground={runs.active !== null} />}
+            {shown && <RunPanel key={shown.id} run={shown} recipe={cat.recipes.find((r) => r.id === shown.recipe) ?? null} />}
+          </div>
+          <aside className="act-history" aria-label={tr("Historia uruchomień")}>
+            <div className="group-head act-recent-head">{tr("Ostatnie uruchomienia")}</div>
             {runs.list.length === 0 ? (
-              <p className="act-hint">Jeszcze nic nie uruchomiono.</p>
+              <p className="act-hint">{tr("Jeszcze nic nie uruchomiono.")}</p>
             ) : (
               <ul className="act-runs">
                 {runs.list.map((r) => (
@@ -364,9 +402,9 @@ export function ActionsView() {
                     <button type="button" className={`act-run${r.id === shown?.id ? " on" : ""}`} onClick={() => runStore.select(r.id)}>
                       <span className={`act-dot st-${r.status}`} aria-hidden />
                       <span className="act-run-main">
-                        <span className="act-run-title">{r.recipe_title}</span>
+                        <span className="act-run-title">{tr(r.recipe_title)}</span>
                         <span className="act-run-sub">
-                          {PROVIDER_NAME[r.provider]} · {MODE_LABEL[r.mode]} · {r.mode === "terminal" ? "otwarto" : STATUS_LABEL[r.status].toLowerCase()}
+                          {PROVIDER_NAME[r.provider]} · {MODE_LABEL[r.mode]} · {r.mode === "terminal" ? tr("otwarto") : STATUS_LABEL[r.status].toLowerCase()}
                         </span>
                       </span>
                       <time className="act-run-time">{formatRunTime(r.started_at)}</time>
@@ -375,13 +413,9 @@ export function ActionsView() {
                 ))}
               </ul>
             )}
-            <p className="act-hint act-tiny">Lista znika po zamknięciu aplikacji.</p>
+            <p className="act-hint act-tiny">{tr("Historia uruchomień znika po zamknięciu aplikacji. Zapisane zadania i wpisy w dziennikach pozostają w projektach.")}</p>
           </aside>
 
-          <div className="act-main">
-            {recipe && <RecipeForm key={recipe.id} recipe={recipe} providers={cat.providers} runningBackground={runs.active !== null} />}
-            {shown && <RunPanel key={shown.id} run={shown} recipe={cat.recipes.find((r) => r.id === shown.recipe) ?? null} />}
-          </div>
         </div>
       )}
     </div>

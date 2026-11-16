@@ -25,9 +25,20 @@ describe("parseInline", () => {
     const src = '<img src=x onerror=alert(1)> [klik](javascript:alert(1)) <script>x</script>';
     expect(parseInline(src)).toEqual([{ t: "text", text: src }]);
   });
+  it("handles italics without breaking snake_case or math", () => {
+    expect(parseInline("*kursywa* i _podkreślenie_ oraz snake_case_name i 2 * 3 * 4")).toEqual([
+      { t: "italic", children: [{ t: "text", text: "kursywa" }] },
+      { t: "text", text: " i " },
+      { t: "italic", children: [{ t: "text", text: "podkreślenie" }] },
+      { t: "text", text: " oraz snake_case_name i 2 * 3 * 4" },
+    ]);
+    expect(parseInline("_foo_bar_")).toEqual([{ t: "italic", children: [{ t: "text", text: "foo_bar" }] }]);
+  });
   it("is linear on hostile input", () => {
     const t = Date.now();
     parseInline("**a ".repeat(100_000));
+    parseInline("*a ".repeat(100_000));
+    parseInline("_a ".repeat(100_000));
     parseInline("`a ".repeat(100_000));
     parseInline("x".repeat(1_000_000));
     expect(Date.now() - t).toBeLessThan(2000);
@@ -35,10 +46,12 @@ describe("parseInline", () => {
 });
 
 describe("parseMarkdown", () => {
-  it("splits paragraphs and headings", () => {
-    const b = parseMarkdown("# Tytuł\n\nPierwszy\nakapit\n\nDrugi");
-    expect(kinds(b)).toEqual(["heading", "p", "p"]);
-    expect(b[1]).toMatchObject({ inline: [{ t: "text", text: "Pierwszy\nakapit" }] });
+  it("splits paragraphs and headings with levels", () => {
+    const b = parseMarkdown("# Tytuł\n\n### Podtytuł\n\nPierwszy\nakapit\n\nDrugi");
+    expect(kinds(b)).toEqual(["heading", "heading", "p", "p"]);
+    expect(b[0]).toMatchObject({ t: "heading", level: 1 });
+    expect(b[1]).toMatchObject({ t: "heading", level: 3 });
+    expect(b[2]).toMatchObject({ inline: [{ t: "text", text: "Pierwszy\nakapit" }] });
   });
   it("parses lists with one nesting level", () => {
     const b = parseMarkdown("- a\n  - a1\n  - a2\n- b\n\n1. x\n2. y");

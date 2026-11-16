@@ -20,6 +20,7 @@ pub mod claude;
 pub mod codex;
 pub mod gate;
 pub mod proto;
+pub mod telemetry;
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -187,6 +188,7 @@ pub struct SessionView {
     pub error: Option<String>,
     /// Keys allowed "na tę sesję".
     pub remembered: Vec<String>,
+    pub telemetry: telemetry::Telemetry,
 }
 
 /// Where a session's changes and answers go (the Tauri side, or a test).
@@ -318,6 +320,33 @@ impl Live {
     /// Applies one act; returns the answer text when a turn ended with one.
     fn apply(&mut self, act: Act) -> Option<String> {
         match act {
+            Act::Connected(model) => {
+                self.view.telemetry.connected = true;
+                self.view.telemetry.model = model.map(|m| self.clean(&m));
+            }
+            Act::Usage(usage) => self.view.telemetry.usage = Some(usage),
+            Act::LimitStatus(status) => {
+                self.view.telemetry.limit_status = Some(status);
+                self.view.telemetry.limits_at = Some(telemetry::timestamp());
+            }
+            Act::Limits(limits) => {
+                if !limits.is_empty() { self.view.telemetry.limits_at = Some(telemetry::timestamp()); }
+                for limit in limits {
+                    if let Some(old) = self.view.telemetry.limits.iter_mut().find(|l| l.id == limit.id) {
+                        old.used_percent = limit.used_percent;
+                        old.reported_at = limit.reported_at;
+                        old.reset_label = limit.reset_label;
+                        if limit.window_minutes.is_some() {
+                            old.window_minutes = limit.window_minutes;
+                        }
+                        if limit.resets_at.is_some() {
+                            old.resets_at = limit.resets_at;
+                        }
+                    } else {
+                        self.view.telemetry.limits.push(limit);
+                    }
+                }
+            }
             Act::Write(l) => self.write(&[l]),
             Act::Text { key, text, append } => {
                 let text = if append { text } else { self.clean(&text) };
@@ -554,6 +583,7 @@ impl Sessions {
                 proposal: None,
                 error: None,
                 remembered: Vec::new(),
+                telemetry: telemetry::Telemetry::default(),
             },
             stdin,
             pgid,
@@ -649,9 +679,18 @@ impl Sessions {
         answers: Vec<(String, String)>,
     ) -> Result<(), String> {
         self.with_live(|l| {
-            let Some(r) = l.pending.remove(&entry) else {
+            let Some(request) = l.pending.get(&entry) else {
                 return Err("Na to pytanie nie można już odpowiedzieć.".into());
             };
+            // Do not consume a multi-question request after a partial answer.
+            if !matches!(answer, Answer::Deny)
+                && request.questions.iter().any(|q| {
+                    answers.iter().filter(|(id, text)| id == &q.id && !text.trim().is_empty()).count() != 1
+                })
+            {
+                return Err("Odpowiedz na wszystkie pytania przed wysłaniem.".into());
+            }
+            let r = l.pending.remove(&entry).expect("pending request checked above");
             let decision = if !r.questions.is_empty() {
                 match answer {
                     Answer::Deny => Decision::Answers(Vec::new()),

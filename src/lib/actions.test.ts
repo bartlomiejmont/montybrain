@@ -25,7 +25,7 @@ const raport: Recipe = {
     { key: "project", label: "Projekt", kind: "project", required: false, placeholder: null, default: null },
   ],
 };
-const prov = (id: "claude" | "codex", available: boolean): ProviderInfo => ({ id, name: id, available, path: null, version: null, problem: null });
+const prov = (id: "claude" | "codex", available: boolean): ProviderInfo => ({ id, name: id, available, path: null, version: null, problem: null, auth: { status: "unknown", method: null, plan: null, problem: null } });
 
 describe("params", () => {
   it("initial values use defaults", () => {
